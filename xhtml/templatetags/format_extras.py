@@ -1,0 +1,48 @@
+# coding: utf-8
+
+#
+#    Copyright 2013 Roma servizi per la mobilità srl
+#    Developed by Luca Allulli and Damiano Morosi
+#
+#    This file is part of Muoversi a Roma for Developers.
+#
+#    Muoversi a Roma for Developers is free software: you can redistribute it
+#    and/or modify it under the terms of the GNU General Public License as
+#    published by the Free Software Foundation, version 2.
+#
+#    Muoversi a Roma for Developers is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+#    or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+#    for more details.
+#
+#    You should have received a copy of the GNU General Public License along with
+#    Muoversi a Roma for Developers. If not, see http://www.gnu.org/licenses/.
+#
+
+from django import template
+from django.utils.translation import ugettext as _
+
+register = template.Library()
+
+def sec2min(secs):
+	return int(round(secs/60.0))
+
+def sec2min_lab(secs):
+	m = sec2min(secs)
+	if m == 1:
+		return _("1 minuto")
+	return _("%d minuti") % m
+
+def arrotonda_distanza(n):
+	step = 50
+	k = round(n / float(step)) * step
+	if k == 0:
+		return _("meno di %.0f metri") % step
+	if k > 1000:
+		return _("%.1f km") % (k / 1000.0)
+	return _("%.0f metri") % k
+
+
+register.filter('sec2min', sec2min)
+register.filter('sec2min_lab', sec2min_lab)
+register.filter('arrotonda_distanza', arrotonda_distanza)

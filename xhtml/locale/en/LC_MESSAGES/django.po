@@ -1,0 +1,70 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2013-04-17 16:43+0200\n"
+"PO-Revision-Date: 2013-04-17 16:35+0100\n"
+"Last-Translator: \n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 1.5.4\n"
+
+#: middleware.py:228
+msgid "d/m/y H:i"
+msgstr "d/m/y H:i"
+
+#: templates/base.html:74 templates/base5.html:71
+msgid "Aggiorna"
+msgstr "Refresh"
+
+#: templates/base.html:75 templates/base5.html:72
+msgid "Indietro"
+msgstr "Back"
+
+#: templates/base.html:77 templates/base5.html:74
+msgid "Menu"
+msgstr "Home"
+
+#: templates/problemi-tecnici.html:7
+msgid ""
+"Per problemi tecnici il servizio momentaneamente non &egrave; disponibile."
+msgstr "We apologize, service is temporarily unavailable."
+
+#: templates/problemi-tecnici.html:8
+msgid "Ci scusiamo per il disagio e vi invitiamo a riprovare in seguito."
+msgstr "Please try later."
+
+#: templatetags/format_extras.py:12
+msgid "1 minuto"
+msgstr "1 minute"
+
+#: templatetags/format_extras.py:13
+#, python-format
+msgid "%d minuti"
+msgstr "%d minutes"
+
+#: templatetags/format_extras.py:19
+#, python-format
+msgid "meno di %.0f metri"
+msgstr "less than %.0f meters"
+
+#: templatetags/format_extras.py:21
+#, python-format
+msgid "%.1f km"
+msgstr "%.1f km"
+
+#: templatetags/format_extras.py:22
+#, python-format
+msgid "%.0f metri"
+msgstr "%.0f meters"
+
+#~ msgid "l j F - H:i"
+#~ msgstr "l j F - h:i A"

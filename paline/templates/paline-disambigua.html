@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% load i18n %}
+{% load history %}
+{% load format_extras %}
+
+{% block content %}
+
+	<p>
+		<form id="linea" method="get" action="/paline">
+		{{ form.cerca }}
+	  <input type="submit" name="Submit" value="Cerca" />
+	  {% formhist %}
+	 </form>
+	</p>
+
+	{% if paline_semplice %}
+		<h2>{% trans "Fermate trovate" %}</h2>
+		{% for p in paline_semplice %}
+			<img class="dot" src="/xhtml/s/img/red_bullet.gif" height="5" width="13" alt="*" />
+			<a href='{% hist %}/paline/palina/{{ p.id_palina }}{% endhist %}'>{{ p.nome_ricapitalizzato }} ({{ p.id_palina}})</a><br />
+		{% endfor %}
+	{% endif %}
+
+	{% if paline_extra %}
+		<h2>{% trans "Fermate trovate" %}</h2>
+		{% for p in paline_extra %}
+			{% if request.GET.mostra_tutto or not p.nascosta %}
+				<p>
+					<a href='{% hist %}/paline/palina/{{ p.id_palina }}{% endhist %}'>{{ p.nome_ricapitalizzato }} ({{ p.id_palina}})</a>
+					{% if p.distanza %}
+						({{ p.distanza|arrotonda_distanza }})
+					{% endif %}
+					<br />
+					{% for l in p.linee_info %}
+						<img class="dot" src="/xhtml/s/img/red_bullet.gif" height="5" width="13" alt="*" />
+						<a href='{% hist %}/paline/linea/{{ l.linea.id_linea }}{% endhist %}'>{{ l.linea.id_linea }}</a> {% trans "Direz." %} {{ l.arrivo.nome_ricapitalizzato }}<br />
+					{% endfor %}
+					{% if p.linee_extra %}
+						<img class="dot" src="/xhtml/s/img/red_bullet.gif" height="5" width="13" alt="*" />
+						{% trans "Altre linee:" %}
+							{% for l in p.linee_extra %}
+								<a href='{% hist %}/paline/linea/{{ l.linea.id_linea }}{% endhist %}'>{{ l.linea.id_linea }}</a>
+							{% endfor %}				
+					{% endif %}
+				</p>
+			{% endif %}
+		{% endfor %}
+		{% if paline_nascoste and not request.GET.mostra_tutto %}
+			<p class="vskip">
+				{% trans "Alcune fermate sono state nascoste perch&eacute; non vi transitano altre linee bus" %}
+				(<a href="{% addparam "mostra_tutto=1" %}">{% trans "mostra tutto" %}</a>).
+			</p>
+		{% endif %}
+	<p>
+		<img class="dot" width="13" height="7" src="/news/s/img/right_bullet.gif" alt="*" />
+		<a href="/percorso/js/?query={{ cerca }}&amp;cl=1&amp;lf=0" target="_blank">{% trans "Mappa interattiva" %}</a>
+	</p>		
+	{% endif %}
+	
+	{% if percorsi %}
+		<h2>{% trans "Linee trovate" %}</h2>
+		<p>
+		{% for p in percorsi %}
+			<img class="dot" src="/xhtml/s/img/red_bullet.gif" height="5" width="13" alt="*" />
+			<a href='{% hist %}/paline/percorso/{{ p.id_percorso }}{% endhist %}'>{{ p.linea.id_linea }}
+			{% if p.decodeCarteggio %}{{ p.decodeCarteggio }} {% endif %}{% blocktrans with dest=p.arrivo.nome_ricapitalizzato %}Direz. {{ dest }}{% endblocktrans %}</a>
+			{% if not p.linea.monitorata %}
+				<br /><img class="dot" src="/xhtml/s/img/blank_bullet.gif" height="5" width="13" alt="*" />
+				({% trans "non monitorata" %})
+			{% else %}
+				{% if not p.abilitata_complessivo %}
+					<br /><img class="dot" src="/xhtml/s/img/blank_bullet.gif" height="5" width="13" alt="*" />
+					{% if p.news_disabilitazione_complessivo %}
+						(<a href="{% hist %}/news/dettaglio/{{ p.news_disabilitazione_complessivo.prima_categoria.id_categoria }}/{{ p.news_disabilitazione_complessivo.id_news }}{% endhist %}">{% trans "non disponibile" %}</a>)
+					{% else %}
+						({% trans "non disponibile" %})
+					{% endif %}
+				{% endif %}
+			{% endif %}
+			<br />
+		{% endfor %}
+		</p>
+	{% endif %}
+
+{% endblock %}

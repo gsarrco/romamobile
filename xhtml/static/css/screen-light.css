@@ -1,0 +1,310 @@
+* {
+	font-family: Tahoma, Lucida Grande, Verdana, sans-serif;
+}
+body {
+	margin: 0em;
+	background-color:#fff;
+	background-image:url('/xhtml/s/img/bg.png');
+	background-attachment: fixed;
+	background-position: 0px 50px;
+}
+p {
+  margin: 0.5em 0em 0.5em 0em;
+}
+h1,h2,h3,h4,h5,h6,.date {
+	font-size: 1em;
+	font-weight: bold;
+  margin: 0.6em 0em 0.5em 0em;
+}
+h2 {
+	/*color: #13985f;*/
+
+}
+h1 {
+	color: #8E001C;
+	padding-left: 0.5em;
+	padding-top: 0em;
+	margin: 0em;
+}
+
+h1 a {
+	color: #ffffff;
+}
+a img {
+	border: 0;
+	text-decoration: none;
+}
+h3 {
+	/*color: #13985f;*/
+}
+a {
+	color: #8e001c;
+	font-weight: bold;
+	text-decoration: none;
+	border-bottom: 1px dotted;	
+}
+input, textarea {
+	color: #000000;
+}
+
+select, select option {
+	color: #000000;
+}
+
+.b {
+	font-weight: bold;
+}
+.i {
+	font-style:italic;
+}
+.c {
+	text-align:center;
+}
+.disabled {
+	color: #999999;
+}
+.small {
+	font-size: small;	
+}
+
+/* Blocco stili header */
+#header {
+	margin-bottom: 0px;
+	height: 50px;
+}
+#rsm-dx {
+	position:absolute;
+	top:0px;
+	left:0px;
+	width: 100%;
+	height: 50px;
+	background-image: url(/xhtml/s/img/sfondo-logo.png);
+	background-repeat: repeat-x;
+	z-index: -2;
+}
+#rsm-sx {
+	position:absolute;
+	top:0px;
+	left:0px;
+	height:50px;
+	width:153px;
+}
+
+#orario {
+		position: absolute;
+		right: 15px;
+		top: 31px;
+		color: #ffffff;
+		font-weight: bold;
+		font-size: small;
+		font-stretch: condensed;
+}
+
+.navtop {
+	position: absolute;
+	top: 50px;
+	left: 0px;
+	padding-top: 7px;
+	padding-left: 5px;
+	height: 24px;
+	width: 100%;
+}
+
+
+
+/* blocco stili contenuto centrale */
+#main {
+	margin: 0em;
+	padding-left: 0.5em;
+	padding-bottom: 0.5em;
+	padding-right: 0.5em;
+	padding-top: 0em;
+	background-color: #fff;
+}
+
+#main a {
+		text-decoration: none;
+		line-height: 1.4 em;
+}
+
+#title {
+		line-height: 1em;
+		margin-top: 5px;
+		margin-bottom: 15px;
+}
+#title #indietro a {
+		color: #8E001C;
+		margin-left: 3px;
+}
+#title a {
+		margin-left: 8px;
+		text-decoration: none;
+		vertical-align: text-bottom;
+}
+#title #aggiorna {
+		position: absolute;
+		right: 15px;
+}
+#title #aggiorna a{
+		text-decoration: none;
+}
+#title table tr td {
+		height: 1.5em;
+}
+#content {
+		
+}
+
+/* blocco stili footer */
+#footer {
+		padding-bottom: 5px;
+		border-top: 3px solid #8e001c;
+		background-color: #13985f;
+		background-repeat: repeat;
+		z-index: -2;
+}
+#footer #navbottom {
+	margin: 0.1em 0.2em 0.2em 0.5em;
+	color: #fff;
+}
+#footer #navbottom a {
+		color: #fff;
+}
+#footer #info {
+		padding-top: 6px;
+		padding-bottom: 6px;
+		color: #ffffff;
+		font-size: small;
+		font-stretch: condensed;
+		height: 24px;
+		background-image: url(/xhtml/s/img/sfondo-logo-2.png);
+		background-repeat: repeat-x;
+}
+#footer #info * {
+		vertical-align: middle;
+}
+
+.icon {
+	vertical-align: middle;
+}
+.middle {
+	vertical-align: middle;
+}
+.menulink {
+	vertical-align: middle;
+	border-bottom: 1px dotted;	
+}
+.menuitem {
+	padding: 2px 0px 2px 0px;
+}
+.dot {
+	vertical-align: middle;
+}
+.emph {
+	color: #13985F;
+	background-color:#B8E0CF;
+}
+.banda0, .banda1, .banda2 {
+	margin-left: -0.5em;
+	margin-right: -0.5em;
+	border-bottom: #84132D dashed 0.1em;
+	padding: 0.3em;
+}
+
+.banda1 {
+	border-left: #84132D solid 0.3em;
+}
+.banda2, .banda0 {
+	border-left: #B8E0CF solid 0.3em;
+}
+
+
+.banda0 {
+	border-top: #84132D dashed 0.1em;
+}
+.nota {
+	margin-top: 3em;
+	font-size: 0.8em;
+}
+.ak {
+  background-color: #999999;
+  color: #FFFFFF;
+  border-left: #999999 solid 0.2em;
+  border-right: #999999 solid 0.2em;
+  border-top: #999999 solid 0.1em;
+  border-bottom: #999999 solid 0.1em;
+  width: 3em;
+}
+.nak {
+  background-color: transparent;
+  color: transparent;
+  border-color: transparent;
+  border-left: solid 0.2em;
+  border-right: solid 0.2em;
+  border-top: solid 0.1em;
+  border-bottom: solid 0.1em;
+}
+.vskip {
+	margin-top: 0.8em;
+}
+.hskip {
+		margin-left: 10px;
+		margin-right: 5px;
+}
+.hid, .hid1 {
+	color: #FFFFFF;
+}
+.hid0, .hid2 {
+	color: #E8E8E8;
+}
+.notifiche {
+	background-color: #efefef;
+	color: #13985F;
+	margin-top: 0.8em;
+	margin-bottom: 0.6em;
+	padding: 0.2em;
+	text-align:left;
+	border-style: solid;
+	border-color: #84132D;
+	border-width: 1px 1px 1px 5px;
+}
+.notifiche a {
+	color: #009b48;
+	text-decoration: none;
+}
+.infobox {
+	background-color: #E8E8E8;
+	color: #13985F;
+	font-size: 0.8em;
+	padding: 0.4em;
+	margin-top: 0.7em;
+	margin-bottom: 0.7em;
+	border-left: #84132D solid 2px;	
+}
+
+.infobox .b {
+	color: #822433;
+}
+
+.hlform {
+	background-color: #D2B0B6;
+}
+.nound {
+	border-bottom: none;
+}
+
+.indented {
+	margin-left: 10px;
+}
+.selected {
+	background-color: #E8E8E8;
+	border-left: #84132D solid 2px;
+}
+.selected a {
+	color: #8e001c;
+}
+.category {
+	font-weight: bold;
+	color: #13985f;
+	margin-top: 12px;
+}

@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load history %}
+
+{% block content %}
+<h2>{{ nome }}</h2>
+<p>
+	{% if palina %}
+		<img class="dot" width="13" height="7" src="/news/s/img/right_bullet.gif" alt="*" /> <a href="#mappa">{% trans "Collocazione fermata e mappa" %}</a><br />
+	{% endif %}	
+	{% if request.user.is_authenticated %}
+		{% if aggiungi and not request.user|in_group:"readonly" %}
+			<img class="dot" width="13" height="7" src="/news/s/img/right_bullet.gif" alt="*" /> <a href="{% hist %}/paline/preferiti/aggiungi/{{ aggiungi }}{% endhist %}">{% trans "Aggiungi alle fermate preferite e imposta notifiche" %}</a><br />
+		{% endif %}
+		<img class="dot" width="13" height="7" src="/news/s/img/right_bullet.gif" alt="*" /> <a href="{% hist %}/paline/disservizio/{% if id_palina %}{{ id_palina }}{% else %}gruppo/{{ id_gruppo }}{% endif %}{% endhist %}">{% trans "Segnala un disservizio" %}</a>
+	{% endif %}
+</p>
+{% for pal in primi_per_palina %}
+	{% if palina %}
+		<h3>{% trans "Riepilogo delle linee con i primi arrivi" %}</h3>
+	{% else %}
+		<h3>{% trans "Riepilogo fermata" %} {{ pal.nome_palina }}</h3>
+	{% endif %}
+	{% for a in pal.arrivi %}
+		<img class="dot" src="/xhtml/s/img/red_bullet.gif" height="5" width="13" alt="*" />
+		{% if a.id_percorso %}
+			<span class="b"><a href="{% hist %}/paline/percorso/{{ a.id_percorso }}?id_palina={{ a.id_palina }}&amp;id_veicolo={{ a.id_veicolo }}#pal{% endhist %}">{{ a.linea }}{% if a.carteggi %} ({{ a.carteggi}}){% endif %}</a>:</span>
+		{% else %}
+			<span class="b"><a href="{% hist %}/paline/linea/{{ a.linea }}?id_palina={{ a.id_palina }}#pal{% endhist %}">{{ a.linea }}</a>:</span>
+		{% endif %}
+		{% if a.disabilitata %}
+			{% if a.news %}
+				<a href="{% hist %}/news/dettaglio/{{ a.news.prima_categoria.id_categoria }}/{{ a.news.id_news }}{% endhist %}">{% trans "Non disponibile" %}</a>
+			{% else %}
+				{% trans "Non disponibile" %}
+			{% endif %}
+		{% else %}
+			{% if a.non_monitorata %}
+				{% trans "Non monitorata" %}
+			{% else %}
+				{% if a.nessun_autobus %}
+					{% trans "Nessun autobus" %}
+				{% else %}
+					{{ a.annuncio }}
+					{% if a.partenza %}
+						{% blocktrans with partenza=a.partenza %}(partenza {{ partenza }}){% endblocktrans %}
+					{% endif %}
+				{% endif %}
+			{% endif %}
+		{% endif %}
+		<br />
+	{% endfor %}
+{% endfor %}
+
+{% if id_palina %}
+	<p>
+		{% trans "Calcola un percorso da qui a" %}:
+		<form id="path" method="get" action="/percorso/da_palina/{{ id_palina }}">
+			{{ percorso_form.stop_address }}
+			<input type="submit" name="Submit" value="{% trans "Vai" %}" />
+			{% formhist %}
+		</form>
+	</p>
+{% endif %}
+
+<h3>{% trans "Tutti gli arrivi" %}</h3>
+{% for a in arrivi %}
+	<div class="banda{{ a.banda }}">
+		<span class="b"><a href="{% hist %}/paline/percorso/{{ a.id_percorso }}?id_palina={{ a.id_palina }}&amp;id_veicolo={{ a.id_veicolo }}#pal{% endhist %}">{{ a.linea }}{% if a.carteggi %} ({{ a.carteggi}}){% endif %}</a>:</span>
+		{% if a.nessun_autobus %}
+			{% trans "Nessun autobus" %}
+		{% else %}
+			{{ a.annuncio }}
+			{% if a.partenza %}
+				{% blocktrans with partenza=a.partenza %}(partenza {{ partenza }}){% endblocktrans %}
+			{% endif %}
+		{% endif %}		
+		{% if a.destinazione %}
+			<br />
+			{% blocktrans with dest=a.destinazione %}<span class="b">Direz.:</span> {{ dest }}{% endblocktrans %}
+		{% endif %}
+	
+		{% if mostra_palina %}
+			<br />
+			<span class="b">{% trans "Fermata" %}:</span> {{ a.nome_palina }}
+		{% endif %}
+		<br />
+		<img class="icon" alt="{{ a.pedanaalt }}" src="/paline/s/img/{{ a.pedana }}.gif" width="15" height="15" />
+		<img class="icon" alt="{{ a.mebalt }}" src="/paline/s/img/{{ a.meb }}.gif" width="15" height="15" />
+		<img class="icon" alt="{{ a.ariaalt }}" src="/paline/s/img/{{ a.aria }}.gif" width="15" height="15" />
+		<img class="icon" alt="{{ a.mobyalt }}" src="/paline/s/img/{{ a.moby }}.gif" width="15" height="15" />
+	</div>
+{% endfor %}
+
+{% if request.GET.legend %}
+<div id="legend">
+
+	<h2 class="vskip">Legenda</h2>
+	<p><img class="icon" src="/paline/s/img/pedana.gif" alt="D" width="15" height="15" /> = {% trans "Pedana disabili" %}<br />
+	<img class="icon" src="/paline/s/img/meb.gif" alt="B" width="15" height="15" /> = {% trans "Emettitrice di biglietti" %}<br />
+	<img class="icon" src="/paline/s/img/aria.gif" alt="A" width="15" height="15" /> = {% trans "Aria condizionata" %}<br />
+	<img class="icon" src="/paline/s/img/moby.gif" alt="M" width="15" height="15" /> = {% trans "Moby" %}</p>
+
+	{% if carteggi %}
+	<p>
+		{% for c in carteggi %}
+		<span class="b">&nbsp;{{ c.nome }}</span> = {{ c.descrizione }}<br />
+		{% endfor %}
+	</p>
+	{% endif %}
+</div>
+{% else %}
+	<p class="vskip">(<a href="{% addparam "legend=1#legend" %}">{% trans "Mostra legenda" %}</a>)</p>
+{% endif %}
+
+{% if palina %}
+	<a name="mappa"></a>
+	<h2 class="vskip">{%trans "Informazioni sulla fermata" %}</h2>
+	<p>
+		<span class="b">{% trans "Nome" %}: </span>{{ palina.nome_ricapitalizzato }}<br />
+		<span class="b">{% trans "Collocazione" %}: </span>{{ palina.descrizione }}
+	</p>
+	{% if mappa %}
+		<div class="c">
+		<p>
+			<img src="http://maps.googleapis.com/maps/api/staticmap?{{mappa}}" alt="Mappa"/><br/>
+				{% if zoom_down %}
+					<a href="{% nohist %}/paline/mappa-palina/static/{{id_palina}}/{{zoom_down}}/{{center_x}}/{{center_y}}#mappa{% endnohist %}" class="nound">[-]</a>
+				{% else %}
+					<span class="disabled">[-]</span>
+				{% endif %}
+				{% if zoom_up %}
+					<a href="{% nohist %}/paline/mappa-palina/static/{{id_palina}}/{{zoom_up}}/{{center_x}}/{{center_y}}#mappa{% endnohist %}" class="nound">[+]</a>
+				{% else %}
+					<span class="disabled">[+]</span>
+				{% endif %}<br />
+				<a href="{% nohist %}/paline/mappa-palina/static/{{id_palina}}/{{zoom}}/{{center_x}}/{{up}}#mappa{% endnohist %}" class="nound">^</a><br />
+				<a href="{% nohist %}/paline/mappa-palina/static/{{id_palina}}/{{zoom}}/{{left}}/{{center_y}}#mappa{% endnohist %}" class="nound">&lt;</a> +
+				<a href="{% nohist %}/paline/mappa-palina/static/{{id_palina}}/{{zoom}}/{{right}}/{{center_y}}#mappa{% endnohist %}" class="nound">&gt;</a><br />
+				<a href="{% nohist %}/paline/mappa-palina/static/{{id_palina}}/{{zoom}}/{{center_x}}/{{down}}#mappa{% endnohist %}" class="nound">v</a>
+		</p>
+		</div>
+		<p>
+			<img class="dot" width="13" height="7" src="/news/s/img/right_bullet.gif" alt="*" />
+			<a href="/percorso/js/?query={{ palina.id_palina }}&amp;cl=1&amp;lf=0" target="_blank">{% trans "Mappa interattiva" %}</a>	
+		</p>		
+	{% else %}
+		<img class="dot" width="13" height="7" src="/news/s/img/right_bullet.gif" alt="*" />
+		<a href="{% nohist %}/paline/mappa-palina/static/{{palina.id_palina}}#mappa{% endnohist %}">{% trans "Mappa base" %}</a><br />
+		<img class="dot" width="13" height="7" src="/news/s/img/right_bullet.gif" alt="*" />
+		<a href="/percorso/js/?query={{ palina.id_palina }}&amp;cl=1&amp;lf=0" target="_blank">{% trans "Mappa interattiva" %}</a>		
+	{% endif %}
+
+{% endif %}
+
+
+{% endblock %}
+

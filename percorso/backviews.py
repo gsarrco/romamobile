@@ -1,0 +1,65 @@
+# coding: utf-8
+
+#
+#    Copyright 2013 Roma servizi per la mobilità srl
+#    Developed by Luca Allulli and Damiano Morosi
+#
+#    This file is part of Muoversi a Roma for Developers.
+#
+#    Muoversi a Roma for Developers is free software: you can redistribute it
+#    and/or modify it under the terms of the GNU General Public License as
+#    published by the Free Software Foundation, version 2.
+#
+#    Muoversi a Roma for Developers is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+#    or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+#    for more details.
+#
+#    You should have received a copy of the GNU General Public License along with
+#    Muoversi a Roma for Developers. If not, see http://www.gnu.org/licenses/.
+#
+
+from models import *
+from django.db import models, connections, transaction
+from servizi.utils import dict_cursor, project, datetime2mysql, group_required
+from datetime import datetime, timedelta, time, date
+from jsonrpc import jsonrpc_method
+import rpyc
+import cPickle as pickle
+import views
+from pprint import pprint
+import urlparse
+
+
+@jsonrpc_method('percorso_cerca', safe=True)
+def percorso_cerca(
+	request,
+	indirizzo_partenza,
+	indirizzo_arrivo,
+	opzioni,
+	orario,
+	lang,
+	offset
+):
+	try:
+		orario = datetime.strptime(orario, '%d/%m/%Y %H:%M')
+	except Exception:
+		return {
+			'errore-data': True,
+		}
+
+	return views.cerca(
+		request, 
+		'',
+		indirizzo_partenza,
+		indirizzo_arrivo,
+		opzioni,
+		orario.strftime('%Y-%m-%d %H:%M:%S'),
+		lang,
+		offset
+	)
+	
+@jsonrpc_method('urldecode', safe=True)
+def urldecode(request, urlparams):
+	d = urlparse.parse_qs(urlparams)
+	return dict([(k, d[k][0]) for k in d])

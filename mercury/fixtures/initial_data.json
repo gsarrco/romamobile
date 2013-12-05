@@ -1,0 +1,112 @@
+[
+{
+  "pk": 1, 
+  "model": "mercury.peertype", 
+  "fields": {
+    "name": "cpd"
+  }
+},
+{
+  "pk": 3, 
+  "model": "mercury.peertype", 
+  "fields": {
+    "name": "giano"
+  }
+},
+{
+  "pk": 4, 
+  "model": "mercury.peertype", 
+  "fields": {
+    "name": "web"
+  }
+},
+{
+  "pk": 5, 
+  "model": "mercury.peertype", 
+  "fields": {
+    "name": "watchdog"
+  }
+},
+{
+  "pk": 6, 
+  "model": "mercury.peertype", 
+  "fields": {
+    "name": "carica_rete"
+  }
+},
+{
+  "pk": 1, 
+  "model": "mercury.route", 
+  "fields": {
+    "active": true, 
+    "sender": 4, 
+    "receiver": 1
+  }
+},
+{
+  "pk": 2, 
+  "model": "mercury.route", 
+  "fields": {
+    "active": true, 
+    "sender": 5, 
+    "receiver": 3
+  }
+},
+{
+  "pk": 3, 
+  "model": "mercury.route", 
+  "fields": {
+    "active": false, 
+    "sender": 4, 
+    "receiver": 3
+  }
+},
+{
+  "pk": 4, 
+  "model": "mercury.route", 
+  "fields": {
+    "active": true, 
+    "sender": 6, 
+    "receiver": 1
+  }
+},
+{
+  "pk": 1, 
+  "model": "mercury.daemoncontrol", 
+  "fields": {
+    "name": "giano", 
+    "restart_from": "00:00:00", 
+    "instances": 1, 
+    "restart_timeout": 0, 
+    "command": "python manage.py runtrovalinea_new tr mini", 
+    "action": "N", 
+    "restart_to": "23:59:00"
+  }
+},
+{
+  "pk": 2, 
+  "model": "mercury.daemoncontrol", 
+  "fields": {
+    "name": "cpd", 
+    "restart_from": "00:00:00", 
+    "instances": 1, 
+    "restart_timeout": 0, 
+    "command": "python manage.py runtrovalinea_new cpd mini download", 
+    "action": "N", 
+    "restart_to": "23:59:00"
+  }
+},
+{
+  "pk": 3, 
+  "model": "mercury.daemoncontrol", 
+  "fields": {
+    "name": "watchdog", 
+    "restart_from": "00:00:00", 
+    "instances": 1, 
+    "restart_timeout": 0, 
+    "command": "python manage.py run_mercury_watchdog watchdog", 
+    "action": "N", 
+    "restart_to": "23:59:00"
+  }
+}
+]

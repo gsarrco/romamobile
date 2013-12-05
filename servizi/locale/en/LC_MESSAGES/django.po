@@ -1,0 +1,301 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2013-11-20 11:24+0100\n"
+"PO-Revision-Date: 2013-11-20 11:24+0100\n"
+"Last-Translator: \n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 1.5.4\n"
+
+#: .\infopoint.py:120 .\infopoint.py:123 .\infopoint.py:196 .\infopoint.py:199
+msgid "Punto su mappa"
+msgstr "Point on map"
+
+#: .\infopoint.py:378
+msgid "ita"
+msgstr "eng"
+
+#: .\utils.py:200
+msgid "Lu"
+msgstr "Mon"
+
+#: .\utils.py:200
+msgid "Ma"
+msgstr "Tue"
+
+#: .\utils.py:200
+msgid "Me"
+msgstr "Wed"
+
+#: .\utils.py:200
+msgid "Gi"
+msgstr "Thu"
+
+#: .\utils.py:200
+msgid "Ve"
+msgstr "Fri"
+
+#: .\utils.py:200
+msgid "Sa"
+msgstr "Sat"
+
+#: .\utils.py:200
+msgid "Do"
+msgstr "Sun"
+
+#: .\utils.py:202
+msgid "lu"
+msgstr "mo"
+
+#: .\utils.py:202
+msgid "ma"
+msgstr "tu"
+
+#: .\utils.py:202
+msgid "me"
+msgstr "we"
+
+#: .\utils.py:202
+msgid "gi"
+msgstr "th"
+
+#: .\utils.py:202
+msgid "ve"
+msgstr "fr"
+
+#: .\utils.py:202
+msgid "sa"
+msgstr "sa"
+
+#: .\utils.py:202
+msgid "do"
+msgstr "su"
+
+#: .\utils.py:204
+msgid "Lunedì"
+msgstr "Monday"
+
+#: .\utils.py:204
+msgid "Martedì"
+msgstr "Tuesday"
+
+#: .\utils.py:204
+msgid "Mercoledì"
+msgstr "Wednesday"
+
+#: .\utils.py:204
+msgid "Giovedì"
+msgstr "Thursday"
+
+#: .\utils.py:204
+msgid "Venerdì"
+msgstr "Friday"
+
+#: .\utils.py:204
+msgid "Sabato"
+msgstr "Saturday"
+
+#: .\utils.py:204
+msgid "Domenica"
+msgstr "Sunday"
+
+#: .\utils.py:206
+msgid "lunedì"
+msgstr "monday"
+
+#: .\utils.py:206
+msgid "martedì"
+msgstr "tuesday"
+
+#: .\utils.py:206
+msgid "mercoledì"
+msgstr "wednesday"
+
+#: .\utils.py:206
+msgid "giovedì"
+msgstr "thursday"
+
+#: .\utils.py:206
+msgid "venerdì"
+msgstr "friday"
+
+#: .\utils.py:206
+msgid "sabato"
+msgstr "saturday"
+
+#: .\utils.py:206
+msgid "domenica"
+msgstr "sunday"
+
+#: .\utils.py:229
+msgid "H:i"
+msgstr "h:i A"
+
+#: .\utils.py:392
+msgid "Conferma"
+msgstr "Ok"
+
+#: .\utils.py:393
+msgid "Annulla"
+msgstr "Cancel"
+
+#: .\views.py:201
+msgid "Ricerche recenti:"
+msgstr "Recently searched:"
+
+#: .\views.py:328
+msgid "Accesso effettuato"
+msgstr "Logged in"
+
+#: .\views.py:418 .\views.py:459
+msgid "La notifica non esiste"
+msgstr "Notification does not exist"
+
+#: .\views.py:450
+msgid "La fascia non esiste"
+msgstr "Time slot does not exist"
+
+#: .\templates\login_richiesto.html.py:10
+#, python-format
+msgid ""
+"\n"
+"\t\t\tPer visualizzare la pagina richiesta &egrave; necessario <a href="
+"\"http://login.muoversiaroma.it/GestioneAccount.aspx?IdSito=%(id_sito)s"
+"\">autenticarsi</a>.\n"
+"\t\t"
+msgstr ""
+"\n"
+"\t\t\t<a href=\"http://login.muoversiaroma.it/GestioneAccount.aspx?IdSito=%"
+"(id_sito)s\">Please login</a>.\n"
+"\t\t"
+
+#: .\templates\notifiche_fasce.html.py:6
+msgid "Impostazioni avanzate notifiche"
+msgstr "Advanced notification settings"
+
+#: .\templates\notifiche_fasce.html.py:9
+msgid ""
+"La notifica richiesta &egrave; sempre attiva. Puoi limitare le fasce orarie "
+"in cui vuoi ricevere le notifiche."
+msgstr ""
+"Your notification is continuously active now. You can define some time "
+"slots, and limit the validity of your notification to them."
+
+#: .\templates\notifiche_fasce.html.py:12
+msgid "Fasce orarie in cui ricevi la notifica:"
+msgstr "Time slots when you receive your notification:"
+
+#: .\templates\notifiche_fasce.html.py:16
+#, python-format
+msgid ""
+"\n"
+"\t\t\tDalle %(oi)s alle %(of)s di %(g)s\n"
+"\t\t"
+msgstr ""
+"\n"
+"\t\tFrom  %(oi)s to %(of)s of %(g)s\n"
+"\t\t"
+
+#: .\templates\notifiche_fasce.html.py:23
+msgid "Aggiungi un'altra fascia oraria"
+msgstr "Add another time slot"
+
+#: .\templates\notifiche_fasce.html.py:27
+msgid "Dalle ore"
+msgstr "From"
+
+#: .\templates\notifiche_fasce.html.py:28
+msgid "alle ore"
+msgstr "to"
+
+#: .\templates\notifiche_fasce.html.py:35
+msgid "Aggiungi fascia"
+msgstr "Add time slot"
+
+#: .\templates\richiedi-conferma.html.py:4
+msgid "Conferma azione"
+msgstr "Confirm"
+
+#: .\templates\servizi_new.html.py:12 .\templates\servizi_new.html.py:19
+msgid "Accedi"
+msgstr "Login"
+
+#: .\templates\servizi_new.html.py:14
+#, python-format
+msgid ""
+"\n"
+"\t\t\t\t\t<a href=\"http://login.muoversiaroma.it/GestioneAccount.aspx?"
+"IdSito=%(id_sito)s\">%(nome)s</a> (<a href=\"/servizi/logout\">Logout</a>)\n"
+"\t\t\t\t"
+msgstr ""
+"\n"
+"\t\t\t\t\t<a href=\"http://login.muoversiaroma.it/GestioneAccount.aspx?"
+"IdSito=%(id_sito)s\">%(nome)s</a> (<a href=\"/servizi/logout\">Logout</a>)\n"
+"\t\t\t\t"
+
+#: .\templates\servizi_new.html.py:26
+msgid "Cerca linea e cerca percorso"
+msgstr "Routes and bus waiting times"
+
+#: .\templates\servizi_new.html.py:29
+msgid "Sono qui"
+msgstr "I'm here"
+
+#: .\templates\servizi_new.html.py:29
+msgid "indirizzo, fermata o linea"
+msgstr "address, bus stop or line"
+
+#: .\templates\servizi_new.html.py:34
+msgid "Vado qui"
+msgstr "I'm going here"
+
+#: .\templates\servizi_new.html.py:34
+msgid "facoltativo"
+msgstr "optional"
+
+#: .\templates\servizi_new.html.py:39
+msgid "Cerca"
+msgstr "Search"
+
+#: .\templates\servizi_new.html.py:40
+msgid "Ritorno"
+msgstr "Way back"
+
+#: .\templates\servizi_new.html.py:45
+msgid "Mobilit&agrave; pubblica o sostenibile"
+msgstr "Public transport"
+
+#: .\templates\servizi_new.html.py:61
+msgid "Mobilit&agrave; privata"
+msgstr "Private transport"
+
+#: .\templates\servizi_new.html.py:77
+msgid "Altro"
+msgstr "Other"
+
+#~ msgid "Percorsi e tempi di attesa bus"
+#~ msgstr "Bus routes and waiting times"
+
+#~ msgid "Opzioni"
+#~ msgstr "Advanced"
+
+#~ msgid "Sfondo chiaro"
+#~ msgstr "Light background"
+
+#~ msgid "Sfondo scuro"
+#~ msgstr "Dark background"
+
+#~ msgid "Accedi o registrati"
+#~ msgstr "Login or register"
+
+#~ msgid "Correggi le seguenti informazioni:"
+#~ msgstr "Please correct:"

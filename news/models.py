@@ -1,0 +1,67 @@
+# coding: utf-8
+
+#
+#    Copyright 2013 Roma servizi per la mobilità srl
+#    Developed by Luca Allulli and Damiano Morosi
+#
+#    This file is part of Muoversi a Roma for Developers.
+#
+#    Muoversi a Roma for Developers is free software: you can redistribute it
+#    and/or modify it under the terms of the GNU General Public License as
+#    published by the Free Software Foundation, version 2.
+#
+#    Muoversi a Roma for Developers is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+#    or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+#    for more details.
+#
+#    You should have received a copy of the GNU General Public License along with
+#    Muoversi a Roma for Developers. If not, see http://www.gnu.org/licenses/.
+#
+
+from django.db import models
+from servizi.utils import oggetto_con_max, oggetto_con_min
+
+class AssNewsCategoria(models.Model):
+	id_news = models.ForeignKey('News', db_column='id_news')
+	id_categoria = models.ForeignKey('Categoria', db_column='id_categoria')
+
+class Categoria(models.Model):
+	id_categoria = models.IntegerField(primary_key=True)
+	codice_lingua = models.CharField(max_length=6)
+	nome = models.CharField(max_length=93)
+	posizione = models.IntegerField(null=True, blank=True)
+	
+		
+	def news_by_date(self):
+		return self.news_set.order_by('-data_pubblicazione')
+
+class News(models.Model):
+	id_news = models.IntegerField(primary_key=True)
+	codice_lingua = models.CharField(max_length=6)
+	titolo = models.CharField(max_length=765)
+	contenuto = models.TextField()
+	data_pubblicazione = models.DateTimeField()
+	primo_piano = models.IntegerField()
+	categorie = models.ManyToManyField(Categoria, through='AssNewsCategoria')
+	
+	def prima_categoria(self):
+		cs = self.categorie.all()
+		if len(cs) > 0:
+			return cs[0]
+		# Ogni news deve avere almeno una categoria. Se per qualche motivo non ne ha una,
+		# restituiamo una categoria arbitraria per soddisfare i prerequisiti dei clienti
+		return Categoria.objects.all()[0]
+	
+		
+	def precedente(self, categoria):
+		try:
+			return oggetto_con_min(News.objects.filter(data_pubblicazione__gt=self.data_pubblicazione, codice_lingua=self.codice_lingua, categorie=categoria), 'data_pubblicazione')
+		except News.DoesNotExist as e:
+			return None
+		
+	def successiva(self, categoria):
+		try:
+			return oggetto_con_max(News.objects.filter(data_pubblicazione__lt=self.data_pubblicazione, codice_lingua=self.codice_lingua, categorie=categoria), 'data_pubblicazione')
+		except News.DoesNotExist as e:
+			return None

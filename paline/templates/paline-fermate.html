@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load history %}
+
+{% block InternalStyle %}
+	<style>
+		.stato-1 {
+			border-left: #999999 solid 0.24em;
+			padding-left: 0.4em;
+			margin-bottom: 2px;
+		}
+		.stato0 {
+			border-left: none;
+			padding-left: 0.64em;
+			margin-bottom: 2px;
+		}	
+		.stato1 {
+			border-left: #000000 solid 0.24em;
+			padding-left: 0.4em;
+			margin-bottom: 2px;			
+		}
+		.stato2 {
+			border-left: #FF0000 solid 0.24em;
+			padding-left: 0.4em;
+			margin-bottom: 2px;			
+		}
+		.stato3 {
+			border-left: #FFD800 solid 0.24em;
+			padding-left: 0.4em;
+			margin-bottom: 2px;			
+		}
+		.stato4 {
+			border-left: #00FF00 solid 0.24em;
+			padding-left: 0.4em;
+			margin-bottom: 2px;
+		}		
+	</style>
+{% endblock %}
+
+{% block content %}
+
+<h2>{% blocktrans with l=percorso.linea.id_linea c=percorso.decodificaCarteggio d=percorso.arrivo.nome_ricapitalizzato %} Percorso {{ l }} {{ c }} Direz. {{ d }}{% endblocktrans %}</h2>
+{% if id_veicolo %}
+	<p><span class="b">{% trans "Arrivi previsti per la vettura: " %}</span>{{ id_veicolo }}</p>
+{% endif %}
+
+{% if mappa %}
+	<div class="c">
+	<p>
+		<img src="http://maps.googleapis.com/maps/api/staticmap?{{mappa}}" alt="Mappa"/><br/>
+			{% if zoom_down %}
+				<a href="{% nohist %}/paline/mappa/static/{{id_percorso}}/{{zoom_down}}/{{center_x}}/{{center_y}}{% endnohist %}" class="nound">[-]</a>
+			{% else %}
+				<span class="disabled">[-]</span>
+			{% endif %}
+			{% if zoom_up %}
+				<a href="{% nohist %}/paline/mappa/static/{{id_percorso}}/{{zoom_up}}/{{center_x}}/{{center_y}}{% endnohist %}" class="nound">[+]</a>
+			{% else %}
+				<span class="disabled">[+]</span>
+			{% endif %}<br />
+			<a href="{% nohist %}/paline/mappa/static/{{id_percorso}}/{{zoom}}/{{center_x}}/{{up}}{% endnohist %}" class="nound">^</a><br />
+			<a href="{% nohist %}/paline/mappa/static/{{id_percorso}}/{{zoom}}/{{left}}/{{center_y}}{% endnohist %}" class="nound">&lt;</a> +
+			<a href="{% nohist %}/paline/mappa/static/{{id_percorso}}/{{zoom}}/{{right}}/{{center_y}}{% endnohist %}" class="nound">&gt;</a><br />
+			<a href="{% nohist %}/paline/mappa/static/{{id_percorso}}/{{zoom}}/{{center_x}}/{{down}}{% endnohist %}" class="nound">v</a>
+	</p>
+	</div>
+	<p>
+		<img class="dot" width="13" height="7" src="/news/s/img/right_bullet.gif" alt="*" />
+		<a href="/percorso/js/?id_percorso={{ percorso.id_percorso }}&amp;lf=0" target="_blank">{% trans "Mappa interattiva" %}</a>
+	</p>
+{% else %}
+	<p>
+		<img class="dot" width="13" height="7" src="/news/s/img/right_bullet.gif" alt="*" />
+		<a href="{% nohist %}/paline/mappa/static/{{percorso.id_percorso}}{% endnohist %}">{% trans "Mappa base" %}</a><br />
+		<img class="dot" width="13" height="7" src="/news/s/img/right_bullet.gif" alt="*" />
+		<a href="/percorso/js/?id_percorso={{ percorso.id_percorso }}&amp;lf=0" target="_blank">{% trans "Mappa interattiva" %}</a>	
+	</p>
+{% endif %}
+
+{% if not percorso.no_orari %}
+	<h2>{% trans "Partenze dal capolinea" %}</h2>
+	{% if orari_partenza %}	
+		<p>
+		{% for op in orari_partenza %}
+			{% if op.minuti %}
+				<span class="b">{{ op.ora }}:</span>{% for m in op.minuti %} {{ m }}{% endfor %}<br />
+			{% endif %}
+		{% endfor %}
+		{% if nessuna_partenza %}
+			{% trans "Nella giornata selezionata il percorso non &egrave; attivo." %}
+		{% endif %}
+		</p> 
+		<h3>{% trans "Altri giorni" %}</h3>
+		<p>
+			{% for g in giorni_partenza %}
+				{% if g.mysql == giorno_partenza_attivo %}
+					<span class="b">&raquo; {{ g.format }}</span> 
+				{% else %}
+					&raquo;  <a href="{% nohist %}/paline/percorso/{{ percorso.id_percorso }}?partenze=1&amp;data={{ g.mysql }}{% endnohist %}">{{ g.format }}</a> 
+				{% endif %}<br />
+			{% endfor %}
+		</p>
+	{% else %}
+		<p>
+			{% if nessuna_partenza %}
+				{% trans "Oggi il percorso non &egrave; attivo." %}
+			{% else %}
+				{% for o in orari_partenza_vicini %}{{ o.orario_partenza|time:"H:i" }} {% endfor %}
+			{% endif %}
+		</p>
+		<p>
+			(<a href="{% nohist %}/paline/percorso/{{ percorso.id_percorso }}?partenze=1{% endnohist %}">{% trans "Altri orari" %}</a>)
+		</p>
+	{% endif %}
+{% endif %}
+
+<h2>{% trans "Fermate" %}</h2>
+{% if disabilitato %}
+	<p><span class="b">{% trans "Siamo spiacenti, il servizio temporaneamente non &egrave; disponibile per questo percorso." %}</span><br />
+	{% trans "In ogni caso ecco le fermate:" %}</p>
+{% else %}
+	<p>{% trans "Seleziona una fermata oppure una vettura." %}</p>	
+{% endif %}
+
+<p>
+	{% for f in fermate %}
+		{% if not f.soppressa %}
+			<div class="stato{{ f.stato_traffico }}">
+				{% if f.veicolo %}
+					<a class="nound" href="{% nohist %}/paline/percorso/{{ percorso.id_percorso }}?id_veicolo={{ f.veicolo.id_veicolo }}{% if id_palina %}&amp;id_palina={{ id_palina }}{% endif %}{% endnohist %}"><img class="dot" {% if id_palina == f.id_palina %}id="pal" {% endif %}src="/paline/s/img/bus{% if id_veicolo == f.veicolo.id_veicolo %}_hl{% endif %}.png" height="20" width="20" alt="B" /></a>
+				{% else %}
+					<img class="dot" {% if id_palina == f.id_palina %}id="pal" {% endif %}src="/paline/s/img/{% if f.id_palina == percorso.arrivo.id_palina %}stop_arrow.gif{% else %}down_arrow.gif{% endif %}" height="7" width="20" alt="*" />
+				{% endif %}
+				{% if mostra_arrivi %}
+					{% if f.orario_arrivo %}
+						{{ f.orario_arrivo }}
+					{% else %}
+						{% trans "--:--" %}
+					{% endif %}
+				{% endif %}
+				<a href='{% hist %}/paline/palina/{{ f.id_palina }}{% endhist %}'>{% if id_palina == f.id_palina %}<span class="emph">{{ f.nome_ricapitalizzato }}</span>{% else %}{{ f.nome_ricapitalizzato }}{% endif %}</a>
+				{% if not mostra_arrivi %}
+					(<a href="{% hist %}/paline/mappa/static/{{percorso.id_percorso}}?id_palina={{f.id_palina}}{% endhist %}" class="small">{% trans "Mappa" %}</a>)
+				{% endif %}
+			</div>
+		{% endif %}
+	{% endfor %}
+</p>
+<h2>{% trans "Altri percorsi della linea" %}</h2>
+<p>
+{% for p in percorsi %}
+	{% if p != percorso %}
+		<img class="dot" src="/xhtml/s/img/red_bullet.gif" height="5" width="13" alt="*" />
+		<a href='{% hist %}/paline/percorso/{{ p.id_percorso }}{% endhist %}'>{{ p.linea.id_linea }}
+		{% if p.decodeCarteggio %}{{ p.decodeCarteggio }} {% endif %}{% blocktrans with dest=p.arrivo.nome_ricapitalizzato %}Direz. {{ dest }}{% endblocktrans %}</a>
+		{% if not p.linea.monitorata %}
+			<br /><img class="dot" src="/xhtml/s/img/blank_bullet.gif" height="5" width="13" alt="*" />
+			({% trans "non monitorata" %})
+		{% else %}
+			{% if not p.abilitata_complessivo %}
+				<br /><img class="dot" src="/xhtml/s/img/blank_bullet.gif" height="5" width="13" alt="*" />
+				{% if p.news_disabilitazione_complessivo %}
+					(<a href="{% hist %}/news/dettaglio/{{ p.news_disabilitazione_complessivo.prima_categoria.id_categoria }}/{{ p.news_disabilitazione_complessivo.id_news }}{% endhist %}">{% trans "non disponibile" %}</a>)
+				{% else %}
+					({% trans "non disponibile" %})
+				{% endif %}
+			{% endif %}
+		{% endif %}
+		<br />
+	{% endif %}
+{% endfor %}
+</p>
+<p>
+	{% blocktrans with l=percorso.linea.id_linea g=percorso.linea.gestore.descrizione %}La linea {{ l }} &egrave; gestita da {{ g }}.{% endblocktrans %}
+</p>
+{% if request.GET.legend %}
+	<div id="legend">
+	
+	<h2 class="vskip">{% trans "Legenda" %}</h2>
+	<p>
+	<img class="dot" src="/paline/s/img/green.gif" alt="S" width="15" height="8" /> = {% trans "Pi&ugrave di 15 km/h" %}<br />
+	<img class="dot" src="/paline/s/img/yellow.gif" alt="I" width="15" height="8" /> = {% trans "10-15 km/h" %}<br />
+	<img class="dot" src="/paline/s/img/red.gif" alt="C" width="15" height="8" /> = {% trans "5-10 km/h" %}<br />
+	<img class="dot" src="/paline/s/img/black.gif" alt="B" width="15" height="8" /> = {% trans "Meno di 5 km/h" %}<br />
+	<img class="dot" src="/paline/s/img/grey.gif" alt="N" width="15" height="8" /> = {% trans "Informazioni non disponibili" %}<br />
+	</p>
+	</div>
+{% else %}
+	<p class="vskip">(<a href="{% addparam "legend=1#legend" %}">{% trans "Mostra legenda" %}</a>)</p>
+{% endif %}
+
+	
+{% endblock %}

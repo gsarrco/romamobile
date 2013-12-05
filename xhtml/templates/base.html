@@ -1,0 +1,101 @@
+{% load i18n %}{% load history %}<?xml version="1.0" encoding="utf-8"?>
+{% if  amFlavor == 'default' %}
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+{% else %}
+<!DOCTYPE html PUBLIC "-//WAPFORUM//DTD XHTML Mobile 1.2//EN" "http://www.openmobilealliance.org/tech/DTD/xhtml-mobile12.dtd">
+{% endif %}
+<html xmlns="http://www.w3.org/1999/xhtml">
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		{% if autorefresh %}
+		<meta http-equiv="refresh" content="{{ autorefresh }}" />
+		{% endif %}
+		<meta name="robots" content="nofollow" />
+		<meta name="description" content="Muoversi a Roma nasce per informare e aggiornare sulla mobilità pubblica e privata i cittadini, i turisti, i pendolari, i city user" />
+		<meta name="keywords" content="muoversi, roma, mobilità, trasporto pubblico, informazione, infomobilità, mobile, atacmobile, tempi di attesa, trovalinea, calcolo del percorso, mappa" />
+		<title>Muoversiaroma.it Mobile</title>
+		<link href="/xhtml/s/css/screen{{request.session.theme}}.css" rel="stylesheet" type="text/css" />
+		{% block InternalStyle %}
+		{% endblock %}{% block fullscript %}{% endblock %}
+	</head>
+
+	{% block custombody %}<body>{% endblock %}
+	{% if not request.GET.onlycontent %}
+		<div id="header">
+			<div id="rsm-sx"><a class="nound" href="/?nav=0&amp;back=1"><img src="/xhtml/s/img/muoversiaroma.png" width="153" height="50" alt="logo" /></a></div>
+			<div id="rsm-dx"></div>
+			<div id="orario">{{ DateTime }}</div>
+			{% if beta %}<div id="beta">Versione BETA</div>{% endif %}
+		</div>
+		
+		<div id="main">
+			{% block title %}
+				{% if servizio %}
+					<div id="title">
+						<span id="indietro"><a class="nound" href="{{ history_1 }}">&laquo;</a></span>
+						<a href="{{ history_service_url }}">{{ servizio.descrizione }}{% if sottotitolo %} - {{ sottotitolo }}{% endif %}</a>
+						<span id="aggiorna"><a href="{{ refresh }}" class="nound"><img src="/xhtml/s/img/reload{{request.session.theme}}.png"/></a></span>
+					</div>
+				{% endif %}
+			{% endblock %}
+			
+			{% if notifiche %}
+				<div class="notifiche">
+					{% for n in notifiche %}
+						{% if n.icona %}
+							<img class="dot" width="n.icona.width" height="n.icona.height" src="{{ n.icona.src }}" alt="*" />
+						{% else %}
+							<img class="dot" width="13" height="7" src="/news/s/img/right_bullet.gif" alt="*" />
+						{% endif %}
+						{% if n.pk %}
+							<a href="{% hist %}/servizi/notifiche/{{ n.pk }}{% endhist %}">{{ n.messaggio }}</a><br />
+						{% else %}
+							{% if n.link %}
+								<a href="{% hist %}{{ n.link }}{% endhist %}">{{ n.messaggio }}</a><br />
+							{% else %}
+								{{ n.messaggio }}<br />
+							{% endif %}
+						{% endif %}
+					{% endfor %}
+				</div>
+			{% endif %}
+	{% endif %}
+
+			{% block content %}
+				Benvenuto in Muoversi a Roma!
+			{% endblock %}
+
+	{% if not request.GET.onlycontent %}
+		</div>
+		<div id="footer">
+			<div id="navbottom">
+			{% block NavigationBottom %}
+				{% if servizio %}
+					&laquo; <a href="{{ refresh }}">{% trans "Aggiorna" %}</a><br />
+					&laquo; <a href="{{ history_1 }}">{% trans "Indietro" %}</a><br />
+					&laquo; <a href="{{ history_service_url }}">{{ history_service_name }}</a><br />
+					&laquo; <a href="/?nav=0&amp;back=1">{% trans "Menu" %}</a><br />
+				{% endif %}
+			{% endblock %}
+			</div>
+			<div id="info">
+				<table style="width: 100%; border: none; padding: 0px; margin: 0px; border-collapse: collapse;">
+					<tr>
+						<td style="padding-left: 5px; vertical-align: middle">
+							<a href="http://www.muoversiaroma.it/muoversiaroma/home.aspx?version=marclassic" class="nound"><img src="/xhtml/s/img/ico-pc.png" alt="Versione PC"/></a>
+							<a href="/facebook" class="nound"><img src="/xhtml/s/img/ico-fb.png" alt="Facebook"/></a>
+							<a href="/twitter" class="nound"><img src="/xhtml/s/img/ico-tw.png" alt="Twitter"/></a>
+						</td>
+						<td style="padding-right: 5px; text-align: right">
+								{{ DebugString }}
+								{{ Nota }}
+								&copy; {{ now|date:"Y" }} Roma servizi per la mobilit&agrave; s.r.l.
+						</td>
+					</tr>
+				</table>
+				<img src="{{ GoogleAnalytics }}" style="display: none" alt="" />
+			</div>
+		</div>
+	{% endif %}
+	</body>
+</html>
