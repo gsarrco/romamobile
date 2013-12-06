@@ -2,7 +2,7 @@
 
 #
 #    Copyright 2013 Roma servizi per la mobilità srl
-#    Developed by Luca Allulli and Damiano Morosi
+#    Developed by Luca Allulli, Damiano Morosi and Davide Valvason
 #
 #    This file is part of Muoversi a Roma for Developers.
 #
