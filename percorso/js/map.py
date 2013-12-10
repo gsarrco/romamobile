@@ -72,7 +72,7 @@ def list_to_point_array(l):
 	return punti
 
 class MapPanel(SimplePanel):
-	def __init__(self, owner):
+	def __init__(self, owner, display_callback=None):
 		SimplePanel.__init__(self)
 		self.owner = owner
 		self.owner.add(self)
@@ -85,6 +85,7 @@ class MapPanel(SimplePanel):
 		map = self.map
 		func = self.onRightClick
 		self.addStyleName('pyjsmapid')
+		self.display_callback=display_callback
 		JS("""
 			$wnd['google'].maps.event.addListener(map, 'rightclick', function(event) {
 				var lat = event.latLng.lat();
@@ -118,6 +119,10 @@ class MapPanel(SimplePanel):
 		if self.open_bubble is not None:
 			self.open_bubble.closeBubble()
 		self.open_bubble = new_bubble
+		
+	def display(self):
+		if self.display_callback is not None:
+			self.display_callback()
 		
 	def addLayerPanel(self, lp):
 		self.layer_panels.append(lp)
@@ -159,6 +164,7 @@ class MapPanel(SimplePanel):
 		return onLoadLayer
 			
 	def loadNewLayer(self, layer_name, func_name, func_id, onDone=None, toggle=None, reload=False, info_panel=None, on_error=None):
+		self.display()
 		l = self.layerByName(layer_name)
 		if l is not None:
 			if reload:
@@ -415,6 +421,7 @@ class Marker:
 
 	def openBubble(self, new_content=None):
 		self.layer.map_panel.replace_bubble(self)
+		self.layer.map_panel.display()
 		map = self.layer.getMap()
 		if new_content is not None:
 			self.bubble.setContent(new_content)

@@ -85,4 +85,4 @@ pattern_list = [
 urlpatterns = patterns('', *pattern_list)
 
 handler404 = 'xhtml.views.handler404'
-handler500 = 'xhtml.views.handler500'
+# handler500 = 'xhtml.views.handler500'

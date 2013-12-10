@@ -303,17 +303,30 @@ class UtenteGenerico(models.Model):
 	def by_request(cls, request):
 		if request is None:
 			return
-		if request.user.is_authenticated():
-			return cls.objects.get(utente=request.user)
-		else:
-			return cls.objects.get(sessione=request.session.session_key)
+		try:
+			if request.user.is_authenticated():
+				return cls.objects.filter(utente=request.user)[0]
+			else:
+				return cls.objects.filter(sessione=request.session.session_key)[0]
+		except Exception:
+			return
 		
 	@classmethod
 	def update(cls, request):
 		if request.user.is_authenticated():
-			ug = cls.objects.get_or_create(utente=request.user)[0]
+			ugs = cls.objects.filter(utente=request.user)
+			if len(ugs) > 0:
+				ug = ugs[0]
+			else: 
+				ug = cls(utente=request.user)
+				ug.save()
 		else:
-			ug = cls.objects.get_or_create(sessione=request.session.session_key)[0]
+			ugs = cls.objects.filter(sessione=request.session.session_key)
+			if len(ugs) > 0:
+				ug = ugs[0]
+			else: 
+				ug = cls(sessione=request.session.session_key)
+				ug.save()			
 		ug.ultimo_aggiornamento = datetime.now()
 		ug.save()
 		return ug

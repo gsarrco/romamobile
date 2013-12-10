@@ -964,7 +964,7 @@ class FrequenzaPercorso(models.Model):
 	a_minuto = models.IntegerField(default=59)
 	
 class PartenzeCapilinea(models.Model):
-	id_percorso = models.CharField(db_index=True, max_length=30)
+	id_percorso = models.CharField(max_length=30, primary_key=True)
 	orario_partenza = models.DateTimeField(db_index=True)
 		
 	class Meta:
@@ -1121,7 +1121,7 @@ class LogCercaPercorso(models.Model):
 	metro = models.BooleanField()
 	fr = models.BooleanField()
 	fc = models.BooleanField()
-	auto = models.BooleanField()
+	auto = models.IntegerField()
 	carpooling = models.BooleanField()
 	linee_escluse = models.CharField(max_length=127)
 	

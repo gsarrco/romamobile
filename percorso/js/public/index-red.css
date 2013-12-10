@@ -883,3 +883,16 @@ color: white;
 	background-color: #83092B;
 	color: white;
 }
+.modo-active {
+	background-color: #888888;
+}
+.modo-inactive {
+}
+.modo-inactive:hover {
+	background-color: #BBBBBB;
+}
+.TooltipPopup {
+    background-color:#fafb7b;
+    border: 1px solid black;
+    padding: 1px 3px 1px 3px;
+}

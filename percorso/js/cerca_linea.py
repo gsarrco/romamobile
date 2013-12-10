@@ -272,7 +272,7 @@ class CercaLineaPanel(SimplePanel, KeyboardHandler, FocusHandler):
 	def onRightClick(self, lat, lng):
 		query = self.base.by_name('query')
 		query.setText('punto:(%s,%s)' % (lat, lng))
-		self.owner.setTabCercaLinea()
+		self.owner.setTabMappaLinea()
 		self.createClLayer()
 		m = Marker(
 			self.cl_layer,
@@ -307,7 +307,7 @@ class CercaLineaPanel(SimplePanel, KeyboardHandler, FocusHandler):
 		self.mostra_tutto.setVisible(False)
 	
 	def createClLayer(self):
-		self.owner.setTabCercaLinea()
+		self.owner.setTabMappaLinea()
 		if self.cl_layer is not None:
 			self.cl_layer.destroy()
 		self.map.hideAllLayers()

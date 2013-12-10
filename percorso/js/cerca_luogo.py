@@ -205,7 +205,7 @@ class CercaLuogoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 	def onRightClick(self, lat, lng):
 		query = self.base.by_name('query')
 		query.setText('punto:(%s,%s)' % (lat, lng))
-		self.owner.setTabCercaLuogo()
+		self.owner.setTabMappaLuogo()
 		self.onCerca()
 
 	def onKeyDown(self, sender, keycode, modifiers):

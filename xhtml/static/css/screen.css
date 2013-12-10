@@ -119,6 +119,9 @@ select, select option {
 		font-weight: bold;
 		font-size: small;
 }
+#beta a {
+	color: #84132D;
+}
 .navtop {
 	position: absolute;
 	top: 50px;

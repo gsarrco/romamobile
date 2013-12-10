@@ -702,7 +702,7 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 		self.cercaPercorso()
 		
 	def createCpLayer(self):
-		self.owner.setTabCercaPercorso()
+		self.owner.setTabMappaPercorso()
 		if self.cp_layer is not None:
 			self.cp_layer.destroy()
 		self.map.hideAllLayers()

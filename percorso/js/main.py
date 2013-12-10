@@ -72,6 +72,9 @@ class ControlPanel(HidingPanel):
 		HidingPanel.__init__(self)
 		self.owner = owner
 		self.map = None
+		self.map_tab = None
+		self.small = False
+		self.layers = None
 		self.split = VerticalSplitPanel()
 		self.split.setSize('100%', '100%')
 		self.split.setSplitPosition('90%')
@@ -84,22 +87,24 @@ class ControlPanel(HidingPanel):
 		
 		self.cerca_percorso = CercaPercorsoPanel(self, self.map)
 		self.cerca_percorso.setSize('100%', '100%')
-		self.tab.add(self.cerca_percorso, "Cerca percorso")
+		self.tab.add(self.cerca_percorso, "Percorso")
 		self.tab.selectTab(0)
 		
 		self.cerca_linea = CercaLineaPanel(self, self.map)
 		self.cerca_linea.setSize('100%', '100%')
-		self.tab.add(self.cerca_linea, "Cerca linea")
+		self.tab.add(self.cerca_linea, "Linea")
 			
 		self.cerca_luogo = CercaLuogoPanel(self, self.map)
 		self.cerca_luogo.setSize('100%', '100%')
-		self.tab.add(self.cerca_luogo, "Cerca luogo")			
+		self.tab.add(self.cerca_luogo, "Luogo")
+		
+		self.tab.addTabListener(self)
 			
 		self.add(self.split)
 		
 	def onUrldecode(self, params):
 		if 'lf' in params and params['lf'] == 0:
-			self.hide()		
+			self.hide()
 		cp_params = self.cerca_percorso.availableParams()
 		for p in cp_params:
 			if p in params:
@@ -131,18 +136,73 @@ class ControlPanel(HidingPanel):
 	def setTabCercaLuogo(self):
 		self.tab.selectTab(2)
 		
+	def setTabMappaPercorso(self):
+		if self.small:
+			self.tab.selectTab(3)
+		else:
+			self.tab.selectTab(0)
+			
+	def setTabMappaLinea(self):
+		if self.small:
+			self.tab.selectTab(3)
+		else:
+			self.tab.selectTab(1)
+			
+	def setTabMappaLuogo(self):
+		if self.small:
+			self.tab.selectTab(3)
+		else:
+			self.tab.selectTab(2)
+
+	def setTabMappa(self):
+		if self.small:
+			self.tab.selectTab(3)
+		
 	def cercaPercorsoRisorse(self, da, tipi, a=None):
 		self.setTabCercaPercorso()
 		self.cerca_percorso.cercaPercorsoRisorse(da, tipi, a)
 	
-		
 	def setMap(self, map):
 		self.map = map
 		self.cerca_percorso.setMap(map)
 		self.cerca_linea.setMap(map)
 		self.cerca_luogo.setMap(map)
-		self.split.setBottomWidget(LayerHolder(map))
+		self.layers = LayerHolder(map)
+		self.split.setBottomWidget(self.layers)
 		
+	def setLayers(self, layers):
+		self.layers = layers
+		
+	def onBeforeTabSelected(self, sender, index):
+		return True
+		
+	def onTabSelected(self, sender, index):
+		if index == 3:
+			self.map.relayout()
+		
+	
+	def setSmallLayout(self):
+		self.small = True
+		self.map_tab = SimplePanel()
+		self.map_tab.add(self.map)
+		self.map_tab.setSize('100%', '100%')
+		self.tab.add(self.map_tab, "Mappa")
+		self.map.setSize('100%', '100%') #self.tab.getClientHeight())
+		self.tab.add(self.layers, "Layer")
+		self.map.relayout()
+		
+	def setLargeLayout(self):
+		self.small = False
+		self.tab.remove(self.layers)
+		self.map_tab.remove(self.map)
+		self.tab.remove(self.map_tab)
+		self.split.setTopWidget(self.tab)
+		self.split.setBottomWidget(self.layers)
+		self.layers.setVisible(True)
+		
+	def updateSplitter(self):
+		if not self.small:
+			self.split.setSplitPosition('90%')
 
 class LayerHolder(SimplePanel):
 	def __init__(self, map):
@@ -179,7 +239,7 @@ class MainPanel(HorizontalPanel):
 	
 		
 		# map panel
-		self.map = MapPanel(self)
+		self.map = MapPanel(self, self.displayMap)
 		self.map.setSize('100%', '100%')
 		self.add(self.map)
 		self.setCellWidth(self.map, '100%')
@@ -190,8 +250,25 @@ class MainPanel(HorizontalPanel):
 		self.control.addHideListener(self.onHide)
 		self.setSize("100%", "100%")
 
-
 	def onHide(self, source):
+		self.map.relayout()
+		
+	def displayMap(self):
+		self.control.setTabMappa()
+				
+	def setSmallLayout(self):
+		self.remove(self.control)
+		self.remove(self.map)
+		self.add(self.control.tab)
+		self.control.setSmallLayout()
+		
+	def setLargeLayout(self):
+		self.control.setLargeLayout()
+		self.add(self.control)
+		self.setCellHeight(self.control, '100%')
+		self.add(self.map)
+		self.setCellWidth(self.map, '100%')
+		self.setCellHeight(self.map, '100%')
 		self.map.relayout()
 		
 def getRawParams():
@@ -201,9 +278,12 @@ class GeneralPanel(VerticalPanel):
 	def __init__(self):
 		VerticalPanel.__init__(self)
 		raw_params = getRawParams()
+		self.small = False
+		self.has_header = False
 
 		if raw_params.find('iframe=0') == -1:
 			# header
+			self.has_header = True
 			self.header = HorizontalPanel()
 			self.header.setSize('100%', '58px')
 			self.add(self.header)
@@ -216,6 +296,7 @@ class GeneralPanel(VerticalPanel):
 			self.copy.addStyleName('copy')
 			self.header.add(self.copy)
 			self.header.setCellHorizontalAlignment(self.copy, HasAlignment.ALIGN_RIGHT)
+			self.small = False
 			
 		# main
 		self.main = MainPanel()
@@ -225,8 +306,35 @@ class GeneralPanel(VerticalPanel):
 		self.setSize('100%', '100%')
 		client.urldecode(getRawParams(), JsonHandler(self.onUrldecode))
 		
+	def setSmallLayout(self):
+		if not self.small:
+			self.small = True
+			if self.has_header:
+				self.remove(self.header)
+			self.main.setSmallLayout()
+			bb = DOM.getElementById("bitbucket")
+			if bb is not None:
+				par = DOM.getParent(bb)
+				DOM.removeChild(par, bb)			
+		
+	def setLargeLayout(self):
+		if self.small:
+			self.small = False
+			self.main.setLargeLayout()
+			if self.has_header:
+				self.insert(self.header, 0)
+			self.setCellHeight(self.header, '58px')
+
+		
 	def onUrldecode(self, params):
 		self.main.control.onUrldecode(params)
+		
+	def onWindowResized(self):
+		if int(self.getClientWidth()) < 640:
+			self.setSmallLayout()
+		else:
+			self.setLargeLayout()
+		self.main.control.updateSplitter()
 	
 if __name__ == '__main__':
 	rp = RootPanel()
@@ -234,6 +342,7 @@ if __name__ == '__main__':
 	par = DOM.getParent(splash)
 	DOM.removeChild(par, splash)
 	gp = GeneralPanel()
-	#rp.add(gp.main.control.tab)
 	rp.add(gp)
-
+	if int(gp.getClientWidth()) < 640:
+		gp.setSmallLayout()
+	Window.addWindowResizeListener(gp)
