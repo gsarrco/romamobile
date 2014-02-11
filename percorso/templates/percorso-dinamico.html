@@ -163,16 +163,18 @@
 						</div>
 					</td>
 					<td>
-						{% if i.tratto.id and i.tratto.info_tratto_exp%}
+						{% if i.tratto.id and i.tratto.info_tratto_exp %}
 							<a id="dettagli"></a>
 						{% endif %}
 						{% if i.tratto.mezzo == 'Z' %}
-							{% trans "Teletrasporto" %} 
-						{% else %}										
+							{% trans "Teletrasporto" %}
+						{% elif i.tratto.mezzo == 'I' %}
+							{% trans "Cambia linea" %}
+						{% else %}
 							{% if i.tratto.mezzo != 'P' and i.tratto.mezzo != 'C' and i.tratto.mezzo != 'CP' and i.tratto.mezzo != 'A' and i.tratto.mezzo != 'CS' %}
 								{% if i.tratto.mezzo == 'B' %}
 									{% trans "Linea" %} 
-								{% endif %}						
+								{% endif %}
 								{% if i.tratto.url %}
 									<a href="{% hist %}{{ i.tratto.url }}{% endhist %}">{{ i.tratto.linea }}</a>
 									{% trans "direz." %} {{ i.tratto.dest }} 
@@ -184,17 +186,13 @@
 							{% endif %}
 							{% if i.tratto.mezzo == 'P' %}
 								{% trans "A piedi" %}
-							{% endif %}
-							{% if i.tratto.mezzo == 'C' %}
+							{% elif i.tratto.mezzo == 'C' %}
 								{% trans "In bicicletta" %}
-							{% endif %}
-							{% if i.tratto.mezzo == 'A' %}
+							{% elif i.tratto.mezzo == 'A' %}
 								{% trans "In automobile" %}
-							{% endif %}
-							{% if i.tratto.mezzo == 'CS' %}
+							{% elif i.tratto.mezzo == 'CS' %}
 								{% trans "Car sharing" %}
-							{% endif %}
-							{% if i.tratto.mezzo == 'CP' %}
+							{% elif i.tratto.mezzo == 'CP' %}
 								{% trans "Car pooling" %}
 								(<a  class="small" href='{% nohist %}/carpooling/richiedi/{{ i.tratto.id }}{% endnohist %}'>{% trans "Chiedi un passaggio" %}</a>)
 								(<a  class="small" href='{% nohist %}/carpooling/escludi/{{ i.tratto.id }}{% endnohist %}'>{% trans "Escludi" %}</a>)
@@ -203,26 +201,21 @@
 							{% if i.tratto.tempo_attesa %}
 								{% if i.tratto.tipo_attesa == 'O' %}
 									{% trans "Partenza ore" %}
-								{% else %}
-									{% if i.tratto.tipo_attesa == 'S' %}
-										{% trans "Attesa circa" %}
+								{% elif i.tratto.tipo_attesa == 'S' %}
+									{% trans "Attesa circa" %}
+								{% elif i.tratto.tipo_attesa == 'P' %}
+									{% if i.tratto.numero == 0 %}
+										{% trans "In arrivo fra" %}
 									{% else %}
-										{% if i.tratto.tipo_attesa == 'P' %}
-											{% if i.tratto.numero == 0 %}
-												{% trans "In arrivo fra" %}
-											{% else %}
-												{% trans "In arrivo dopo" %}	
-											{% endif %}
-										{% else %}
-											{% if i.tratto.tipo_attesa == 'E' %}
-												{% trans "Attesa" %}
-											{% endif %}
-										{% endif %}
-									{% endif %}						
+										{% trans "In arrivo dopo" %}
+									{% endif %}
+								{% elif i.tratto.tipo_attesa == 'E' %}
+									{% trans "Attesa" %}
+								{% elif i.tratto.tipo_attesa == 'Z' %}
+									{% trans "Apertura ZTL ore" %}
 								{% endif %}
 								{{ i.tratto.tempo_attesa }}<br />
 							{% endif %}
-	
 							{% if i.tratto.id %}
 								{% if i.tratto.info_tratto_exp %}
 									{{ i.tratto.info_tratto }}:

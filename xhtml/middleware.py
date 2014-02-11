@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013 Roma servizi per la mobilità srl
+#    Copyright 2013-2014 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -267,7 +267,8 @@ class Middleware:
 		response.context_data['history_1'] = get_back_url(request, len(request.session['history']) - 2)
 		response.context_data['refresh'] = get_back_url(request, len(request.session['history']) - 1)
 		response.context_data['history_main_menu'] = '/?%s=%s' % (settings.SESSION_COOKIE_NAME, request.session.session_key) if request.does_not_accept_cookies else '/'
-		response.context_data['rnd'] = rnd.randint(0, 10000000)
+		response.context_data['rnd_didyouknow'] = rnd.randint(0, 4)
+		response.context_data['id_sito'] = settings.ID_SITO
 		response.context_data['formaction'] = mark_safe('action="%s"' % request.path_info)
 		response.context_data['id_sito'] = settings.ID_SITO		
 		response.context_data['request'] = request

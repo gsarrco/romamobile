@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013 Roma servizi per la mobilità srl
+#    Copyright 2013-2014 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -21,6 +21,7 @@
 
 from models import *
 from django.db import models, connections, transaction
+from paline.models import IndirizzoAutocompl, ParolaIndirizzoAutocompl
 from servizi.utils import dict_cursor, project, datetime2mysql, group_required
 from datetime import datetime, timedelta, time, date
 from jsonrpc import jsonrpc_method
@@ -32,6 +33,20 @@ logout_url = 'http://login.muoversiaroma.it/Logout.aspx?IdSito=%d' % settings.ID
 password_sito = ''
 from django.contrib.auth import login, authenticate
 from django.contrib import auth
+
+@jsonrpc_method('servizi_autocompleta_indirizzo')
+def autocompleta_indirizzo(request, cerca):
+	print cerca
+	parole = cerca.split()
+	parole.sort(key=lambda x: -len(x))
+	if len(parole) == 0 or len(parole[0]) < 3:
+		return {'cerca': cerca, 'risultati': []}
+	pias = IndirizzoAutocompl.objects
+	for p in parole:
+		pias = pias.filter(parolaindirizzoautocompl__parola__startswith=p.lower())
+	pias = pias.order_by('indirizzo')
+	return {'cerca': cerca, 'risultati': [(u.pk, u.indirizzo) for u in pias[:10]]}
+
 
 @jsonrpc_method('servizi_get_tutti')
 @group_required('operatori')
@@ -65,7 +80,7 @@ def get(request):
 
 @jsonrpc_method('servizi_set_servizio')
 @group_required('operatori')
-def set(request, pk, stato):
+def servizi_set_servizio(request, pk, stato):
 	"""
 	Imposta lo stato del servizio
 	"""

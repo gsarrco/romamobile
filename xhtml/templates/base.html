@@ -1,4 +1,4 @@
-{% load i18n %}{% load history %}<?xml version="1.0" encoding="utf-8"?>
+{% load i18n %}{% load history %}{% load i18n %}<?xml version="1.0" encoding="utf-8"?>
 {% if  amFlavor == 'default' %}
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
 {% else %}
@@ -13,7 +13,7 @@
 		<meta name="robots" content="nofollow" />
 		<meta name="description" content="Muoversi a Roma nasce per informare e aggiornare sulla mobilità pubblica e privata i cittadini, i turisti, i pendolari, i city user" />
 		<meta name="keywords" content="muoversi, roma, mobilità, trasporto pubblico, informazione, infomobilità, mobile, atacmobile, tempi di attesa, trovalinea, calcolo del percorso, mappa" />
-		<title>Muoversiaroma.it Mobile</title>
+		<title>{% if servizio %}{{ servizio.descrizione }}{% if sottotitolo %} - {{ sottotitolo }}{% endif %} | {% endif %}Muoversi a Roma mobile</title>
 		<link href="/xhtml/s/css/screen{{request.session.theme}}.css" rel="stylesheet" type="text/css" />
 		{% block InternalStyle %}
 		{% endblock %}{% block fullscript %}{% endblock %}
@@ -25,7 +25,7 @@
 			<div id="rsm-sx"><a class="nound" href="/?nav=0&amp;back=1"><img src="/xhtml/s/img/muoversiaroma.png" width="153" height="50" alt="logo" /></a></div>
 			<div id="rsm-dx"></div>
 			<div id="orario">{{ DateTime }}</div>
-			{% if beta %}<div id="beta">Versione BETA</div>{% else %}<div id="beta"><a href="http://www.agenziamobilita.roma.it/servizi/open-data/" class="nound">Fork me on Bitbucket</a></div>{% endif %}
+			{% if beta %}<div id="beta">Versione BETA</div>{% endif %}
 		</div>
 		
 		<div id="main">
@@ -63,6 +63,44 @@
 
 			{% block content %}
 				Benvenuto in Muoversi a Roma!
+			{% endblock %}
+			
+			{% block didyouknow %}
+				<h2>{% trans "Lo sapevi?" %}</h2>
+				<p>
+					{% if rnd_didyouknow == 0 %}
+						{% blocktrans %}
+							I dati e i servizi di Muoversi a Roma, compresi quelli in tempo reale, sono
+							<a href="http://www.agenziamobilita.roma.it/servizi/open-data/">liberamente accessibili come Open Data</a>.
+						{% endblocktrans %}
+					{% elif rnd_didyouknow ==  1 %}
+						{% blocktrans %}
+							Muoversi a Roma &egrave; open source.
+							<a href="http://www.agenziamobilita.roma.it/servizi/open-data/codice-sorgente.html">Scarica il codice sorgente</a>
+							e contribuisci anche tu allo sviluppo del sito mobile, del cerca percorso, cerca linea e cerca luogo.
+						{% endblocktrans %}		
+					{% elif rnd_didyouknow ==  2 %}
+						{% blocktrans %}
+							Hai un sito web? Puoi <a href="http://www.agenziamobilita.roma.it/servizi/open-data/strumenti-per-i-webmaster.html">incorporare
+							una versione personalizzata</a> dei servizi di infomobilit&agrave;
+							di Muoversi a Roma: cerca percorso, cerca linea e cerca luogo.
+						{% endblocktrans %}
+					{% elif rnd_didyouknow ==  3 %}
+						{% blocktrans %}
+							Muoversi a Roma &egrave; sviluppato da <a href="http://www.agenziamobilita.roma.it">Roma
+							servizi per la mobilit&agrave;</a>, l'Agenzia per la Mobilit&agrave; di Roma Capitale.
+							Ci trovi anche su <a href="http://muovi.roma.it/facebook">Facebook</a> e
+							<a href="http://muovi.roma.it/twitter">Twitter</a>.
+						{% endblocktrans %}
+					{% elif rnd_didyouknow ==  4 %}
+						{% blocktrans %}
+							Il <a href="http://muovi.roma.it/percorso">cerca percorso di Muoversi a Roma</a> funziona
+							con i dati in tempo reale. Conosce la posizione degli autobus e lo stato del traffico,
+							e calcola, momento per momento, il percorso pi&ugrave; conveniente
+							con i mezzi Atac, Roma TPL, la metropolitana e le ferrovie regionali. 
+						{% endblocktrans %}												
+					{% endif %}
+				</p>
 			{% endblock %}
 
 	{% if not request.GET.onlycontent %}

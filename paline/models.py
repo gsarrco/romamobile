@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013 Roma servizi per la mobilità srl
+#    Copyright 2013-2014 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -19,7 +19,7 @@
 #    Muoversi a Roma for Developers. If not, see http://www.gnu.org/licenses/.
 #
 
-from django.db import models, connections, transaction
+from django.db import models, connections
 import urllib2
 import re
 import time
@@ -27,7 +27,7 @@ from xml.dom import minidom
 import errors
 import settings
 from servizi.utils import oggetto_con_min, oggetto_con_max, aggiungi_banda, giorni_settimana
-from servizi.utils import ricapitalizza, FunctionInThread, PickledObjectField
+from servizi.utils import ricapitalizza, FunctionInThread, PickledObjectField, transaction
 from datetime import datetime, timedelta
 from servizi.models import VersioneManager, VersionatoManager, VersioneVersioning, Versionato, RichiestaNotifica
 from servizi.models import UtenteGenerico, Luogo
@@ -219,6 +219,8 @@ TIPO_LINEA_CHOICES = (
 	(u"FC", u"Ferrovia Concessa"),
 )
 
+TIPO_LINEA_CHOICES_DICT = dict(TIPO_LINEA_CHOICES)
+
 class Linea(VersionatoPaline, Disabilitabile):
 	id_linea = models.CharField(max_length=30, db_index=True)
 	monitorata = models.IntegerField()
@@ -256,6 +258,12 @@ class Linea(VersionatoPaline, Disabilitabile):
 		
 		ret['percorsi'] = percorsi
 		return ret
+
+	def percorsi_attivi(self):
+		return Percorso.objects.by_date().select_related('arrivo').filter(linea=self, soppresso=False).distinct()
+
+	def getTipoDec(self):
+		return TIPO_LINEA_CHOICES_DICT[self.tipo]
 	
 class DisabilitazionePalina(Disabilitazione):
 	id_palina = models.CharField(db_index=True, max_length=20)
@@ -564,7 +572,8 @@ class Percorso(VersionatoPaline, Disabilitabile):
 			'carteggio': self.carteggio_quoz,
 			'carteggio_dec': self.decodeCarteggio(),
 			'abilitata': abilitato,
-			'id_news': -1 if abilitato else self.news_disabilitazione_complessivo(),
+			'id_news': -1 if abilitato else self.id_news_disabilitazione_complessivo(),
+			'gestore': self.linea.gestore.descrizione,
 		}
 	
 	def getFermate(self):
@@ -789,13 +798,18 @@ def dettaglio_palina(palina, linee_escluse=set([]), nome_palina=None, caching=Fa
 				x['nome_palina'] = nome_palina
 				x['id_palina'] = palina.id_palina
 				if not l.abilitata_complessivo() or not l.monitorata:
+					news = None
 					if not l in linee_disabilitate:
 						x['linea'] = l.id_linea
 						if not l.monitorata:
 							x['non_monitorata'] = True
 						else:
 							x['disabilitata'] = True
-							x['news'] = l.news_disabilitazione_complessivo()
+							news = l.news_disabilitazione_complessivo()
+						if as_service:
+							x['id_news'] = news.pk if news is not None else -1
+						else:
+							x['news'] = news
 						_aggiungi_dotazioni_default(x, as_service)
 						v3.append(x)
 				elif l.id_linea not in linee_usate:
@@ -1130,4 +1144,57 @@ class LogCercaPercorso(models.Model):
 	
 	class Meta:
 		verbose_name_plural = "Log cerca percorso"	
-	
+
+class LogAvm(models.Model):
+	id_gestore = models.ForeignKey(Gestore)
+	id_veicolo = models.CharField(max_length=5)
+	data = models.DateField()
+	ora = models.TimeField()
+	lat = models.FloatField()
+	lon = models.FloatField()
+	gps_fix = models.CharField(max_length=1)
+	id_linea = models.CharField(max_length=10)
+	id_percorso = models.CharField(max_length=10, blank=True, null=True)
+	evento = models.CharField(max_length=5)
+	numero_passeggeri = models.IntegerField(blank=True, null=True, default=-1)
+	carico_passeggeri = models.FloatField(blank=True, null=True, default=-1)
+
+	def __unicode__(self):
+		return "[%s] %s" % (self.id_linea, self.id_veicolo)
+
+	class Meta:
+		verbose_name_plural = "Log Avm"
+
+class IndirizzoAutocompl(models.Model):
+	indirizzo = models.CharField(max_length=127, db_index=True)
+
+	def __unicode__(self):
+		return self.indirizzo
+
+	class Meta:
+		verbose_name = "Indirizzo autocompletamento"
+		verbose_name_plural = "Indirizzi autocompletamento"
+
+class ParolaIndirizzoAutocompl(models.Model):
+	parola = models.CharField(max_length=63, db_index=True)
+	indirizzo_autocompl = models.ForeignKey(IndirizzoAutocompl)
+
+	def __unicode__(self):
+		return "(%s, %s)" % (self.parola, self.indirizzo_autocompl.indirizzo)
+
+	class Meta:
+		verbose_name = "Parola indirizzo autocompletamento"
+		verbose_name_plural = "Parole indirizzi autocompletamento"
+
+	@classmethod
+	def costruisci(cls):
+		with transaction():
+			cls.objects.all().delete()
+			ias = IndirizzoAutocompl.objects.all()
+			for ia in ias:
+				print ia.indirizzo
+				for p in ia.indirizzo.split():
+					ParolaIndirizzoAutocompl(
+						parola=p.lower(),
+						indirizzo_autocompl=ia,
+					).save()

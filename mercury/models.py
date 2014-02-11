@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013 Roma servizi per la mobilità srl
+#    Copyright 2013-2014 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -356,6 +356,7 @@ class DaemonControl(models.Model):
 	restart_from = models.TimeField()
 	restart_to = models.TimeField()
 	restart_timeout = models.IntegerField()
+	max_restart_time = models.IntegerField(default=3)
 	command = models.CharField(max_length=1023)
 	action = models.CharField(max_length=1, default='F', choices=control_action_choices)
 	

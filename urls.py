@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013 Roma servizi per la mobilità srl
+#    Copyright 2013-2014 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -30,11 +30,6 @@ from xhtml.views import ga as google_analytics, ping
 import django.views.static
 import servizi.views
 import django
-if django.get_version() >= '1.5.1':
-	from django.views.generic.base import RedirectView
-	redirect_to = RedirectView.as_view()
-else:
-	from django.views.generic.simple import redirect_to
 	
 # Uncomment the next two lines to enable the admin:
 from django.contrib import admin
@@ -56,6 +51,8 @@ url_opendata = [
 
 pattern_list = [
 	url(r'^static/admin/(?P<path>.*)$', django.views.static.serve, {'document_root': os.path.join(os.path.dirname(__file__),'admin_media').replace('\\','/')}),
+	url(r'^base', servizi.views.base),
+	url(r'^webapp', servizi.views.webapp),
 	url(r'^admin/', include(admin.site.urls)),
 	url(r'^json/browse/', 'jsonrpc.views.browse', name="jsonrpc_browser"),
 	url(r'^json/$', jsonrpc_site.dispatch, name='jsonrpc_mountpoint'),
@@ -67,9 +64,10 @@ pattern_list = [
 	url(r'^backend/password/change/$', 'django.contrib.auth.views.password_change', {'template_name': 'password_change_form.html', 'post_change_redirect': '/backend/password/change/done/'}),
 	url(r'^backend/password/change/done/$', 'django.contrib.auth.views.password_change_done', {'template_name': 'password_change_done.html'}),
 	url(r'^media/(?P<path>.*)$', group_required(['doc'], HttpResponseRedirect('/backend'))(django.views.static.serve),
-			{'document_root': settings.MEDIA_ROOT}),	
-	url(r'^facebook$', redirect_to, {'url': 'https://www.facebook.com/pages/Muoversi-a-Roma/202373936538862'}),
-	url(r'^twitter$', redirect_to, {'url': 'http://twitter.com/romamobilita'}),	
+			{'document_root': settings.MEDIA_ROOT}),
+	url(r'^facebook$', lambda req: HttpResponseRedirect('https://www.facebook.com/pages/Muoversi-a-Roma/202373936538862')),
+	url(r'^twitter$', lambda req: HttpResponseRedirect('http://twitter.com/romamobilita')),
+	url(r'^atacmobile.php$', 'servizi.views.servizi_new'),	
 	url(r'^$', 'servizi.views.servizi_new'),
 	url(r'^i18n/', include('django.conf.urls.i18n')),
 	url('^favicon.ico', django.views.static.serve,

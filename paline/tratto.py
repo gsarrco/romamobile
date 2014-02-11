@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013 Roma servizi per la mobilità srl
+#    Copyright 2013-2014 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -233,8 +233,7 @@ class TrattoBusArcoPercorso(Tratto):
 		fermata_t = rete.fermate_da_palina[(self.id_palina_t, self.parent.id_percorso)]
 		a = grafo.archi[(5, fermata_s.id_fermata, fermata_t.id_fermata)]
 		self.tempo_percorrenza, self.tipo_percorrenza = a.get_tempo_vero(self.tempo, opz)
-					
-		
+
 class TrattoMetro(TrattoBus):
 	def __init__(self, parent, tempo, rete_fermata_s, tempo_attesa, tipo_attesa, attesa_salita, interscambio=False):
 		Tratto.__init__(self, parent, tempo)
@@ -309,6 +308,22 @@ class TrattoTeletrasportoArcoPercorso(Tratto):
 
 # end teletrasporto
 
+class TrattoInterscambio(Tratto):
+	def __init__(self, parent, tempo, palina_s, tempo_percorrenza):
+		Tratto.__init__(self, parent, tempo)
+		self.id_palina_s = palina_s.id_palina
+		self.nome_palina_s = ricapitalizza(palina_s.nome)
+		self.id_palina_t = ''
+		self.nome_palina_t = ''
+		self.poly = [(palina_s.x, palina_s.y)]
+		self.tempo_percorrenza = tempo_percorrenza
+
+	def set_palina_t(self, palina_t):
+		self.id_palina_t = palina_t.id_palina
+		self.nome_palina_t = ricapitalizza(palina_t.nome)
+		self.poly.append((palina_t.x, palina_t.y))
+
+
 class TrattoFC(TrattoMetro):
 	pass
 
@@ -380,6 +395,11 @@ class TrattoAuto(Tratto):
 	def __init__(self, parent, tempo, carsharing=False):
 		Tratto.__init__(self, parent, tempo)
 		self.carsharing = carsharing
+
+class TrattoAutoAttesaZTL(Tratto):
+	def __init__(self, parent, tempo, tempo_attesa):
+		Tratto.__init__(self, parent, tempo)
+		self.tempo_attesa = tempo_attesa
 
 class TrattoAutoArco(TrattoPiediArco):
 	pass
@@ -625,6 +645,42 @@ def format_indicazioni_icona_root_post(tratto, ft, opz):
 		)		
 	return ft
 
+@formattatore('indicazioni_icona', [TrattoInterscambio])
+def format_indicazioni_icona_tratto_interscambio(tratto, ft, opz):
+	ft.aggiungi_nodo(
+		t=tratto.tempo,
+		nome=tratto.nome_palina_s,
+		tipo='F',
+		id=tratto.id_palina_s,
+		punto=tratto.get_punto_wgs_84(),
+		url='',
+		overwrite=True,
+	)
+	ft.aggiungi_tratto(
+		mezzo='I',
+		linea='',
+		id_linea='',
+		dest='',
+		url='',
+		id='',
+		tipo_attesa='',
+		tempo_attesa='',
+		info_tratto='',
+		info_tratto_exp='',
+		icona='interscambio.png',
+	)
+	ft.aggiungi_nodo(
+		t=tratto.tempo + timedelta(seconds=tratto.tempo_percorrenza),
+		nome=tratto.nome_palina_t,
+		tipo='F',
+		id=tratto.id_palina_t,
+		punto=tratto.get_punto_fine_wgs_84(),
+		url='',
+		overwrite=True,
+	)
+
+
+
 @formattatore('indicazioni_icona', [TrattoBus, TrattoMetro, TrattoTreno, TrattoFC, TrattoTeletrasporto])
 def format_indicazioni_icona_tratto_bus(tratto, ft, opz):
 	numero_fermate = len([x for x in tratto.sub if isinstance(x, TrattoBusArcoPercorso)])
@@ -720,13 +776,19 @@ def format_indicazioni_icona_tratto_piedi(tratto, ft, opz):
 		distanza = arrotonda_distanza(tratto.get_distanza()).capitalize()
 		id = "O-%s" % sub[0].id_arco
 		dettagli = u''
-		if 'espandi_tutto' in opz or ('espandi' in opz and opz['espandi']) == id:
-			nome_corr = None
-			for s in sub:
-				if s.nome_arco != "" and s.nome_arco != nome_corr:
-					dettagli += u"&nbsp;%s<br />" % s.nome_arco
-					nome_corr = s.nome_arco
-			dettagli += u"<br />".join([u"&nbsp;%s %s" % (x[0], x[1]) for x in fermate_intermedie(tratto)])
+		ta = tratto.get_tempo_attesa()
+		attesa_ztl = None if ta == 0 else tratto.tempo + timedelta(seconds=ta)
+		prima_strada = None
+		nome_corr = None
+		for s in sub:
+			if s.nome_arco != "" and s.nome_arco != nome_corr:
+				dettagli += u"&nbsp;%s<br />" % s.nome_arco
+				nome_corr = s.nome_arco
+				if prima_strada is None:
+					prima_strada = nome_corr
+		dettagli += u"<br />".join([u"&nbsp;%s %s" % (x[0], x[1]) for x in fermate_intermedie(tratto)])
+		if not('espandi_tutto' in opz or ('espandi' in opz and opz['espandi']) == id):
+			dettagli = ''
 		bici = isinstance(tratto, TrattoBici)
 		auto = isinstance(tratto, TrattoAuto)
 		if bici:
@@ -742,6 +804,7 @@ def format_indicazioni_icona_tratto_piedi(tratto, ft, opz):
 		else:
 			mezzo = 'P'
 			icona = 'piedi.png'
+		ft.aggiungi_nodo(tratto.tempo, prima_strada, '', 'I', tratto.get_punto_wgs_84())
 		ft.aggiungi_tratto(
 			mezzo=mezzo,
 			linea='',
@@ -749,8 +812,8 @@ def format_indicazioni_icona_tratto_piedi(tratto, ft, opz):
 			dest='',
 			url='',
 			id=id,
-			tipo_attesa='',
-			tempo_attesa='',
+			tipo_attesa='Z' if attesa_ztl is not None else '',
+			tempo_attesa=arrotonda_tempo(attesa_ztl) if attesa_ztl is not None else '',
 			info_tratto=_("%(distanza)s (%(tempo)s)" % {
 				'distanza': distanza,
 				'tempo': to_min(tratto.get_tempo_percorrenza()),
@@ -902,13 +965,9 @@ def format_mappa_teletrasporto(tratto, ft, opz):
 	ft.add_marker(tratto.get_punto_fine_wgs_84(), '/paline/s/img/teletrasporto.png', icon_size=(16, 16), infobox='Rimaterializzazione Teletrasporto', anchor=(8, 8))
 	return ft
 
-@formattatore('mappa', [TrattoPiedi])
+@formattatore('mappa', [TrattoPiedi, TrattoInterscambio])
 def format_mappa_piedi(tratto, ft, opz):
 	color = '#000000'
-	"""
-	if int(tratto.tipo) != 12:
-		color = '#00FF00'
-	"""
 	ft.add_polyline(tratto.get_poly_wgs84(), 1, color, 2.5)
 	return ft
 
@@ -944,7 +1003,7 @@ def format_mappa_root(tratto, ft, opz):
 		out += _("Parti da %(luogo)s") % {'luogo': tratto.partenza['address']}	
 	p = tratto.get_poly_wgs84()
 	if len(p) > 0:
-		ft.add_marker(p[0], '/paline/s/img/partenza_percorso.png', icon_size=(32, 32), infobox=out, drop_callback='drop_start')		
+		ft.add_marker(p[0], '/paline/s/img/partenza_percorso.png', icon_size=(32, 32), anchor=(16, 32), infobox=out, drop_callback='drop_start')
 	return ft
 
 @formattatore('mappa', [TrattoRoot], True)
@@ -956,7 +1015,7 @@ def format_mappa_root_post(tratto, ft, opz):
 		out += _("Sei arrivato a %s") % tratto.arrivo['address']
 	p = tratto.get_poly_wgs84()
 	if len(p) > 0:
-		ft.add_marker(p[-1], '/paline/s/img/arrivo_percorso.png', icon_size=(32, 32), infobox=out, drop_callback='drop_stop')		
+		ft.add_marker(p[-1], '/paline/s/img/arrivo_percorso.png', icon_size=(32, 32), anchor=(16, 32), infobox=out, drop_callback='drop_stop')
 	return ft
 
 # Formattatori per statistiche percorso

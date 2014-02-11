@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013 Roma servizi per la mobilità srl
+#    Copyright 2013-2014 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -24,6 +24,7 @@ from django.db import models, connections, transaction
 from django.template.response import TemplateResponse
 from log_servizi.models import ServerVersione
 import errors
+from servizi.utils import getdef
 from utils import dict_cursor, project, messaggio, populate_form, hist_redirect, giorni_settimana
 from utils import AtacMobileForm, permission_links, restore_login_params
 import uuid
@@ -100,7 +101,6 @@ def stato(request, token, prodotto, lingua):
 
 @servizi3.metodo('Menu')
 def menu(request, token, prodotto, lingua):
-	
 	try:
 		servizi = ServizioLingua.objects.filter(lingua__codice=lingua).order_by('servizio__ordine')
 	except ServizioLingua.DoesNotExists:
@@ -198,8 +198,18 @@ def get_fav(request):
 	return fav
 	
 
+def base(request):
+	request.session['js_version'] = False
+	return HttpResponseRedirect('/')
+
+def webapp(request):
+	request.session['js_version'] = True
+	return HttpResponseRedirect('/percorso/js')
 
 def servizi_new(request):
+	if getdef(request.session, 'js_version', True):
+		return HttpResponseRedirect('/percorso/js')
+
 	ctx = {}
 	servizi_pubblico = ['news', 'risorse', 'bike', 'carpooling', 'paline', 'percorso']
 	servizi_privato = ['news', 'ztl', 'bollettino', 'tempi', 'parcheggi', 'telecamere']

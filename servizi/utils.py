@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013 Roma servizi per la mobilità srl
+#    Copyright 2013-2014 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -34,6 +34,7 @@ from django.template.response import TemplateResponse
 from django.template import Template, Context
 from django.template.loader import get_template
 from django.template.defaultfilters import time as timefilter
+from django.template.loaders.app_directories import Loader as TemplateLoader
 from django.http import HttpResponseRedirect
 from django.forms.widgets import CheckboxInput
 from django.core.mail import send_mail
@@ -515,7 +516,7 @@ def autodump(obj):
 	return pickle.loads(pickle.dumps(obj))
 
 		
-def template_to_mail(dest, template_name, ctx):
+def template_to_mail(dest, template_name, ctx, process_template=False):
 	"""
 	Invia una mail dopo aver effettuato il rendering del template
 	
@@ -525,9 +526,11 @@ def template_to_mail(dest, template_name, ctx):
 	"""
 	if type(dest) != list:
 		dest = [dest]
-	t = get_template(template_name)
-	righe = t.render(Context(ctx)).splitlines()
-	print righe
+	if process_template:
+		righe = render_text_template(template_name, ctx).splitlines()
+	else:
+		t = get_template(template_name)
+		righe = t.render(Context(ctx)).splitlines()
 	fr = righe[0]
 	subj = righe[1]
 	msg = "\n".join(righe[2:])
@@ -743,3 +746,71 @@ def enforce_login(f):
 			return HttpResponseRedirect('/servizi/login')
 		return f(request, *args, **kwargs)
 	return g
+
+def find_common_sublists(l1, l2):
+	"""
+	Find common subsequences of lists l1 and l1
+	
+	l1, l2: lists
+	output: list of tuples, with the form (0|1|2, element), where
+		0: common element
+		1: element of l1
+		2: element of l2
+	"""
+	s1 = set(l1)
+	s2 = set(l2)
+	s0 = s1.intersection(s2)
+	i1 = 0
+	i2 = 0
+	n1 = len(l1)
+	n2 = len(l2)
+	out = []
+	while i1 < n1 and i2 < n2:
+		e1 = l1[i1]
+		e2 = l2[i2]
+		if e1 in s0 and e1 == e2:
+			out.append((0, e1))
+			i1 += 1
+			i2 += 1
+		elif not e1 in s0:
+			out.append((1, e1))
+			i1 += 1
+		else:
+			out.append((2, e2))
+			i2 += 1
+	out.extend([(1, i) for i in l1[i1:]])	
+	out.extend([(2, i) for i in l2[i2:]])
+	return out
+				
+
+def batch_qs(qs, batch_size=50000):
+	"""
+	Yields tuples, one by one, from the queryset. The query is performed in batches.
+
+	Usage:
+			# Make sure to order your querset
+			article_qs = Article.objects.order_by('id')
+			for start, end, total, qs in batch_qs(article_qs):
+					print "Now processing %s - %s of %s" % (start + 1, end, total)
+					for article in qs:
+							print article.body
+	"""
+	total = qs.count()
+	for start in range(0, total, batch_size):
+		end = min(start + batch_size, total)
+		for p in qs[start:end]:
+			yield p
+
+def render_text_template(name, ctx):
+	tl = TemplateLoader()
+	s, d = tl.load_template_source(name)
+	out = []
+	for l in s.splitlines():
+		l = l.strip()
+		if len(l) > 1 and l[0] == '^' and l[-1] == '$':
+			l = l[1:-1]
+		if l == '':
+			out.append('\n')
+		else:
+			out.append(l)
+	return Template("".join(out)).render(Context(ctx))

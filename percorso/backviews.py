@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013 Roma servizi per la mobilità srl
+#    Copyright 2013-2014 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -24,6 +24,7 @@ from django.db import models, connections, transaction
 from servizi.utils import dict_cursor, project, datetime2mysql, group_required
 from datetime import datetime, timedelta, time, date
 from jsonrpc import jsonrpc_method
+from copy import copy
 import rpyc
 import cPickle as pickle
 import views
@@ -63,3 +64,16 @@ def percorso_cerca(
 def urldecode(request, urlparams):
 	d = urlparse.parse_qs(urlparams)
 	return dict([(k, d[k][0]) for k in d])
+
+@jsonrpc_method('percorso_get_params', safe=True)
+def percorso_get_params(request):
+	infopoint = request.session['infopoint']
+	return {
+		'route': views.infopoint_to_get_params(infopoint),
+		'to': views.infopoint_to_get_params(infopoint, da=False),
+	}
+
+@jsonrpc_method('percorso_email', safe=True)
+def percorso_email(request, address):
+	views.calcola_percorso_mail(request, address)
+	return 'OK'

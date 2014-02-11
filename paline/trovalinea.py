@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013 Roma servizi per la mobilità srl
+#    Copyright 2013-2014 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -50,7 +50,9 @@ import carpoolinggraph
 import tomtom
 from mercury.models import MercuryListener, autopickle
 from django import db
+from ztl.models import ZTL
 from pprint import pprint
+from paline.models import LogAvm, Gestore
 
 
 PERCORSI_INTERSEZIONE = [
@@ -147,7 +149,7 @@ def TrovalineaFactory(retina=False, calcola_percorso=False, tempo_reale=False, s
 			if calcola_percorso:
 				g = graph.Grafo()
 				tpl.registra_classi_grafo(g)
-				g.deserialize('%s%s.dat' % (settings.GRAPH, '_mini' if retina else ''))
+				g.deserialize('%s%s.v3.dat' % (settings.GRAPH, '_mini' if retina else ''))
 				tpl.carica_rete_su_grafo(r, g, retina, versione=v)
 				fn = u'fr.txt'
 				tpl.carica_orari_fr_da_file(r, g, fn)
@@ -492,7 +494,26 @@ def TrovalineaFactory(retina=False, calcola_percorso=False, tempo_reale=False, s
 			
 			
 			
-		def exposed_calcola_percorso(self, punti, piedi, bus, metro, fc, fr, pickled_date, bici=False, max_distanza_bici=5000, linee_escluse=None, auto=0, carpooling=0, carpooling_vincoli=None, teletrasporto=False, rev=False, tipi_ris=[]):
+		def exposed_calcola_percorso(
+			self,
+			punti,
+			piedi,
+			bus,
+			metro,
+			fc,
+			fr,
+			pickled_date,
+			bici=False,
+			max_distanza_bici=5000,
+			linee_escluse=None,
+			auto=0,
+			carpooling=0,
+			carpooling_vincoli=None,
+			teletrasporto=False,
+			rev=False,
+			tipi_ris=[],
+			ztl=[]
+		):
 			data = pickle.loads(pickled_date)
 			print "Calcolo il percorso"
 			le = set()
@@ -505,14 +526,18 @@ def TrovalineaFactory(retina=False, calcola_percorso=False, tempo_reale=False, s
 						le.update(self.rete.linee_equivalenti[l])
 					else:
 						le.add(l)
+			# modi = ['modo_auto', 'modo_tpl', 'modo_pnr', 'modo_bnr', 'modo_carsharing']
+			if auto == 4:
+				ztl = [z.codice for z in ZTL.objects.all()]
+			ztl = set(ztl)
 			if auto < 2:
-				opzioni_cp = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, True if auto==0 else False, carpooling, carpooling_vincoli, teletrasporto)
+				opzioni_cp = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, True if auto==0 else False, carpooling, carpooling_vincoli, teletrasporto, ztl=ztl)
 			elif auto == 2:
-				opzioni_cp1 = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, True, carpooling, carpooling_vincoli, teletrasporto)
-				opzioni_cp2 = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, False, carpooling, carpooling_vincoli, teletrasporto)
+				opzioni_cp1 = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, True, carpooling, carpooling_vincoli, teletrasporto, ztl=ztl)
+				opzioni_cp2 = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, False, carpooling, carpooling_vincoli, teletrasporto, ztl=ztl)
 			elif auto == 4:
-				opzioni_cp1 = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, False, carpooling, carpooling_vincoli, teletrasporto)
-				opzioni_cp2 = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, True, carpooling, carpooling_vincoli, teletrasporto, True)
+				opzioni_cp1 = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, False, carpooling, carpooling_vincoli, teletrasporto, ztl=ztl, tpl=True)
+				opzioni_cp2 = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, True, carpooling, carpooling_vincoli, teletrasporto, True, ztl=ztl, tpl=True)
 
 			nodi_geo = []
 			nodi_del = []
@@ -705,6 +730,7 @@ def TrovalineaFactory(retina=False, calcola_percorso=False, tempo_reale=False, s
 				gbfe_to_wgs84(start['x'], start['y']),
 				icon='/paline/s/img/partenza_percorso.png',
 				icon_size=(32, 32),
+				anchor=(16, 32),
 				infobox="Sono qui",
 			)
 			db.reset_queries()
@@ -788,6 +814,32 @@ def TrovalineaFactory(retina=False, calcola_percorso=False, tempo_reale=False, s
 		def exposed_dati_da_avm_romatpl(self, dati):
 			self.rete.dati_da_avm_romatpl(dati)
 			return 'OK'
+
+		@autopickle
+		def exposed_log_dati_avm_romatpl(self, dati):
+			# Esegue il log dei dati di roma tpl
+			print 'Dati arrivati'
+			try:
+				dt = dati['dataora']
+				logavm = LogAvm(
+					id_gestore = Gestore.objects.by_date().get(descrizione="Roma TPL"),
+					id_veicolo = dati['id_vettura'],
+					data = date(year=dt.year, month=dt.month, day=dt.day),
+					ora = time(hour=dt.hour, minute=dt.minute, second=dt.second),
+					lat = dati['lat'],
+					lon = dati['lon'],
+					gps_fix = dati['tipo_fix'],
+					id_linea = dati['id_linea_attuale'],
+					id_percorso = dati['targa_percorso'],
+					evento = dati['tipo_evento'],
+					numero_passeggeri = dati['numero_passeggeri'],
+					carico_passeggeri = dati['carico_passeggeri']
+				)
+				logavm.save()
+			except:
+				traceback.print_exc()
+			return 'OK'
+
 		
 	Trovalinea.init_rete()
 	Trovalinea.init_scheduler()

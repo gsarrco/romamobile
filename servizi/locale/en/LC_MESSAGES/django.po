@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2013-11-20 11:24+0100\n"
-"PO-Revision-Date: 2013-11-20 11:24+0100\n"
+"PO-Revision-Date: 2013-12-17 12:23+0100\n"
 "Last-Translator: \n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
@@ -174,8 +174,8 @@ msgid ""
 "\t\t"
 msgstr ""
 "\n"
-"\t\t\t<a href=\"http://login.muoversiaroma.it/GestioneAccount.aspx?IdSito=%"
-"(id_sito)s\">Please login</a>.\n"
+"\t\t\t<a href=\"http://login.muoversiaroma.it/GestioneAccount.aspx?IdSito="
+"%(id_sito)s\">Please login</a>.\n"
 "\t\t"
 
 #: .\templates\notifiche_fasce.html.py:6
@@ -288,6 +288,9 @@ msgstr "Other"
 #~ msgid "Opzioni"
 #~ msgstr "Advanced"
 
+#~ msgid "Novit&agrave; su Atac mobile"
+#~ msgstr "Atac mobile news"
+
 #~ msgid "Sfondo chiaro"
 #~ msgstr "Light background"
 
@@ -299,3 +302,8 @@ msgstr "Other"
 
 #~ msgid "Correggi le seguenti informazioni:"
 #~ msgstr "Please correct:"
+
+#~ msgid ""
+#~ "Il servizio &egrave; disponibile tutti i giorni dalle ore 06.30 alle ore "
+#~ "24.00."
+#~ msgstr "Atac mobile is available from 6.30 AM to 12.00 AM, every day."

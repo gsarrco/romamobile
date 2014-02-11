@@ -1,5 +1,5 @@
 #
-#    Copyright 2013 Roma servizi per la mobilità srl
+#    Copyright 2013-2014 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -22,6 +22,7 @@ from pyjamas.ui.VerticalPanel import VerticalPanel
 from pyjamas.ui.HorizontalPanel import HorizontalPanel
 from pyjamas.ui.VerticalSplitPanel import VerticalSplitPanel
 from pyjamas.ui.SimplePanel import SimplePanel
+from pyjamas.ui.ScrollPanel import ScrollPanel
 from pyjamas.ui.FlowPanel import FlowPanel
 from pyjamas.ui.DisclosurePanel import DisclosurePanel
 from pyjamas.ui.TabPanel import TabPanel
@@ -38,6 +39,7 @@ from pyjamas.ui.ListBox import ListBox
 from pyjamas.ui.Button import Button
 from pyjamas.ui.RadioButton import RadioButton
 from pyjamas.ui.PopupPanel import PopupPanel
+from pyjamas.ui.DialogBox import DialogBox
 from pyjamas.ui.KeyboardListener import KeyboardHandler
 from pyjamas.ui.FocusListener import FocusHandler
 from pyjamas.ui.Tree import Tree, TreeItem
@@ -56,7 +58,8 @@ from pyjamas import DOM
 from prnt import prnt
 from util import StyledFixedColumnFlexTable, HTMLFlowPanel, DP, VP, HP, GP, SP
 from util import get_checked_radio, HidingPanel, ValidationErrorRemover, MyAnchor
-from util import ToggleImage
+from util import ToggleImage, SearchBox, DeferrablePanel, ScrollAdaptivePanel
+from util import wait_start, wait_stop
 from datetime import date, time, datetime, timedelta
 from Calendar import Calendar, DateField, TimeField
 from map import MapPanel, Layer, LayerPanel, Marker
@@ -64,8 +67,15 @@ from map import MapPanel, Layer, LayerPanel, Marker
 from DissolvingPopup import DissolvingPopup
 from util import JsonHandler, redirect
 
-
-client = JSONProxy('/json/', ['percorso_cerca', 'urldecode', 'risorse_lista_tipi'])
+client = JSONProxy('/json/', [
+	'percorso_cerca',
+	'urldecode',
+	'risorse_lista_tipi',
+	'ztl_get_lista',
+	'percorso_get_params',
+	'percorso_email',
+	'servizi_autocompleta_indirizzo',
+])
 
 class LineaLabel(HorizontalPanel):
 	def __init__(self, id_linea):
@@ -100,9 +110,10 @@ class LineaLabel(HorizontalPanel):
 			self.chiudi_listener = None
 			chiudi()
 
-class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
+class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, DeferrablePanel):
 	def __init__(self, owner):
-		SimplePanel.__init__(self)
+		ScrollAdaptivePanel.__init__(self)
+		DeferrablePanel.__init__(self)
 		KeyboardHandler.__init__(self)
 		self.owner = owner
 		self.map = None
@@ -135,10 +146,11 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 									'class': HP,
 									'sub': [
 											{
-												'class': TextBox,
+												'class': SearchBox,
 												'name': 'da',
 												'call_addKeyboardListener': ([self], {}),
 												'call_addFocusListener': ([self], {}),
+												'args': [client.servizi_autocompleta_indirizzo, None, 3, 100, False],
 											},
 											{
 												'class': HP,
@@ -154,6 +166,7 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 														'class': Button,
 														'args': ['X', self.onChiudiDa],
 														'width': '40px',
+														'style': 'close-button',
 													}														
 												]
 										},
@@ -168,10 +181,11 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 									'class': HP,
 									'sub': [
 											{
-												'class': TextBox,
+												'class': SearchBox,
 												'name': 'a',
 												'call_addKeyboardListener': ([self], {}),
 												'call_addFocusListener': ([self], {}),
+												'args': [client.servizi_autocompleta_indirizzo, None, 3, 100, False],
 											},
 											{
 												'class': HP,
@@ -187,6 +201,7 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 														'class': Button,
 														'args': ['X', self.onChiudiA],
 														'width': '40px',
+														'style': 'close-button',
 													}														
 												]
 										},
@@ -201,13 +216,19 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 									'class': Button,
 									'args': ["Cerca", self.onCerca],
 									'name': 'cerca',
-									'width': '50%',
-								}, {
+									'width': '49%',
+								},
+								{
+									'class': SP,
+									'sub': [],
+									'width': '2%',
+								},
+								{
 									'class': Button,
 									'args': ["Ritorno", self.onScambia],
 									'name': 'scambia',
-									'width': '50%',
-								}
+									'width': '49%',
+								},
 							]
 						},
 						{
@@ -223,38 +244,38 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 							'sub': [
 								{
 									'class': ToggleImage,
-									'args': ['modo_tpl.png', 'modo-inactive', 'modo-active', self.onModo, 1, False],
+									'args': ['modo_tpl_s.png', 'modo-inactive', 'modo-active', self.onModo, 1, False],
 									'name': 'modo_tpl',
 									'expand': False,
-									'call_addMouseListener': ([TooltipListener("Trasporto pubblico", 350)], {}),
+									'call_setTooltip': (["Trasporto pubblico"], {}),
 								},
 								{
 									'class': ToggleImage,
-									'args': ['modo_bnr.png', 'modo-inactive', 'modo-active', self.onModo, 3, False],
+									'args': ['modo_bnr_s.png', 'modo-inactive', 'modo-active', self.onModo, 3, False],
 									'name': 'modo_bnr',
 									'expand': False,
-									'call_addMouseListener': ([TooltipListener("Bike and ride", 350)], {}),
+									'call_setTooltip': (["Bike and ride"], {}),
 								},
 								{
 									'class': ToggleImage,
-									'args': ['modo_carsharing.png', 'modo-inactive', 'modo-active', self.onModo, 4, False],
+									'args': ['modo_carsharing_s.png', 'modo-inactive', 'modo-active', self.onModo, 4, False],
 									'name': 'modo_carsharing',
 									'expand': False,
-									'call_addMouseListener': ([TooltipListener("Car sharing", 350)], {}),
+									'call_setTooltip': (["Car sharing"], {}),
 								},
 								{
 									'class': ToggleImage,
-									'args': ['modo_auto.png', 'modo-inactive', 'modo-active', self.onModo, 0, False],
+									'args': ['modo_auto_s.png', 'modo-inactive', 'modo-active', self.onModo, 0, False],
 									'name': 'modo_auto',
 									'expand': False,
-									'call_addMouseListener': ([TooltipListener("Trasporto privato", 350)], {}),
+									'call_setTooltip': (["Trasporto privato"], {}),
 								},
 								{
 									'class': ToggleImage,
-									'args': ['modo_pnr.png', 'modo-inactive', 'modo-active', self.onModo, 2, False],
+									'args': ['modo_pnr_s.png', 'modo-inactive', 'modo-active', self.onModo, 2, False],
 									'name': 'modo_pnr',
 									'expand': False,
-									'call_addMouseListener': ([TooltipListener("Park and ride", 350)], {}),
+									'call_setTooltip': (["Park and ride"], {}),
 								},							
 							],
 						},								
@@ -283,9 +304,35 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 							{
 								'class': ListBox,
 								'name': 'risorse',
+								'style': 'big-list',
 								'call_setVisibleItemCount': ([6], {}),
 								'call_setMultipleSelect': ([True], {}),
 								'call_setVisible': ([False], {}),
+							},
+
+							{
+								'class': VP,
+								'name': 'opzioni_car',
+								'call_setVisible': ([False], {}),
+								'sub': [
+									{
+										'class': Label,
+										'args': ['Permessi di accesso ZTL'],
+										'style': 'indicazioni-h2',
+									},
+									{
+										'class': ListBox,
+										'name': 'ztl',
+										'style': 'big-list',
+										'call_setVisibleItemCount': ([6], {}),
+										'call_setMultipleSelect': ([True], {}),
+									},
+									{
+										'class': MyAnchor,
+										'name': 'ztl_all',
+										'args': [1, ],
+									},
+								],
 							},
 							{
 								'class': VP,
@@ -456,8 +503,25 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 										'vertical_alignment': HasAlignment.ALIGN_MIDDLE,
 									},											
 								]
-							},												
-
+							},
+							{
+								'class': HTML,
+								'args': [
+									"""
+									<p>
+										Questo servizio calcola il miglior percorso con i mezzi
+										Atac, Roma TPL e le ferrovie regionali Trenitalia.
+										Usa i dati in tempo reale per tener conto dello stato
+										del traffico e della posizione degli autobus.
+									<p>
+									</p>
+										Il software, sviluppato dall'Agenzia per la Mobilit&agrave;
+										di Roma, &egrave; <a href="http://www-test.agenziamobilita.roma.it/servizi/open-data/codice-sorgente.html" target="_blank">rilasciato
+										con licenza open source.</a>
+									</p>
+									"""
+								],
+							},
 						]
 					}],
 				},
@@ -467,12 +531,15 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 					'sub': [],
 				},
 			],
-			add_to_owner=True,				
+			add_to_owner=True,
 		)
 		
 		self.base.by_name('modo_tpl').setActive(True)
 		self.modo = 1
-		
+		self.get_ztl = []
+		ztl_all = self.base.by_name('ztl_all')
+		ztl_all.setWidget(HTML('Seleziona tutte'))
+		ztl_all.addClickListener(self.onZtlAll)
 		self.risultati = None
 		n = datetime.now()
 		
@@ -485,12 +552,18 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 		self.linee_escluse = None
 		self.percorsi_realtime = []
 		
-		self.realtime = Button("Tempo reale off", self.onRealtime)
-		self.realtime.addStyleName('realtime')
-		self.realtime.setVisible(False)
-		self.realtime_status = False
-		self.owner.owner.add(self.realtime)
+		# self.realtime = Button("Tempo reale off", self.onRealtime)
+		# self.realtime.addStyleName('realtime')
+		# self.realtime.setVisible(False)
+		# self.realtime_status = False
+		# self.owner.owner.add(self.realtime)
+
 		self.cercaLuogoInit = False
+
+
+	def scrollaAPercorso(self):
+		if self.risultati is not None:
+			self.risultati.getElement().scrollIntoView()
 		
 	def cambiaModo(self, modo):
 		modi = ['modo_auto', 'modo_tpl', 'modo_pnr', 'modo_bnr', 'modo_carsharing']
@@ -501,13 +574,17 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 		tpl = False
 		pnr = False
 		bnr = False
+		car = False
 		luoghi = True
+		if self.modo == 0:
+			car = True
 		if self.modo == 1:
 			tpl = True
 		elif self.modo == 2:
 			tpl = True
 			pnr = True
 			luoghi = False
+			car = True
 		elif self.modo == 3:
 			tpl = True
 			bnr = True
@@ -517,13 +594,15 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 		self.base.by_name('opzioni_tpl').setVisible(tpl)
 		self.base.by_name('opzioni_bnr').setVisible(bnr)
 		self.base.by_name('opzioni_pnr').setVisible(pnr)
+		self.base.by_name('opzioni_car').setVisible(car)
 		if not luoghi:
 			self.base.by_name('luogo').setChecked(False)
 			self.base.by_name('risorse').setVisible(False)
 		self.base.by_name('luogo').setVisible(luoghi)
 		self.base.by_name('come_header').setText("Come: %s" % come[self.modo])
+		if car:
+			self.getZtl()
 
-	
 	def onModo(self, sender):
 		self.cambiaModo(sender.data)
 		if self.base.by_name('da') != "" and self.base.by_name('a') != "":
@@ -547,6 +626,28 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 		n = risorse.getItemCount()
 		for i in range(n):
 			risorse.setItemSelected(i, risorse.getItemText(i) in trs)
+
+	def onZtlListaDone(self, res):
+		ztl = self.base.by_name('ztl')
+		i = 0
+		for r in res:
+			ztl.addItem(r['descrizione'], r['id_ztl'])
+			ztl.setItemSelected(i, r['id_ztl'] in self.get_ztl)
+			i += 1
+		self.get_ztl = None
+
+	def getZtl(self):
+		if self.get_ztl is not None:
+			client.ztl_get_lista(JsonHandler(self.onZtlListaDone))
+
+	def onZtlAll(self):
+		ztl = self.base.by_name('ztl')
+		n = ztl.getItemCount()
+		for i in range(n):
+			ztl.setItemSelected(i, True)
+
+	def getSelectedZtl(self):
+		return self.base.by_name('ztl').getSelectedValues()
 
 		
 	def onCercaLuogo(self):
@@ -579,12 +680,13 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 			'linee_escluse',
 			'carpooling',
 			'tipi_ris',
+			'ztl',
 			'cp', # cp deve essere l'ultimo parametro
 		]
 		
 	def setParam(self, param, value):
 		if param == 'carpooling':
-			self.carpooling = carpooling
+			self.carpooling = value
 		if param == 'da':
 			self.base.by_name('da').setText(value)	
 		if param == 'a':
@@ -620,6 +722,8 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 			tipi_ris = value.split(",")
 			self.base.by_name('parcheggi_scambio').setChecked('Parcheggi di scambio' in tipi_ris)
 			self.base.by_name('parcheggi_autorimesse').setChecked('Autorimesse' in tipi_ris)
+		if param == 'ztl':
+			self.get_ztl = value.split(",")
 		if param == 'cp':
 			self.cercaPercorso()
 	
@@ -635,11 +739,11 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 		self.map.addRightClickOption("Cerca percorso da qui", self.onRightClickDa)
 		self.map.addRightClickOption("Cerca percorso fino a qui", self.onRightClickA)
 		
-	def onRealtime(self):
-		self.realtime_status = not self.realtime_status
-		self.realtime.setText("Tempo reale %s" % ("on" if self.realtime_status else "off"))
-		for id_percorso in self.percorsi_realtime:
-			self.map.loadNewLayer("%s*" % id_percorso, 'percorso_tiny', id_percorso, toggle=self.realtime_status)
+	# def onRealtime(self):
+	# 	self.realtime_status = not self.realtime_status
+	# 	self.realtime.setText("Tempo reale %s" % ("on" if self.realtime_status else "off"))
+	# 	for id_percorso in self.percorsi_realtime:
+	# 		self.map.loadNewLayer("%s*" % id_percorso, 'percorso_tiny', id_percorso, toggle=self.realtime_status)
 
 		
 	def onRightClickDa(self, lat, lng):
@@ -656,6 +760,7 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 				(lng, lat),
 				'/paline/s/img/partenza_percorso.png',
 				icon_size=(32, 32),
+				anchor=(16, 32),
 			)
 			
 			
@@ -673,6 +778,7 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 				(lng, lat),
 				'/paline/s/img/arrivo_percorso.png',
 				icon_size=(32, 32),
+				anchor=(16, 32),
 			)			
 		
 
@@ -698,18 +804,24 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 			self.onCerca()
 			
 	def onCerca(self):
+		self.owner.setDirty()
 		self.linee_escluse = None
 		self.cercaPercorso()
 		
 	def createCpLayer(self):
-		self.owner.setTabMappaPercorso()
+		# self.owner.setTabMappaPercorso()
 		if self.cp_layer is not None:
 			self.cp_layer.destroy()
 		self.map.hideAllLayers()
 		self.cp_layer = Layer('cp_layer', 'Percorso trovato', self.map)
 
+	def impostaDa(self, da):
+		self.base.by_name('da').setText(da)
+
+	def impostaA(self, a):
+		self.base.by_name('a').setText(a)
 		
-	def cercaPercorso(self, tipi_risorse=None):
+	def cercaPercorso(self, tipi_risorse=None, su_mappa=False):
 		cerca = self.base.by_name('cerca')
 		n = datetime.now().strftime('%d/%m/%Y %H:%M')
 		quando = get_checked_radio(self.base, 'quando', range(4))
@@ -738,10 +850,18 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 		da_in = self.getIndirizzo(False)
 		a_in = self.getIndirizzo(True)
 		
-		if da_in != '' and a_in != '' and cerca.isEnabled():
+		if da_in != '' and a_in == '' and cerca.isEnabled():
+			self.owner.cercaLinea(da_in)
+		
+		elif da_in != '' and a_in != '' and cerca.isEnabled():
 			cerca.setEnabled(False)
-			cerca.setHTML('<img width="16" height="16" src="loading.gif" />')
+			wait_start()
+			# cerca.setHTML('<img width="16" height="16" src="loading.gif" />')
 			self.ripristinaWidgets()
+			ztl = self.get_ztl
+			if ztl is None:
+				ztl = self.getSelectedZtl()
+
 			opzioni = {
 				'mezzo': 1 if self.modo == 3 else self.modo,
 				'piedi': get_checked_radio(self.base, 'piedi', range(3)),
@@ -757,9 +877,14 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 				'tipi_ris': tipi_ris,
 				'parcheggi_scambio': self.base.by_name('parcheggi_scambio').isChecked(),
 				'parcheggi_autorimesse': self.base.by_name('parcheggi_autorimesse').isChecked(),
+				'ztl': ztl,
 			}
 			if self.linee_escluse is not None:
 				opzioni['linee_escluse'] = self.linee_escluse
+			if su_mappa:
+				callback = self.onCercaDoneSuMappa
+			else:
+				callback = self.onCercaDone
 			client.percorso_cerca(
 				da_in,
 				a_in,
@@ -767,7 +892,7 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 				n,
 				'it',
 				offset,
-				JsonHandler(self.onCercaDone, self.onCercaErroreRemoto)
+				JsonHandler(callback, self.onCercaErroreRemoto)
 			)
 			
 		
@@ -788,12 +913,12 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 	
 	def onLineaFactory(self, id_percorso):
 		def onLinea(source):
-			self.map.loadNewLayer(id_percorso, 'percorso', id_percorso)
+			self.owner.cercaLineaPercorso(id_percorso, su_mappa=True)
 		return onLinea
 	
 	def onPalinaFactory(self, id_palina):
 		def onPalina(source):
-			self.map.loadNewLayer(id_palina, 'palina-singola', id_palina)
+			self.owner.cercaLinea(id_palina, su_mappa=True)
 		return onPalina	
 	
 	def onInfoEsteseFactory(self, panel, info_ext):
@@ -850,7 +975,8 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 	def abilitaCerca(self):
 		cerca = self.base.by_name('cerca')
 		cerca.setEnabled(True)
-		cerca.setText('Cerca') 
+		wait_stop()
+		# cerca.setText('Cerca')
 	
 	def onCercaErroreRemoto(self, text, code):
 		self.abilitaCerca()
@@ -868,9 +994,11 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 				x_list.addItem(i)
 		else:
 			x.addStyleName('validation-error')
+
+	def onCercaDoneSuMappa(self, res):
+		self.onCercaDone(res, su_mappa=True)
 		
-		
-	def onCercaDone(self, res):
+	def onCercaDone(self, res, su_mappa=False):
 		self.abilitaCerca()
 		
 		# Errori
@@ -887,6 +1015,10 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 			return
 		
 		# OK
+		if su_mappa:
+			self.owner.setTabMappaPercorso()
+		else:
+			self.owner.setTabPercorsoMappa()
 		self.createCpLayer()
 		self.percorsi_realtime = []
 		self.base.by_name('opzioni_avanzate').setOpen(False)
@@ -902,11 +1034,33 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 					'style': 'indicazioni',
 					'sub': [
 						{
-							'class': Label,
-							'args': ['Riepilogo'],
-							'style': 'indicazioni-h1',
-							'height': None,
-						},									
+							'class': HP,
+							'sub': [
+								{
+									'class': Label,
+									'style': 'indicazioni-h1',
+									'args': ['Riepilogo'],
+								},
+								{
+									'class': Image,
+									'args': ["link.png"],
+									'width': '41px',
+									'height': '30px',
+									'vertical_alignment': HasAlignment.ALIGN_MIDDLE,
+									'style': 'modo-inactive',
+									'call_addClickListener': ([self.onGetLink], {}),
+								},
+								{
+									'class': Image,
+									'args': ["email.png"],
+									'width': '40px',
+									'height': '30px',
+									'vertical_alignment': HasAlignment.ALIGN_MIDDLE,
+									'style': 'modo-inactive',
+									'call_addClickListener': ([self.onEmail], {}),
+								},
+							]
+						},
 						{
 							'class': FlowPanel,
 							'name': 'riepilogo',
@@ -983,8 +1137,11 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 				t = i['tratto']
 				indicazioni.addStyledWidget(Image("/percorso/s/img/%s" % t['icona']), expand=False, center=True, style="tratto")
 				mezzo = t['mezzo']
+				tipo_attesa = t['tipo_attesa']
 				if mezzo == 'Z':
 					out.addHtml('Teletrasporto')
+				elif mezzo == 'I':
+					out.addHtml('Cambia linea')
 				else:
 					if mezzo in ['P', 'C', 'CP', 'A', 'CS']:
 						if mezzo =='P':
@@ -997,6 +1154,10 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 							out.addHtml('In automobile')
 						elif mezzo == 'CS':
 							out.addHtml('Car sharing')
+						if tipo_attesa == 'Z':
+							out.addBr()
+							out.addHtml('Apertura ZTL ore&nbsp;')
+							out.addHtml(" %s" % t['tempo_attesa'])
 					else:
 						if mezzo == 'B':
 							out.addHtml('Linea&nbsp;')
@@ -1011,7 +1172,6 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 						ll.addLineaListener(self.onLineaFactory(id_percorso))
 						if mezzo == 'B':
 							self.percorsi_realtime.append(id_percorso)
-						tipo_attesa = t['tipo_attesa']
 						if tipo_attesa == 'O':
 							out.addHtml('Partenza ore&nbsp;')
 						elif tipo_attesa == 'S':
@@ -1077,24 +1237,167 @@ class CercaPercorsoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 					out.addAnchor(n['nome'], self.onPalinaFactory(n['id']))
 				else:
 					out.addHtml(n['nome'])
-				# todo: parti in bici/a piedi	
-				
+
 				indicazioni.addStyledWidget(out)
 				
 		risultati_holder.add(self.risultati)
+		self.risultati.getElement().scrollIntoView()
 		
 		self.cp_layer.deserialize(res['mappa'], callbacks={
 			'drop_start': self.onRightClickDa,
 			'drop_stop': self.onRightClickA,
 		})
-		self.cp_layer.centerOnMap()
+		self.owner.center_and_zoom(self.cp_layer)
+		self.do_or_defer(self.scrollaAPercorso)
 		
-		if len(self.percorsi_realtime) > 0:
-			self.realtime_status = False
-			self.realtime.setVisible(True)
-			self.realtime.setText("Tempo reale off")
+		# if len(self.percorsi_realtime) > 0:
+		# 	self.realtime_status = False
+		# 	self.realtime.setVisible(True)
+		# 	self.realtime.setText("Tempo reale off")
 		
 	def onScambia(self):
 		da, a = self.base.by_name('da').getText(), self.base.by_name('a').getText()
 		self.base.by_name('da').setText(a)
 		self.base.by_name('a').setText(da)
+
+	def onGetLink(self):
+		LinkDialog(self, self.base.by_name('da').getText(), self.base.by_name('a').getText())
+
+	def onEmail(self):
+		EmailDialog(self)
+
+class LinkDialog(DialogBox, FocusHandler):
+	def __init__(self, owner, origine, destinazione):
+		DialogBox.__init__(self, glass=True)
+		self.owner = owner
+
+		self.base = VP(
+			self,
+			[
+				{
+					'class': HTML,
+					'args': ['Link al percorso completo:'],
+					'style': 'indicazioni-h1',
+					'height': None,
+				},
+				{
+					'class': HTML,
+					'args': ["""
+						Questo link mostrer&agrave; le indicazioni e la mappa del percorso
+						da %s a %s.
+					""" % (origine, destinazione)],
+					'height': None,
+				},
+				{
+					'class': TextBox,
+					'name': 'route',
+					'height': None,
+					'call_addFocusListener': ([self], {}),
+
+				},
+				{
+					'class': HTML,
+					'args': ['Link al cerca percorso fino a %s:' % destinazione],
+					'style': 'indicazioni-h1',
+					'height': None,
+				},
+				{
+					'class': HTML,
+					'args': ["""
+						Questo link chieder&agrave; un punto di partenza, a partire dal quale
+						cercher&agrave; il percorso fino a %s.
+					""" % destinazione],
+					'height': None,
+				},
+				{
+					'class': TextBox,
+					'name': 'to',
+					'height': None,
+					'call_addFocusListener': ([self], {}),
+				},
+				{
+					'class': Button,
+					'args': ['Chiudi', self.onChiudi],
+					'horizontal_alignment': HasAlignment.ALIGN_RIGHT,
+					'height': None,
+				},
+			],
+			add_to_owner=True,
+		)
+		self.setWidth('300px')
+		self.addStyleName('indicazioni')
+		client.percorso_get_params(JsonHandler(self.onPercorsoGetParams))
+		self.show()
+		left = (Window.getClientWidth() - self.getClientWidth()) / 2
+		top = (Window.getClientHeight() - self.getClientHeight()) / 2
+		self.setPopupPosition(left, top)
+
+	def onChiudi(self):
+		self.hide()
+
+	def onPercorsoGetParams(self, res):
+		base_url = 'http://muovi.roma.it/percorso/js/?'
+		self.base.by_name('route').setText(base_url + res['route'])
+		self.base.by_name('to').setText(base_url + res['to'])
+
+	def onFocus(self, text):
+		text.selectAll()
+
+class EmailDialog(DialogBox):
+	def __init__(self, owner):
+		DialogBox.__init__(self, glass=True)
+		self.owner = owner
+
+		self.base = VP(
+			self,
+			[
+				{
+					'class': HTML,
+					'args': ['Indirizzo email del destinatario:'],
+					'style': 'indicazioni-h1',
+					'height': None,
+				},
+				{
+					'class': TextBox,
+					'name': 'email',
+					'height': None,
+				},
+				{
+					'class': HP,
+					'sub': [
+						{
+							'class': Button,
+							'args': ['Invia', self.onInvia],
+							'height': None,
+						},
+						{
+							'class': Button,
+							'args': ['Annulla', self.onAnnulla],
+							'height': None,
+						},
+					]
+				},
+			],
+			add_to_owner=True,
+		)
+		client.percorso_get_params(JsonHandler(self.onPercorsoGetParams))
+		self.addStyleName('indicazioni')
+		self.show()
+		left = (Window.getClientWidth() - self.getClientWidth()) / 2
+		top = (Window.getClientHeight() - self.getClientHeight()) / 2
+		self.setPopupPosition(left, top)
+
+	def onInvia(self):
+		client.percorso_email(self.base.by_name('email').getText().strip(), JsonHandler(self.onEmailDone))
+		self.hide()
+
+	def onEmailDone(self, res):
+		pass
+
+	def onAnnulla(self):
+		self.hide()
+
+	def onPercorsoGetParams(self, res):
+		base_url = 'http://muovi.roma.it/percorso/js/?'
+		self.base.by_name('route').setText(base_url + res['route'])
+		self.base.by_name('to').setText(base_url + res['to'])

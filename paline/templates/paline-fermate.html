@@ -93,7 +93,7 @@
 		<h3>{% trans "Altri giorni" %}</h3>
 		<p>
 			{% for g in giorni_partenza %}
-				{% if g.mysql == giorno_partenza_attivo %}
+				{% if g.mysql == giorno_partenza %}
 					<span class="b">&raquo; {{ g.format }}</span> 
 				{% else %}
 					&raquo;  <a href="{% nohist %}/paline/percorso/{{ percorso.id_percorso }}?partenze=1&amp;data={{ g.mysql }}{% endnohist %}">{{ g.format }}</a> 

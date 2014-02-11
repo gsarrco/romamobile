@@ -16,6 +16,9 @@ code {
 a {
 color:darkblue;
 }
+a, img {
+	border:none;
+}
 a:visited {
 color:darkblue;
 }
@@ -407,6 +410,13 @@ background-color: #87be77;
 .step-panel {
 	margin: 2px 20px 2px 20px;
 }
+#Loading-Message {
+    position: absolute;
+    z-index: -1;
+    width: 100%;
+    padding-top: 130px;
+    text-align: center;
+}
 
 /* ########## STILI PERSONALIZZATI ########## */
 
@@ -417,7 +427,9 @@ a, a:visited {
 	display: block;
 	cursor: pointer;
 }
-
+.leaflet-control-attribution a {
+	display: inline;
+}
 /*a:hover {
 	color: white;
 	background-color: #83092b;
@@ -895,4 +907,9 @@ color: white;
     background-color:#fafb7b;
     border: 1px solid black;
     padding: 1px 3px 1px 3px;
+}
+.floating {
+	position: fixed;
+	top:60px;
+	left:60px;
 }

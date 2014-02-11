@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2013-11-20 10:15+0100\n"
-"PO-Revision-Date: 2013-11-20 10:06+0100\n"
+"POT-Creation-Date: 2014-01-17 13:05+0100\n"
+"PO-Revision-Date: 2014-01-17 13:06+0100\n"
 "Last-Translator: \n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
@@ -16,104 +16,104 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "X-Generator: Poedit 1.5.4\n"
 
-#: .\views.py:484
+#: .\views.py:492
 msgid "distanza massima in bici (errata)"
 msgstr "max cycling distance (wrong)"
 
-#: .\views.py:578
+#: .\views.py:594
 msgid "partenza"
 msgstr "starting"
 
-#: .\views.py:578
+#: .\views.py:594
 msgid "arrivo"
 msgstr "destination"
 
-#: .\views.py:588
+#: .\views.py:604
 #, python-format
 msgid "fermata di %s (non esiste)"
 msgstr "%s bus stop (does not exist)"
 
-#: .\views.py:602
+#: .\views.py:618
 #, python-format
 msgid "indirizzo di %s (manca)"
 msgstr "%s address (empty)"
 
-#: .\views.py:607
+#: .\views.py:623
 #, python-format
 msgid "indirizzo di %s (molti trovati)"
 msgstr "%s address (choose one)"
 
-#: .\views.py:611
+#: .\views.py:627
 #, python-format
 msgid "indirizzo di %s (errato)"
 msgstr "%s address (wrong)"
 
-#: .\views.py:623 .\templates\percorso-dinamico.html.py:37
+#: .\views.py:639 .\templates\percorso-dinamico.html.py:37
 #: .\templates\percorso-dinamico.html.py:53
 msgid "Mezzo privato"
 msgstr "Private transport"
 
-#: .\views.py:624
+#: .\views.py:640
 msgid "Mezzi pubblici"
 msgstr "Public transport"
 
-#: .\views.py:625 .\templates\percorso-dinamico.html.py:41
+#: .\views.py:641 .\templates\percorso-dinamico.html.py:41
 #: .\templates\percorso-dinamico.html.py:54
 msgid "Park and ride"
 msgstr "Park and ride"
 
-#: .\views.py:626 .\templates\percorso-dinamico.html.py:43
+#: .\views.py:642 .\templates\percorso-dinamico.html.py:43
 #: .\templates\percorso-dinamico.html.py:51
 msgid "Bike and ride"
 msgstr "Bike and ride"
 
-#: .\views.py:627 .\templates\percorso-dinamico.html.py:45
+#: .\views.py:643 .\templates\percorso-dinamico.html.py:45
 #: .\templates\percorso-dinamico.html.py:52
-#: .\templates\percorso-dinamico.html.py:195
+#: .\templates\percorso-dinamico.html.py:192
 msgid "Car sharing"
 msgstr "Car sharing"
 
-#: .\views.py:633 .\views.py:663
+#: .\views.py:649 .\views.py:679
 msgid "Adesso (dati in tempo reale)"
 msgstr "Now (real time data)"
 
-#: .\views.py:634 .\views.py:664
+#: .\views.py:650 .\views.py:680
 msgid "Fra 5 minuti (dati in tempo reale)"
 msgstr "In 5 minutes (real time data)"
 
-#: .\views.py:635
+#: .\views.py:651
 msgid "Scegli orario di partenza:"
 msgstr "Select departure time:"
 
-#: .\views.py:636
+#: .\views.py:652
 msgid "Scegli orario di arrivo:"
 msgstr "Select arrival time:"
 
-#: .\views.py:655
+#: .\views.py:671
 msgid "Bassa (camminatore lento)"
 msgstr "Low (slow walker)"
 
-#: .\views.py:656
+#: .\views.py:672
 msgid "Media"
 msgstr "Medium"
 
-#: .\views.py:657
+#: .\views.py:673
 msgid "Alta (camminatore veloce)"
 msgstr "High (fast walker)"
 
-#: .\views.py:665
+#: .\views.py:681
 msgid "Scegli orario partenza:"
 msgstr "Select departure time:"
 
-#: .\views.py:666
+#: .\views.py:682
 msgid "Scegli orario arrivo:"
 msgstr "Select arrival time:"
 
-#: .\views.py:816
+#: .\views.py:832
 msgid "Confermi di voler eliminare l'indirizzo?"
 msgstr "Delete address: are you sure?"
 
-#: .\views.py:857
+#: .\views.py:873
 msgid "Luogo aggiunto ai preferiti"
 msgstr "Place added to favorites"
 
@@ -165,7 +165,7 @@ msgid "Mezzo pubblico"
 msgstr "Public transport"
 
 #: .\templates\percorso-dinamico.html.py:58
-#: .\templates\percorso-dinamico.html.py:261
+#: .\templates\percorso-dinamico.html.py:252
 msgid "Opzioni avanzate"
 msgstr "Advanced options"
 
@@ -209,7 +209,7 @@ msgstr "Bus stop"
 
 #: .\templates\percorso-dinamico.html.py:142
 #: .\templates\percorso-dinamico.html.py:183
-#: .\templates\percorso-dinamico.html.py:200
+#: .\templates\percorso-dinamico.html.py:196
 msgid "Escludi"
 msgstr "Exclude"
 
@@ -226,7 +226,7 @@ msgid "Parti a piedi"
 msgstr "On foot"
 
 #: .\templates\percorso-dinamico.html.py:170
-#: .\templates\percorso-dinamico.html.py:275
+#: .\templates\percorso-dinamico.html.py:266
 msgid "Teletrasporto"
 msgstr "Teleportation"
 
@@ -243,79 +243,83 @@ msgstr "dest."
 msgid "A piedi"
 msgstr "Walk"
 
-#: .\templates\percorso-dinamico.html.py:189
+#: .\templates\percorso-dinamico.html.py:188
 msgid "In bicicletta"
 msgstr "By bike"
 
-#: .\templates\percorso-dinamico.html.py:192
+#: .\templates\percorso-dinamico.html.py:190
 msgid "In automobile"
 msgstr "By car"
 
-#: .\templates\percorso-dinamico.html.py:198
+#: .\templates\percorso-dinamico.html.py:194
 msgid "Car pooling"
 msgstr "Car pooling"
 
-#: .\templates\percorso-dinamico.html.py:199
+#: .\templates\percorso-dinamico.html.py:195
 msgid "Chiedi un passaggio"
 msgstr "Request a lift"
 
-#: .\templates\percorso-dinamico.html.py:205
+#: .\templates\percorso-dinamico.html.py:201
 msgid "Partenza ore"
 msgstr "Departure time"
 
-#: .\templates\percorso-dinamico.html.py:208
+#: .\templates\percorso-dinamico.html.py:203
 msgid "Attesa circa"
 msgstr "Approx. waiting time"
 
-#: .\templates\percorso-dinamico.html.py:212
+#: .\templates\percorso-dinamico.html.py:206
 msgid "In arrivo fra"
 msgstr "Arriving in"
 
-#: .\templates\percorso-dinamico.html.py:214
+#: .\templates\percorso-dinamico.html.py:208
 msgid "In arrivo dopo"
 msgstr "Arriving after"
 
-#: .\templates\percorso-dinamico.html.py:218
+#: .\templates\percorso-dinamico.html.py:211
 msgid "Attesa"
 msgstr "Waiting time"
 
-#: .\templates\percorso-dinamico.html.py:247
+#: .\templates\percorso-dinamico.html.py:213
+msgid "Apertura ZTL ore"
+msgstr "LTZ opens at"
+
+#: .\templates\percorso-dinamico.html.py:238
 msgid "Esclusioni"
 msgstr "Exclude"
 
-#: .\templates\percorso-dinamico.html.py:251
+#: .\templates\percorso-dinamico.html.py:242
 msgid "Includi"
 msgstr "Include"
 
-#: .\templates\percorso-dinamico.html.py:257
+#: .\templates\percorso-dinamico.html.py:248
 msgid "Offri un passaggio lungo questo percorso"
 msgstr "Offer a lift on this route"
 
-#: .\templates\percorso-dinamico.html.py:264
+#: .\templates\percorso-dinamico.html.py:255
 msgid "Propensione spostamenti a piedi e in bici:"
 msgstr "Propensity for walking and biking:"
 
-#: .\templates\percorso-dinamico.html.py:269
+#: .\templates\percorso-dinamico.html.py:260
 msgid "Mezzi pubblici da utilizzare:"
 msgstr "Public means of transport:"
 
-#: .\templates\percorso-dinamico.html.py:271
+#: .\templates\percorso-dinamico.html.py:262
 msgid "Autobus e tram"
 msgstr "Bus and tram"
 
-#: .\templates\percorso-dinamico.html.py:272
+#: .\templates\percorso-dinamico.html.py:263
 msgid "Metropolitana"
 msgstr "Underground"
 
-#: .\templates\percorso-dinamico.html.py:273
+#: .\templates\percorso-dinamico.html.py:264
 msgid "Ferrovie urbane"
 msgstr "Urban railways"
 
-#: .\templates\percorso-dinamico.html.py:280
+#: .\templates\percorso-dinamico.html.py:271
 msgid "Bike and ride:"
 msgstr "Bike and ride:"
 
-#: .\templates\percorso-dinamico.html.py:282
+#: .\templates\percorso-dinamico.html.py:273
 #, python-format
 msgid ""
 "\n"
@@ -326,27 +330,27 @@ msgstr ""
 "\t\t\tMax biking distance: %(mdb)s km\n"
 "\t\t\t"
 
-#: .\templates\percorso-dinamico.html.py:288
+#: .\templates\percorso-dinamico.html.py:279
 msgid "Park and ride:"
 msgstr "Park and ride:"
 
-#: .\templates\percorso-dinamico.html.py:290
+#: .\templates\percorso-dinamico.html.py:281
 msgid "Parcheggi di scambio"
 msgstr "Car parks"
 
-#: .\templates\percorso-dinamico.html.py:291
+#: .\templates\percorso-dinamico.html.py:282
 msgid "Autorimesse private"
 msgstr "Garages"
 
-#: .\templates\percorso-dinamico.html.py:295 .\templates\percorso.html.py:54
+#: .\templates\percorso-dinamico.html.py:286 .\templates\percorso.html.py:54
 msgid "Quando"
 msgstr "When"
 
-#: .\templates\percorso-dinamico.html.py:300 .\templates\percorso.html.py:59
+#: .\templates\percorso-dinamico.html.py:291 .\templates\percorso.html.py:59
 msgid "alle"
 msgstr "at"
 
-#: .\templates\percorso-dinamico.html.py:303 .\templates\percorso.html.py:29
+#: .\templates\percorso-dinamico.html.py:294 .\templates\percorso.html.py:29
 #: .\templates\percorso.html.py:62
 msgid "Cerca"
 msgstr "Find"
@@ -399,6 +403,25 @@ msgstr ""
 msgid "Come"
 msgstr "How"
 
+#: .\templates\percorso.html.py:69
+msgid "Lo sapevi?"
+msgstr "Did you know?"
+
+#: .\templates\percorso.html.py:71
+msgid ""
+"\n"
+"\t\t\tQuesto servizio calcola il percorso ottimale con i mezzi\n"
+"\t\t\tAtac, Roma TPL e le ferrovie regionali Trenitalia.\n"
+"\t\t\tUsa i dati in tempo reale per tener conto dello stato\n"
+"\t\t\tdel traffico e della posizione degli autobus.\n"
+"\t\t"
+msgstr ""
+"\n"
+"\t\t\t\t\t\t\tThis journey planner uses real time data from GPS bus "
+"trackers, in order to determine traffic status and waiting times at bus "
+"stops. Thus, it is able to find the quickest route on board of Atac and Roma "
+"TPL buses, the underground and urban railways.\t\t\t\t\t\t"
+
 #~ msgid "Nel giorno selezionato:"
 #~ msgstr "On selected day:"
 
@@ -406,8 +429,8 @@ msgstr "How"
 #~ "\n"
 #~ "\t<h2>Percorso trovato</h2>\n"
 #~ "\t<p>\n"
-#~ "\t\t<span class=\"b\">Partenza:</span> %(sa)s (%(sp)s) (<a href=\"%"
-#~ "(nohist)s/percorso/preferiti/aggiungi/s%(endnohist)s\">Imposta come "
+#~ "\t\t<span class=\"b\">Partenza:</span> %(sa)s (%(sp)s) (<a href="
+#~ "\"%(nohist)s/percorso/preferiti/aggiungi/s%(endnohist)s\">Imposta come "
 #~ "preferito</a>)<br />\n"
 #~ "\t\t<span class=\"b\">Arrivo:</span> %(ta)s (%(tp)s) (<a href=\"%(nohist)"
 #~ "s/percorso/preferiti/aggiungi/t%(endnohist)s\">Imposta come preferito</a>)"

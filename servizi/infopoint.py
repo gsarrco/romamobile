@@ -1,7 +1,8 @@
 # coding: utf-8
+from servizi.models import RicercaErrata
 
 #
-#    Copyright 2013 Roma servizi per la mobilità srl
+#    Copyright 2013-2014 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -20,6 +21,7 @@
 #
 
 from servizi.utils import ricapitalizza, contenttype2model
+from servizi.models import *
 import re
 import urllib, urllib2
 from BeautifulSoup import BeautifulStoneSoup
@@ -34,6 +36,7 @@ from pprint import pprint
 from paline import models as paline
 from risorse import models as risorse
 from mercury.models import Mercury
+import traceback
 
 DEFAULT_GEOCODER = 'google'
 
@@ -48,6 +51,55 @@ gbfe = pyproj.Proj("+proj=tmerc +lat_0=0 +lon_0=15 +k=0.9996 +x_0=2520000 +y_0=0
 gbfo = pyproj.Proj("+proj=tmerc +lat_0=0 +lon_0=9 +k=0.9996 +x_0=1500000 +y_0=0 +ellps=intl +units=m +no_defs")
 
 infopoint_url = ""
+
+re_spazi_duplicati = re.compile(r' +')
+def cerca_ricerca_errata(ricerca):
+	"""
+	Cerca la ricerca corrente tra quelle errate.
+
+	Se la trova, restituisce l'eventuale conversione e l'oggetto ricerca errata.
+	Input: stringa di ricerca
+	Altrimenti restituisce None
+	"""
+	ricerca = re_spazi_duplicati.sub(' ', ricerca).lower()
+	print ricerca
+	res = RicercaErrata.objects.filter(ricerca=ricerca).order_by('-conteggio')
+	if len(res) > 0:
+		r = res[0]
+		if r.conversione is not None:
+			r.conteggio += 1
+			r.save()
+		return (r.conversione, r)
+	return None
+
+def aggiorna_ricerca_errata(ricerca, ricerca_errata=None):
+	"""
+	Aggiorna le statistiche sulle ricerche errate.
+
+	Se ricerca_errata è None, crea una nuova istanza di RicercaErrata
+	"""
+	if ricerca_errata is None:
+		ricerca = re_spazi_duplicati.sub(' ', ricerca).lower()
+		RicercaErrata(ricerca=ricerca).save()
+	else:
+		ricerca_errata.conteggio += 1
+		ricerca_errata.save()
+
+def correggi_ricerca_errata(f):
+	def g(address, *args, **kwargs):
+		address.strip()
+		ricerca = address
+		ricerca_errata = None
+		res = cerca_ricerca_errata(ricerca)
+		if res is not None:
+			conversione, ricerca_errata = res
+			if conversione is not None:
+				address = conversione
+		res = f(address, *args, **kwargs)
+		if res['stato'] != 'OK':
+			aggiorna_ricerca_errata(ricerca, ricerca_errata)
+		return res
+	return g
 
 
 def componi_indirizzo_place(address, streetno, place):
@@ -123,7 +175,7 @@ def geocode_place_google(composite_address):
 		return {
 			'stato': 'Error',
 		}
-	return out		
+	return out
 
 
 
@@ -135,10 +187,10 @@ def geocode_place_infotp(composite_address):
 			x, y = wgs84_to_gbfe(lng, lat)
 			out = {
 				'stato': 'OK',
-				'indirizzo': _('Punto su mappa'),
+				'indirizzo': _('Punto su mappa <punto:(%s,%s)>') % (lat, lng),
 				'ricerca': composite_address,
 				'streetno': '',
-				'address': _('Punto su mappa'),
+				'address': _('Punto su mappa <punto:(%s,%s)>') % (lat, lng),
 				'place': '',
 				'y': y,
 				'x': x,
@@ -204,17 +256,27 @@ def geocode_place_gbfe_only(address, geocoder=DEFAULT_GEOCODER):
 		gc = geocode_place_infotp
 	return gc(address)
 
+
+re_address = re.compile(r'.*<(.*)>')
+
+@correggi_ricerca_errata
 def geocode_place(address, geocoder=DEFAULT_GEOCODER):
+	address = address.strip()
+	address_sym = re_address.findall(address)
+	if len(address_sym) == 1:
+		r = geocode_place(address_sym[0], geocoder)
+		r['ricerca'] = address
+		return r
 	if address.startswith('punto:'):
 		try:
 			lat, lng = address[7:-1].split(',')
 			x, y = wgs84_to_gbfe(lng, lat)
 			out = {
 				'stato': 'OK',
-				'indirizzo': _('Punto su mappa'),
+				'indirizzo': _('Punto su mappa <punto:(%s,%s)>') % (lat, lng),
 				'ricerca': address,
 				'streetno': '',
-				'address': _('Punto su mappa'),
+				'address': _('Punto su mappa <punto:(%s,%s)>') % (lat, lng),
 				'place': '',
 				'y': y,
 				'x': x,
@@ -223,7 +285,7 @@ def geocode_place(address, geocoder=DEFAULT_GEOCODER):
 			}
 			return out
 		except Exception, e:
-			return {'stato': 'Error'}		
+			return {'stato': 'Error'}
 	elif address.startswith('fermata:'):
 		id_palina = address[8:]
 		p = paline.Palina.objects.by_date().filter(id_palina=id_palina)

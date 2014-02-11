@@ -64,3 +64,15 @@
 
 </form>
 {% endblock %}
+
+{% block didyouknow %}
+	<h2>{% trans "Lo sapevi?" %}</h2>
+	<p>
+		{% blocktrans %}
+			Questo servizio calcola il percorso ottimale con i mezzi
+			Atac, Roma TPL e le ferrovie regionali Trenitalia.
+			Usa i dati in tempo reale per tener conto dello stato
+			del traffico e della posizione degli autobus.
+		{% endblocktrans %}
+	</p>
+{% endblock %}

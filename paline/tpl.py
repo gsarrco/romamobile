@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013 Roma servizi per la mobilità srl
+#    Copyright 2013-2014 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -38,7 +38,7 @@ import osm
 import geocoder
 from servizi.utils import datetime2compact, datetime2time, transaction, date2datetime
 from servizi.utils import datetime2date, dateandtime2datetime, ricapitalizza
-from servizi.utils import model2contenttype, contenttype2model
+from servizi.utils import model2contenttype, contenttype2model, batch_qs
 from servizi.models import Festivita
 from parcheggi import models as parcheggi
 import os, os.path
@@ -52,6 +52,8 @@ from constance import config
 import cPickle as pickle
 from mercury.models import Mercury
 from risorse import models as risorse
+from ztl.views import Orari, orari_per_ztl
+from ztl import models as ztl
 import xmlrpclib
 import tomtom
 from pprint import pprint
@@ -149,11 +151,12 @@ class RetePalina(object):
 	def deserializza(self, res):
 		self.x = res['x']
 		self.y = res['y']
-			
+
 	def log_arrivi(self):
 		if settings.CPD_LOG_PER_STATISTICHE:
 			for k in self.fermate:
-				f = self.fermate[k]	
+				f = self.fermate[k]
+
 				if f.tratto_percorso_successivo is None:
 					#print "Capolinea percorso " + k
 					f.log_arrivi()
@@ -1073,6 +1076,26 @@ def get_parametri_costo_pedonale(a0, a1, exp):
 	c1 = (a1 - c0) / math.pow(1000, exp)
 	return (c0, c1, exp) 
 	
+class ReteZtl(object):
+	def __init__(self, codice, nome, orari):
+		self.id_ztl = codice
+		self.nome = nome
+		# Orari è una lista di tuple (orario_inizio, orario_fine), che rappresentano
+		# gli orari in cui la ZTL è attiva nei prossimi n giorni
+		self.orari = orari
+
+	def attesa(self, t, rev=False):
+		"""
+		Restituisce None se la ztl non è attiva, oppure il tempo di attesa in secondi
+		"""
+		for o in self.orari:
+			if t >= o[0] and t < o[1]:
+				if not rev:
+					return (o[1] - t).seconds
+				else:
+					return (t - o[0]).seconds
+		return None
+
 	
 class Rete(object):
 	def __init__(self):
@@ -1086,6 +1109,7 @@ class Rete(object):
 		self.fermate = {}
 		self.fermate_da_palina = {}
 		self.veicoli = {}
+		self.ztl = {}
 		# Dizionario che associa le pk degli oggetti di tipo StatPeriodiAggregazione agli indici degli elementi
 		# che contengono il tempo
 		self.indice_stat_periodi_aggregazione = {}
@@ -1201,6 +1225,9 @@ class Rete(object):
 			self.capilinea[id_palina].append(id_percorso)
 		else:
 			self.capilinea[id_palina] = [id_percorso]
+
+	def add_ztl(self, codice, nome, orari):
+		self.ztl[codice] = ReteZtl(codice, nome, orari)
 
 		
 	def aggiorna_arrivi(self, num_thread=3, calcola_percorrenze=False, logging=False, aggiorna_arrivi=True):
@@ -1341,7 +1368,7 @@ class Rete(object):
 		else:
 			inizio_validita = datetime2compact(versione)
 		path_rete = os.path.join(settings.TROVALINEA_PATH_RETE, inizio_validita)
-		rete_serializzata_file = os.path.join(path_rete, 'rete%s.v2.dat' % ('_mini' if retina else ''))
+		rete_serializzata_file = os.path.join(path_rete, 'rete%s.v3.dat' % ('_mini' if retina else ''))
 		
 		try:
 			f = open(rete_serializzata_file, 'rb')
@@ -1399,7 +1426,7 @@ class Rete(object):
 				# Frequenze
 				fs = FrequenzaPercorso.objects.filter(id_percorso=p.id_percorso)
 				for f in fs:
-					percorso_rete.frequenza[f.giorno_settimana][f.ora_inizio] = (f.frequenza, f.da_minuto, f.a_minuto)		
+					percorso_rete.frequenza[f.giorno_settimana][f.ora_inizio] = (f.frequenza, f.da_minuto, f.a_minuto)
 			print "Carico coordinate paline" 
 			path_shp = os.path.join(path_rete, 'shp')
 			sf = shapefile.Reader(os.path.join(path_shp, 'Fermate_Percorsi.shp'))
@@ -1442,10 +1469,17 @@ class Rete(object):
 				'indice_stat_periodi_aggregazione': self.indice_stat_periodi_aggregazione,
 			}, 2))
 			f.close()
+		print "Carico ZTL"
+		today = date.today()
+		zs = orari_per_ztl(today, today + timedelta(days=settings.CPD_GIORNI_LOOKAHEAD))
+		for ztl_id in zs:
+			z = zs[ztl_id]
+			self.add_ztl(ztl_id, z['toponimo'], z['fasce'])
 		print "Calcolo distanze"
 		for id_percorso in self.percorsi:
 			self.percorsi[id_percorso].calcola_distanze()
 		db.reset_queries()
+
 
 		
 	def valida_distanze(self):
@@ -1543,7 +1577,24 @@ class Rete(object):
 		).order_by('livello')
 		return [self.indice_stat_periodi_aggregazione[spa.pk] for spa in spas]
 	
-	def get_opzioni_calcola_percorso(self, metro, bus, fc, fr, piedi, dt=None, primo_tratto_bici=False, linee_escluse=None, auto=False, carpooling=False, carpooling_vincoli=None, teletrasporto=False, carsharing=False):
+	def get_opzioni_calcola_percorso(
+		self,
+		metro,
+		bus,
+		fc,
+		fr,
+		piedi,
+		dt=None,
+		primo_tratto_bici=False,
+		linee_escluse=None,
+		auto=False,
+		carpooling=False,
+		carpooling_vincoli=None,
+		teletrasporto=False,
+		carsharing=False,
+		ztl=None,
+		tpl=False,
+	):
 		"""
 		Restituisce le opzioni di calcolo del percorso
 		
@@ -1577,6 +1628,7 @@ class Rete(object):
 			't_sal_fc': config.CPD_T_SAL_FC,
 			't_disc_fc': config.CPD_T_DISC_FC,
 			't_disc_bici': config.CPD_T_DISC_BICI,
+			't_interscambio': config.CPD_T_INTERSCAMBIO,
 			'indici_stat': self.get_indici_periodi_attivi(dt),
 			'giorno': dt.day,
 			'wd_giorno': Festivita.get_weekday(dt, compatta_feriali=True),
@@ -1599,6 +1651,9 @@ class Rete(object):
 			'carpooling_vincoli': carpooling_vincoli,
 			'carsharing': carsharing,
 			'teletrasporto': teletrasporto,
+			'rete': self,
+			'ztl': set() if ztl is None else ztl,
+			'tpl': tpl,
 		}
 
 		
@@ -1996,7 +2051,38 @@ class ArcoAttesaMetroInterscambio(Arco):
 	def costruisci_percorso(self, t, opzioni):
 		vars = self.s.get_vars(opzioni)
 		ta, tt = self.get_tempo_vero(vars.time, opzioni)
-		return tratto.TrattoMetro(t, vars.time, self.t.rete_fermata, ta, tt, opzioni['t_sal_metro'], True)	
+		return tratto.TrattoMetro(t, vars.time, self.t.rete_fermata, ta, tt, opzioni['t_sal_metro'], True)
+
+class ArcoAttesaInterscambio(Arco):
+	def __init__(self, nodo_palina, nodo_interscambio):
+		Arco.__init__(self, nodo_palina, nodo_interscambio, (21, nodo_palina.rete_palina.id_palina, nodo_interscambio.nome))
+
+	def get_tempo(self, t, opz):
+		if opz['auto']:
+			return (-1, -1)
+		return (opz['t_interscambio'], opz['t_interscambio'])
+
+	def get_coordinate(self):
+		return []
+
+	def costruisci_percorso(self, t, opzioni):
+		vars = self.s.get_vars(opzioni)
+		return tratto.TrattoInterscambio(t.parent, vars.time, self.s.rete_palina, opzioni['t_interscambio'])
+
+class ArcoDiscesaInterscambio(Arco):
+	def __init__(self, nodo_interscambio, nodo_palina):
+		Arco.__init__(self, nodo_interscambio, nodo_palina, (22, nodo_interscambio.nome, nodo_palina.rete_palina.id_palina))
+
+	def get_tempo(self, t, opz):
+		return (0, 0)
+
+	def get_coordinate(self):
+		return []
+
+	def costruisci_percorso(self, t, opzioni):
+		vars = self.s.get_vars(opzioni)
+		t.set_palina_t(self.t.rete_palina)
+		return tratto.TrattoPiedi(t.parent, vars.time)
 		
 
 class ArcoPercorrenzaMetro(ArcoPercorrenzaBus):
@@ -2313,10 +2399,29 @@ def carica_rete_su_grafo(r, g, retina=False, versione=None):
 			p.nodo_palina = n
 			g.add_nodo(n)
 	interscambio = {'TERMINI': None, 'BOLOGNA': None}
+	nodi_scambio = {
+		'PIRAMIDE': ['90151', '91151', 'BP8', 'BD15', '90221', '91221'],
+		'EUR MAGLIANA': ['90153', '91153', 'BP4', 'BD19'],
+		'SAN PAOLO': ['90152', '91152', 'BP6', 'BD17'],
+		# 'TEST': ['BP8', 'BD15', 'AP7', 'AD21'] # Ostiense <-> Porta Furba
+	}
 	for k in interscambio:
 		n = NodoInterscambio(k)
 		interscambio[k] = n
 		g.add_nodo(n)
+	for k in nodi_scambio:
+		n = NodoInterscambio(k)
+		g.add_nodo(n)
+		for id_palina in nodi_scambio[k]:
+			try:
+				np = g.nodi[(1, id_palina)]
+				a = ArcoAttesaInterscambio(np, n)
+				g.add_arco(a)
+				a = ArcoDiscesaInterscambio(n, np)
+				g.add_arco(a)
+			except:
+				traceback.print_exc()
+				print "Nodo scambio: palina %s non trovata" % id_palina
 	# Fermate
 	fermata_teletrasporto = None
 	for k in r.fermate:
@@ -2396,7 +2501,7 @@ def carica_rete_su_grafo(r, g, retina=False, versione=None):
 	else:
 		inizio_validita = datetime2compact(versione)			
 	path_rete = os.path.join(settings.TROVALINEA_PATH_RETE, inizio_validita)
-	geocoding_file = os.path.join(path_rete, 'archi_geocoding%s.dat' % ('_mini' if retina else ''))
+	geocoding_file = os.path.join(path_rete, 'archi_geocoding%s.v3.dat' % ('_mini' if retina else ''))
 	r.geocoder = geocoder.Geocoder(g, 12) # 12 e' il tipo degli archi stradali
 	gc = r.geocoder
 	try:
@@ -2446,7 +2551,7 @@ def carica_rete_e_grafo(retina=False, versione=None):
 	rete.carica(retina, versione)
 	g = Grafo()
 	registra_classi_grafo(g)
-	g.deserialize('%s%s.dat' % (settings.GRAPH, '_mini' if retina else ''))
+	g.deserialize('%s%s.v3.dat' % (settings.GRAPH, '_mini' if retina else ''))
 	carica_rete_su_grafo(rete, g, retina, versione)
 	fn = u'fr.txt'
 	carica_orari_fr_da_file(rete, g, fn)
@@ -2550,25 +2655,6 @@ def calcola_frequenze():
 		g = cerca_giorno(gi)
 		print g
 		calcola_frequenze_giorno(g, gi)
-
-def batch_qs(qs, batch_size=50000):
-	"""
-	Returns a (start, end, total, queryset) tuple for each batch in the given
-	queryset.
-	
-	Usage:
-	    # Make sure to order your querset
-	    article_qs = Article.objects.order_by('id')
-	    for start, end, total, qs in batch_qs(article_qs):
-	        print "Now processing %s - %s of %s" % (start + 1, end, total)
-	        for article in qs:
-	            print article.body
-	"""
-	total = qs.count()
-	for start in range(0, total, batch_size):
-		end = min(start + batch_size, total)
-		for p in qs[start:end]:
-			yield p
 
 		
 def elabora_statistiche(data_inizio, data_fine, min_weight=5):

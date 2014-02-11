@@ -1,5 +1,5 @@
 #
-#    Copyright 2013 Roma servizi per la mobilità srl
+#    Copyright 2013-2014 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -53,8 +53,9 @@ from pyjamas.JSONService import JSONProxy
 from pyjamas import History
 from pyjamas import DOM
 from prnt import prnt
-from util import StyledFixedColumnFlexTable, HTMLFlowPanel, DP, VP, HP, GP, SP
+from util import StyledFixedColumnFlexTable, HTMLFlowPanel, DP, VP, HP, GP, SP, DeferrablePanel, ScrollAdaptivePanel
 from util import get_checked_radio, HidingPanel, ValidationErrorRemover, MyAnchor, LoadingButton
+from util import SearchBox
 from datetime import date, time, datetime, timedelta
 from Calendar import Calendar, DateField, TimeField
 from map import MapPanel, Layer, LayerPanel, Marker
@@ -63,12 +64,13 @@ from DissolvingPopup import DissolvingPopup
 from util import JsonHandler, redirect
 
 
-client = JSONProxy('/json/', ['risorse_lista_tipi'])
+client = JSONProxy('/json/', ['risorse_lista_tipi', 'servizi_autocompleta_indirizzo'])
 
 
-class CercaLuogoPanel(SimplePanel, KeyboardHandler, FocusHandler):
+class CercaLuogoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, DeferrablePanel):
 	def __init__(self, owner):
-		SimplePanel.__init__(self)
+		ScrollAdaptivePanel.__init__(self)
+		DeferrablePanel.__init__(self)
 		KeyboardHandler.__init__(self)
 		self.owner = owner
 		self.map = None
@@ -94,10 +96,11 @@ class CercaLuogoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 									'width': '70%',
 									'sub': [							
 										{
-											'class': TextBox,
+											'class': SearchBox,
 											'name': 'query',
 											'call_addKeyboardListener': ([self], {}),
 											'call_addFocusListener': ([self], {}),
+											'args': [client.servizi_autocompleta_indirizzo, None, 3, 100, False],
 										},
 										{
 											'class': HP,
@@ -113,6 +116,7 @@ class CercaLuogoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 													'class': Button,
 													'args': ['X', self.onChiudiQuery],
 													'width': '40px',
+													'style': 'close-button',
 												},										
 											]
 										},											
@@ -129,6 +133,7 @@ class CercaLuogoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 						{
 							'class': ListBox,
 							'name': 'risorse',
+							'style': 'big-list',
 							'call_setVisibleItemCount': ([6], {}),
 							'call_setMultipleSelect': ([True], {}),
 						},
@@ -217,8 +222,10 @@ class CercaLuogoPanel(SimplePanel, KeyboardHandler, FocusHandler):
 		self.ripristinaWidgets()
 		self.cercaLuogo(self.base.by_name('query').getText())
 		
-	def cercaLuogo(self, query, tipi=None):
+	def cercaLuogo(self, query, tipi=None, set_input=False):
 		query = query.strip()
+		if set_input:
+			self.base.by_name('query').setText(query)
 		if query == '':
 			self.onCercaErrore({'stato': 'Error'})
 			return

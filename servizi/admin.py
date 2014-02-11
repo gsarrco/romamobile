@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013 Roma servizi per la mobilità srl
+#    Copyright 2013-2014 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -34,3 +34,8 @@ admin.site.register(LinguaPreferita)
 admin.site.register(LogoPersonalizzato)
 admin.site.register(Festivita)
 
+class RicercaErrataAdmin(admin.ModelAdmin):
+    list_display = ('ricerca', 'conteggio', 'conversione')
+    search_fields = ('ricerca', 'conversione')
+
+admin.site.register(RicercaErrata, RicercaErrataAdmin)

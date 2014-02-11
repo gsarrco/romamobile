@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013 Roma servizi per la mobilità srl
+#    Copyright 2013-2014 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -52,47 +52,34 @@ from pyjamas.JSONService import JSONProxy
 from pyjamas import History
 from pyjamas import DOM
 from prnt import prnt
-from pyjamas.gmaps.Map import Map, MapTypeId, MapOptions
-from pyjamas.gmaps.Base import LatLng
 from pyjamas.ui.ContextMenuPopupPanel import ContextMenuPopupPanel
 from datetime import date, time, datetime, timedelta
 from __pyjamas__ import JS
 
 from DissolvingPopup import DissolvingPopup
-from util import JsonHandler, redirect, MenuCmd, HTMLFlowPanel, SearchPopup
+from util import JsonHandler, redirect, MenuCmd, HTMLFlowPanel, SearchPopup, DeferrablePanel, MyAnchor
 
-from pyjamas.gmaps.Map import Map, MapTypeId, MapOptions
 
 client = JSONProxy('/json/', ['mappa_layer'])
 
 def list_to_point_array(l):
 	JS("""punti = Array();""")
 	for y, x in l:
-		JS("""punti.push(new $wnd['google'].maps.LatLng(x, y));""")
+		JS("""punti.push(new $wnd['L'].latLng(x, y));""")
 	return punti
 
-class MapPanel(SimplePanel):
+class MapPanel(SimplePanel, DeferrablePanel):
 	def __init__(self, owner, display_callback=None):
 		SimplePanel.__init__(self)
+		DeferrablePanel.__init__(self)
 		self.owner = owner
 		self.owner.add(self)
 		self.setSize('100%', '100%')
 		self.layers = []
 		self.layer_panels = []
 		self.right_click_options = []
-		options = MapOptions(zoom=12, center=LatLng(41.892055, 12.483559), mapTypeId=MapTypeId.ROADMAP)
-		self.map = Map(self.getElement(), options)
-		map = self.map
-		func = self.onRightClick
-		self.addStyleName('pyjsmapid')
+		self.setID('map-container')
 		self.display_callback=display_callback
-		JS("""
-			$wnd['google'].maps.event.addListener(map, 'rightclick', function(event) {
-				var lat = event.latLng.lat();
-    		var lng = event.latLng.lng();
-				func(lat, lng, event.pixel.x, event.pixel.y);
-			});
-		""")
 		self.open_bubble = None
 		
 	def addRightClickOption(self, option, callback):
@@ -111,9 +98,49 @@ class MapPanel(SimplePanel):
 			menu.addItem(opt, MenuCmd(self.rightClickHandlerFactory(cb, lat, lng)))
 		popup = ContextMenuPopupPanel(menu)
 		popup.showAt(x + mx, y + my)
-		
+
+	def create_map(self):
+		mapquestAttrib = """Tiles Courtesy of <a href="http://www.mapquest.com/" target="_blank">MapQuest</a>
+		<img src="http://developer.mapquest.com/content/osm/mq_logo.png">,
+		&copy; <a href="http://www.openstreetmap.org/" target="_blank">OpenStreetMap</a>"""
+		func = self.onRightClick
+		JS("""
+			this.map = $wnd['L'].map(
+				'map-container', {
+					zoomControl: false
+				}
+			).setView([41.892055, 12.483559], 12);
+			zoom_ctrl = $wnd['L'].control.zoom({position: 'topright'});
+			this.map.addControl(zoom_ctrl);
+			osm = $wnd['L'].tileLayer('http://{s}.mqcdn.com/tiles/1.0.0/map/{z}/{x}/{y}.png', {
+				attribution: mapquestAttrib,
+				maxZoom: 18,
+				subdomains: ['otile1', 'otile2', 'otile3', 'otile4']
+			});
+			osm.addTo(this.map);
+			/*
+				pcn = $wnd['L'].tileLayer.wms("http://wms.pcn.minambiente.it/ogc?map=/ms_ogc/WMS_v1.3/raster/ortofoto_colore_08.map", {
+					layers: 'OI.ORTOIMMAGINI.2008',
+					minZoom: 16,
+					format: 'image/png',
+					attribution: '<a href="http://www.pcn.minambiente.it/GN/" target="_blank">Geoportale Nazionale</a>'
+				});
+				var baseMaps = {
+					"Cartografia": osm,
+				};
+				var overlayMaps = {
+					"Immagini aeree (zoom in)": pcn
+				};
+				var layersControl = new $wnd['L'].Control.Layers(baseMaps, overlayMaps);
+				this.map.addControl(layersControl);
+			*/
+			this.map.addEventListener('contextmenu', function(e) {
+				func(e.latlng.lat, e.latlng.lng, e.containerPoint.x, e.containerPoint.y)
+			});
+		""")
+
 	def relayout(self):
-		JS("""$wnd['google'].maps.event.trigger(self.map, "resize");""")
+		JS("""self.map.invalidateSize();""")
 			
 	def replace_bubble(self, new_bubble):
 		if self.open_bubble is not None:
@@ -157,7 +184,7 @@ class MapPanel(SimplePanel):
 				return
 			l = Layer(layer_name, res['descrizione'], self)
 			l.deserialize(res, info_panel=info_panel)
-			l.centerOnMap()
+			self.owner.center_and_zoom(l)
 			if onDone is not None:
 				self.onDone(l)
 
@@ -199,7 +226,7 @@ class InfoPanel(HorizontalPanel):
 		self.onClicCallback = onClic
 		
 	def onClic(self):
-		if onClicCallback is not None:
+		if self.onClicCallback is not None:
 			self.onClicCallback()
 		
 	
@@ -214,10 +241,16 @@ class Layer:
 		self.sub = []
 		self.owner = owner
 		self.destroyed = False
+		map = map_panel.map
+		JS("""
+			self.group = new $wnd['L'].featureGroup();
+			self.group.addTo(map);
+		""")
 		if self.owner is None:
 			map_panel.addLayer(self)
 		else:
 			client.mappa_layer(name, JsonHandler(self.onMappaLayerDone))
+
 			
 	def onMappaLayerDone(self, res):
 		self.deserialize(res)
@@ -282,16 +315,16 @@ class Layer:
 				self.owner = None
 		
 	def centerOnMap(self):
-		bounds = JS("""new $wnd['google'].maps.LatLngBounds();""")
 		map = self.map_panel.map
-		n = 0
+		n = len(self.features)
+		"""
 		for f in self.features:
 			if isinstance(f, Marker):
 				n += 1
 				m = f.point
-				JS("""bounds.extend(m);""")
+		"""
 		if n > 0:
-			JS("""map.fitBounds(bounds);""")
+			JS("""map.fitBounds(self.group.getBounds());""")
 			if n == 1:
 				JS("""map.setZoom(16);""")
 		
@@ -376,72 +409,77 @@ class Marker:
 		if anchor is not None:
 			ax = anchor[0]
 			ay = anchor[1]
-			JS("""ajs = new $wnd['google'].maps.Point(ax, ay);""")
+			JS("""ajs = new $wnd['L'].point(ax, ay);""")
 		else:
 			ajs = None
 		draggable = False if drop_callback is None else True
-		self.marker = JS("""
-			self.point = new $wnd['google'].maps.LatLng(x, y);
-			mImg = new $wnd['google'].maps.MarkerImage(icon_path, null, null, ajs);
+		JS("""
+			self.point = new $wnd['L'].latLng(x, y);
+			mImg = new $wnd['L'].icon({
+				iconUrl: icon_path,
+				iconAnchor: ajs
+			});
 			mOpt = {
-				position: self.point,
 				title: lb,
 				icon: mImg,
 				draggable: draggable,
-				map: map
 			};
-			self.marker = new $wnd['google'].maps.Marker(mOpt);
+			self.marker = new $wnd['L'].marker(self.point, mOpt);
+			self.marker.addTo(map);
+			layer.group.addLayer(self.marker);
 		""")
 		marker = self.marker
 		if drop_callback is not None:
 			JS("""
-				$wnd['google'].maps.event.addListener(marker, 'dragend', function() {
-					var latlng = marker.getPosition();
-					drop_callback(latlng.lat(), latlng.lng());
+				marker.addEventListener('dragend', function() {
+					var latlng = marker.getLatLng();
+					drop_callback(latlng.lat, latlng.lng);
 				});
 			""")
 		if infobox is not None or infobox_listener is not None:
-			if infobox is not None:
-				infobox_listener = self.openBubble
-			else:
-				infobox = ''
+			if infobox_listener is None and self.name is not None:
+				infobox_listener = self.openBubbleListener
 			JS("""
-				mInfoOpt = {
-					content: infobox,
-					position: new $wnd['google'].maps.LatLng(x, y),
-					pixelOffset: new $wnd['google'].maps.Size(0, 0),
-					visible: true
-				};
+				marker.bindPopup(infobox);
 			""")
-			self.bubble = JS("""new $wnd['google'].maps.InfoWindow(mInfoOpt);""")	
-			JS("""$wnd['google'].maps.event.addListener(self.marker, "click", function() {infobox_listener(); });""")
-		if open:
-			self.openBubble()
-			
+			self.bubble = marker.getPopup()
+			if infobox_listener is not None:
+				JS("""
+					marker.addEventListener('click', function() {
+						infobox_listener(self);
+					});
+				""")
+			if open:
+				if infobox_listener is not None:
+					infobox_listener(self)
+				else:
+					marker.openPopup()
+
+	def openBubbleListener(self, marker):
+		self.openBubble()
 
 	def openBubble(self, new_content=None):
-		self.layer.map_panel.replace_bubble(self)
-		self.layer.map_panel.display()
-		map = self.layer.getMap()
 		if new_content is not None:
 			self.bubble.setContent(new_content)
 		elif self.name is not None:
 			client.mappa_layer(self.name, JsonHandler(self.onMappaLayerDone))
-		JS("""self.bubble.open(map, self.marker);""")
+		self.marker.openPopup()
+
 		
 	def onMappaLayerDone(self, res):
 		self.bubble.setContent(res)
 		
 	def closeBubble(self):
-		JS("""self.bubble.close();""")
-		
+		# JS("""self.bubble.close();""")
+		pass
+
 	def setVisible(self, visible):
 		self.visible = visible
+		map = self.layer.getMap()
 		if visible:
-			map = self.layer.getMap()
+			self.marker.addTo(map)
 		else:
-			map = None
-		self.marker.setMap(map)
+			map.removeLayer(self.marker)
 
 
 class Polyline:
@@ -453,29 +491,27 @@ class Polyline:
 		map = layer.getMap() if visible else None
 		JS("""
 			var myPolyOpt = {
-					strokeColor: color,
-					strokeOpacity: opacity,
-					strokeWeight: thickness,
-					visible: true,
-					zIndex: zIndex
+				color: color,
+				opacity: opacity,
+				weight: thickness,
 			}
-			self.myPoly = new $wnd['google'].maps.Polyline(myPolyOpt);
-			self.myPoly.setPath(pt);
-			self.myPoly.setMap(map);
+			self.myPoly = new $wnd['L'].polyline(pt, myPolyOpt);
+			self.myPoly.addTo(map);
+			layer.group.addLayer(self.myPoly);
 		""")
 		
 	def setVisible(self, visible):
 		self.visible = visible
+		map = self.layer.getMap()
 		if visible:
-			map = self.layer.getMap()
+			self.myPoly.addTo(map)
 		else:
-			map = None
-		self.myPoly.setMap(map)
+			map.removeLayer(self.myPoly)
 	
 		
 		
 class Geocoder(KeyboardHandler):
-	def __init__(self, search, method, map=None, pin_url='partenza_percorso.png', pin_size=(32, 32), lngBox=None, latBox=None, callback=None):
+	def __init__(self, search, method, map=None, pin_url='partenza_percorso.png', pin_size=(32, 32), lngBox=None, latBox=None, callback=None, anchor=(16, 32)):
 		self.search = search
 		self.map = map
 		self.search.addKeyboardListener(self)
@@ -497,6 +533,7 @@ class Geocoder(KeyboardHandler):
 		self.pin_size = pin_size
 		self.popup = None
 		self.callback = callback
+		self.anchor = anchor
 		
 	def onSearchChange(self):
 		if not self.valid:
@@ -578,7 +615,8 @@ class Geocoder(KeyboardHandler):
 				(self.lng, self.lat),
 				self.pin_url,
 				icon_size=self.pin_size,
-				drop_callback=self.onDrop
+				drop_callback=self.onDrop,
+				anchor=self.anchor,
 			)
 			self.layer.centerOnMap()
 		if self.callback is not None:
@@ -611,5 +649,14 @@ class Geocoder(KeyboardHandler):
 	def destroy(self):
 		if self.layer is not None:
 			self.layer.destroy()
-		
-		
+
+def get_location(callback):
+	JS("""
+		if (navigator.geolocation) {
+			navigator.geolocation.getCurrentPosition(function(position) {
+				lng = position.coords.longitude;
+				lat = position.coords.latitude;
+				callback(lng, lat);
+			});
+		}
+  """)

@@ -1,5 +1,5 @@
 #
-#    Copyright 2013 Roma servizi per la mobilità srl
+#    Copyright 2013-2014 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -18,12 +18,14 @@
 #
 
 from prnt import prnt
-from __pyjamas__ import JS, jsimport
+from __pyjamas__ import JS
+from pyjamas import DOM
 from pyjamas.ui.Calendar import Calendar, DateField
 from pyjamas.ui.RootPanel import RootPanel
 from pyjamas.ui.VerticalPanel import VerticalPanel
 from pyjamas.ui.HorizontalPanel import HorizontalPanel
 from pyjamas.ui.SimplePanel import SimplePanel
+from pyjamas.ui.ScrollPanel import ScrollPanel
 from pyjamas.ui.DisclosurePanel import DisclosurePanel
 from pyjamas.ui.DialogBox import DialogBox
 from pyjamas.ui.TabPanel import TabPanel
@@ -51,7 +53,7 @@ from pyjamas.ui.MenuBar import MenuBar
 from pyjamas.ui.MenuItem import MenuItem
 from pyjamas.ui.Widget import Widget
 from pyjamas.ui.Hyperlink import Hyperlink
-from pyjamas import Window
+from pyjamas import Window, History
 from pyjamas.Timer import Timer
 from datetime import date, time, datetime, timedelta
 from DissolvingPopup import DissolvingPopup
@@ -250,10 +252,10 @@ class MinuteListBox(ListBox):
 		
 		
 class MyAnchor(Anchor):
-	def __init__(self, *args, **kwargs):
+	def __init__(self, max_parita=2, *args, **kwargs):
 		Anchor.__init__(self, *args, **kwargs)
 		self.my_parita = 0
-		self.max_parita = 2
+		self.max_parita = max_parita
 		
 	def set_numero_eventi(self, n):
 		self.max_parita = n
@@ -321,8 +323,11 @@ class StyledFlexTable(FlexTable):
 		self.setWidget(self.row, self.column, w)
 		if style is not None:
 			self.formatter.addStyleName(self.row, self.column, style)
-		if center:
-			self.formatter.setHorizontalAlignment(self.row, self.column, HasAlignment.ALIGN_CENTER)
+		if type(center) == bool:
+			if center:
+				self.formatter.setHorizontalAlignment(self.row, self.column, HasAlignment.ALIGN_CENTER)
+		else:
+			self.formatter.setHorizontalAlignment(self.row, self.column, center)
 		if expand:
 			self.formatter.setWidth(self.row, self.column, '100%')
 			w.setWidth('100%')
@@ -339,8 +344,8 @@ class StyledFixedColumnFlexTable(StyledFlexTable):
 		if self.column == self.column_count:
 			self.newRow()
 			
-	def add(self, w):
-		self.addStyledWidget(w, center=True, expand=expand)
+	def add(self, w, center=True):
+		self.addStyledWidget(w, center=center, expand=expand)
 
 		
 		
@@ -534,20 +539,24 @@ class HP(HorizontalPanel, AutoLayout):
 		
 	def onCreate(self, el, kwargs):
 		#el.setSize('100%', '100%')
-		el.setWidth('100%')
 		self.add(el)
+		if not 'width' in kwargs:
+			el.setWidth('100%')
 		if 'width' in kwargs:
 			if kwargs['width'] is not None:
+				el.setWidth('100%')
 				self.setCellWidth(el, kwargs['width'])
 		if not 'height' in kwargs:
 			self.setCellHeight(el, '100%')
 		elif kwargs['height'] is not None:
 			self.setCellHeight(el, kwargs['height'])
 		if 'vertical_alignment' in kwargs:
-			self.setCellVerticalAlignment(el, kwargs['vertical_alignment'])			
+			self.setCellVerticalAlignment(el, kwargs['vertical_alignment'])
+		if 'horizontal_alignment' in kwargs:
+			self.setCellHorizontalAlignment(el, kwargs['horizontal_alignment'])
 			
 	def getReservedArgs(self):
-		return ['width', 'vertical_alignment']
+		return ['width', 'height', 'vertical_alignment', 'horizontal_alignment']
 
 			
 class VP(VerticalPanel, AutoLayout):
@@ -637,13 +646,15 @@ class LoadingButton(Button):
 		if self.backup_html is None:
 			self.setEnabled(False)
 			self.backup_html = self.getHTML()
-			self.setHTML('<img src="loading.gif" />')
+			# self.setHTML('<img src="loading.gif" />')
+			wait_start()
 			
 	def stop(self):
 		if self.backup_html is not None:
-			self.setHTML(self.backup_html)
+			# self.setHTML(self.backup_html)
 			self.backup_html = None
 			self.setEnabled(True)
+			wait_stop()
 		
 class MenuCmd:
 	def __init__(self, handler):
@@ -663,6 +674,9 @@ class ToggleImage(Image):
 		self.addClickListener(self.onClick)
 		self.data = data
 		self.can_turn_off = can_turn_off
+
+	def setTooltip(self, s):
+		self.getElement().setAttribute('title', s)
 		
 	def setActive(self, active=None):
 		if active is None:
@@ -685,8 +699,8 @@ class ToggleImage(Image):
 			self.setActive(True)
 		if self.callback is not None:
 			self.callback(self)
-	  
-	  
+
+
 # SearchBox
 
 class SearchPopup(PopupPanel, KeyboardHandler):
@@ -694,7 +708,9 @@ class SearchPopup(PopupPanel, KeyboardHandler):
 		PopupPanel.__init__(self, True, modal=False)
 		self.callback = callback
 		self.list = ListBox()
+		self.list.addStyleName('big-list')
 		self.list.setVisibleItemCount(10)
+		self.list.addKeyboardListener(self)
 		self.list.addClickListener(self.onList)
 		self.els = els
 		self.names = {}
@@ -703,9 +719,8 @@ class SearchPopup(PopupPanel, KeyboardHandler):
 			self.list.addItem(name, pk)
 			self.names[pk] = name
 		self.setWidget(self.list)
-		self.list.addKeyboardListener(self)
 		self.textbox = textbox
-		
+
 	def update(self, els):
 		self.list.clear()
 		self.names = {}
@@ -721,17 +736,19 @@ class SearchPopup(PopupPanel, KeyboardHandler):
 	def setFocus(self, focus=True):
 		self.list.setFocus(focus)
 		self.list.setSelectedIndex(0)
-		
+
 	def onKeyDown(self, sender, keycode, modifiers):
 		if keycode == 38 and self.textbox is not None and self.list.getSelectedIndex() == 0:
 			self.list.setValueSelection([])
 			self.textbox.setFocus(True)
-			
-					
+
 	def onKeyUp(self, sender, keycode, modifiers):
 		if keycode == 13:
 			pk = self.list.getValue(self.list.getSelectedIndex())
 			self.callback(pk, self.names[pk])
+		if keycode == 27:
+			self.hide()
+
 			
 	def getSingleElement(self):
 		"""
@@ -743,7 +760,7 @@ class SearchPopup(PopupPanel, KeyboardHandler):
 
 
 class SearchBox(TextBox, KeyboardHandler, FocusListener):
-	def __init__(self, method, callback=None):
+	def __init__(self, method, callback=None, min_len=3, delay=100, mandatory=True):
 		"""
 		method: json-rpc method. It expects a search string, a returns a list of pairs (pk, name)
 		"""
@@ -754,46 +771,78 @@ class SearchBox(TextBox, KeyboardHandler, FocusListener):
 		self.pk = -1
 		self.popup = None
 		self.callback = callback
+		self.delay = delay
+		self.min_len = min_len
+		self.timer = Timer(notify=self.onTimer)
+		self.timer_enabled = False
+		self.mandatory = mandatory
+
+	def closePopup(self):
+		self.stop_timer()
+		if self.popup is not None:
+			self.popup.hide()
+
+	def onTimer(self):
+		if self.timer_enabled:
+			search = self.getText()
+			if len(search) >= self.min_len:
+				self.method(search, JsonHandler(self.onMethodDone))
+
+	def start_timer(self):
+		self.timer_enabled = True
+		self.timer.schedule(self.delay)
+
+	def stop_timer(self):
+		self.timer_enabled = False
+		self.timer.cancel()
 		
 	def onMethodDone(self, res):
-		if len(res) > 0:
+		if self.timer_enabled and res['cerca'] == self.getText() and len(res['risultati']) > 0:
+			res = res['risultati']
 			if self.popup is not None:
 				self.popup.update(res)
 			else:
 				self.popup = SearchPopup(res, self.onSearchPopupSelected, self)
-			self.popup.setPopupPosition(self.getAbsoluteLeft(), self.getAbsoluteTop() + 20)
+			self.popup.setPopupPosition(self.getAbsoluteLeft(), self.getAbsoluteTop() + self.getClientHeight())
 			self.popup.show()
 			
 	def onLostFocus(self):
-		if self.popup is not None:
+		if self.mandatory and self.popup is not None:
 			el = self.popup.getSingleElement()
 			if el is not None:
 				pk, name = el
-				self.onSearchPopupSelected(pk, name)		
-	
+				self.onSearchPopupSelected(pk, name)
+
+	def onKeyDown(self, sender, keycode, modifiers):
+		if keycode in [9, 13, 27]: # TAB, Enter, ESC
+			self.closePopup()
+
 	def onKeyUp(self, sender, keycode, modifiers):
 		self.removeStyleName('validation-error')
-		if keycode == 40 and self.popup is not None:
+		self.stop_timer()
+		if keycode == 40 and self.popup is not None: # Down
 			self.popup.setFocus()
-		elif keycode == 13 and self.popup is not None:
+		elif self.mandatory and keycode == 13 and self.popup is not None:
 			el = self.popup.getSingleElement()
 			if el is not None:
 				pk, name = el
 				self.onSearchPopupSelected(pk, name)
 		else:
-			self.pk = -1
-			if self.popup is not None:
-				self.popup.hide()
-			search = self.getText()
-			if len(search) >= 3:
-				self.method(search, JsonHandler(self.onMethodDone))
-				
+			c = chr(keycode).lower()
+			if (c >= 'a' and c <= 'z') or (c >= '0' and c <= '9') or keycode == 8: # Backspace
+				self.pk = -1
+				if self.popup is not None:
+					self.closePopup()
+				self.start_timer()
+
 	def setValidationError(self):
 		self.addStyleName('validation-error')
 		
 	def onSearchPopupSelected(self, pk, name):
-		self.popup.hide()
+		self.closePopup()
 		self.setText(name)
+		self.setFocus(True)
+		self.setCursorPos(len(name))
 		self.pk = pk
 		if self.callback is not None:
 			self.callback()
@@ -904,8 +953,6 @@ class InputMapper(KeyboardHandler):
 				callback_yes()
 		else:
 			QuestionDialogBox("Conferma", "Ci sono modifiche non salvate. Confermi la chiusura?", [("S&igrave;", callback_yes, None), ("No", callback_no, None)]).show()
-
-		
 		
 	def onLoadDone(self, res):
 		for name in res:
@@ -938,13 +985,105 @@ class InputMapper(KeyboardHandler):
 				text, lng, lat = el
 				input.setAddress(text, lng, lat)
 		if self.load_callback is not None:
-			self.load_callback(res)				
-				
-			
-			
+			self.load_callback(res)
 		
 	def load(self):
 		self.load_method(self.pk, JsonHandler(self.onLoadDone))
-		
-		
-	
+
+
+class DeferrableTabPanel(TabPanel):
+	def __init__(self, owner):
+		super(DeferrableTabPanel, self).__init__()
+		History.addHistoryListener(self)
+		self.owner = owner
+		self.selected = None
+
+	def onHistoryChanged(self, token):
+		if token.startswith('htm-'):
+			index = int(token[4:])
+			super(DeferrableTabPanel, self).selectTab(index)
+
+
+	def onTabSelected(self, sender, tabIndex):
+		res = super(DeferrableTabPanel, self).onTabSelected(sender, tabIndex)
+		self.selected = self.getWidget(tabIndex)
+		History.newItem("htm-%d" % tabIndex)
+		self.selected.perform_deferred()
+		self.selected.onTabSelected()
+		return res
+
+	def add(self, widget, *args, **kwargs):
+		widget.dtp = self
+		return TabPanel.add(self, widget, *args, **kwargs)
+
+	def star_tab(self, index):
+		tab_bar = self.getTabBar()
+		h = tab_bar.getTabHTML(index)
+		w = tab_bar.getTabWidget(index)
+		if h[-1] != '*':
+			w.setHTML(h + '*')
+			def remove_star():
+				w.setHTML(h)
+			self.getWidget(index).do_or_defer(remove_star)
+
+
+class DeferrablePanel(object):
+	def __init__(self, deferrable_tab_panel):
+		object.__init__(self)
+		self.op = []
+		self.dtp = deferrable_tab_panel
+
+	def do_or_defer(self, o, *args, **kwargs):
+		self.op.append([o, args, kwargs])
+		if self == self.dtp.selected:
+			self.perform_deferred()
+
+	def perform_deferred(self):
+		op = self.op
+		self.op = []
+		for el in op:
+			o, args, kwargs = el
+			o(*args, **kwargs)
+
+	def onTabSelected(self):
+		pass
+
+
+class ScrollAdaptivePanel(ScrollPanel):
+	def __init__(self):
+		ScrollPanel.__init__(self)
+
+	def relayout(self):
+		w = self.getWidget()
+		self.remove(w)
+		self.setHeight('100%')
+		height = self.getClientHeight()
+		self.setHeight(height)
+		self.setWidget(w)
+
+waiting = [None]
+
+def wait_init(owner):
+	waiting[0] = Waiting(owner)
+def wait_start():
+	waiting[0].start()
+def wait_stop():
+	waiting[0].stop()
+
+class Waiting(Image):
+	def __init__(self, owner):
+		Image.__init__(self, 'wait.gif')
+		self.owner = owner
+		self.addStyleName('waiting')
+
+	def start(self):
+		self.owner.add(self)
+
+	def stop(self):
+		self.owner.remove(self)
+
+def getdefault(d, key, default):
+	if key in d:
+		return d[key]
+	return default
+

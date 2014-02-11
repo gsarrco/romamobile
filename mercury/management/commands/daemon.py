@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013 Roma servizi per la mobilità srl
+#    Copyright 2013-2014 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -66,7 +66,10 @@ class Command(BaseCommand):
 				print "Forzo riavvio"
 				ss_pronti = ss_istanziati
 			else:
-				ss_pronti = ss_istanziati.filter(ready=True)			
+				ss_pronti = ss_istanziati.filter(
+					Q(ready=True) |
+					Q(ready=False, active_since__lt=n - timedelta(minutes=sc.max_restart_time))
+				)
 			
 			if sc.action == 'R':
 				for s in ss_istanziati:
@@ -90,10 +93,13 @@ class Command(BaseCommand):
 				# Chiudo un eventuale server obsoleto
 				server_chiusi = 0			
 				if len(ss_pronti) == len(ss_istanziati):
-					ss_scaduti = ss_istanziati.filter(Q(active_since__lt=n - timedelta(minutes=sc.restart_timeout)) | Q(action='R')).exclude(action='F')
+					ss_scaduti = ss_istanziati.filter(
+						Q(active_since__lt=n - timedelta(minutes=sc.restart_timeout))
+						| Q(action='R')
+					).exclude(action='F').order_by('ready')
 					if len(ss_scaduti) > 0:
 						s = ss_scaduti[0]
-						if s.action == 'R' or sc.restart_from <= t <= sc.restart_to:
+						if s.action == 'R' or sc.restart_from <= t <= sc.restart_to or not s.ready:
 							print "Chiudo il processo ", sc.name, s.pid
 							try:
 								os.kill(s.pid, signal.SIGTERM)
@@ -112,4 +118,3 @@ class Command(BaseCommand):
 						pid=p.pid,
 					).save()
 
-			
