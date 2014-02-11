@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013 Roma servizi per la mobilità srl
+#    Copyright 2013-2014 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -24,6 +24,7 @@ from servizi.utils import dictfetchall, model2contenttype
 from pprint import pprint
 from django.db import connections
 from django.contrib.gis.geos import Point, GEOSGeometry, LineString
+from django.contrib.gis.gdal import DataSource
 import traceback
 
 # Create your models here.
@@ -59,8 +60,41 @@ class Polilinea(models.Model):
 	objects = models.GeoManager()
 	
 	def __unicode__(self):
-		return self.parent_id	
+		return self.parent_id
+		
+class Poligono(models.Model):
+	# Regular Django fields corresponding to the attributes in the
+	# world borders shapefile.
+	parent_id = models.CharField(max_length=50)
+	parent_type = models.IntegerField()
+	geom = models.PolygonField(srid=3004)
+	
+	objects = models.GeoManager()
 
+class Multipoligono(models.Model):
+	# Regular Django fields corresponding to the attributes in the
+	# world borders shapefile.
+	parent_id = models.CharField(max_length=50)
+	parent_type = models.IntegerField()
+	geom = models.MultiPolygonField(srid=3004)
+
+	objects = models.GeoManager()
+	
+	def __unicode__(self):
+		return self.parent_id
+
+
+class Punto(models.Model):
+	# Regular Django fields corresponding to the attributes in the
+	# world borders shapefile.
+	parent_id = models.CharField(max_length=50)
+	parent_type = models.IntegerField()
+	geom = models.PointField(srid=3004)
+	
+	objects = models.GeoManager()
+	
+	def __unicode__(self):
+		return self.parent_id
 
 def geocode(point, polyline_model, max_distance=50):
 	polyline_type = model2contenttype(polyline_model)
@@ -106,4 +140,10 @@ def geocode(point, polyline_model, max_distance=50):
 	}
 	pprint(out)
 	return out
-	
+
+def load_shapefile(name, source_srid):
+	ds = DataSource(name)
+	layer = ds[0]
+	geom_gdal = layer.get_geoms()[0]
+	geom_geos = GEOSGeometry(geom_gdal.wkb, srid=source_srid)
+	return geom_geos

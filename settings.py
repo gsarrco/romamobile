@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013 Roma servizi per la mobilità srl
+#    Copyright 2013-2014 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -86,6 +86,7 @@ DATABASE_APPS_MAPPING = {
 	'percorso': 'default',
 	'risorse': 'default',
 	'servizi': 'default',
+	'ztl': 'default',
 }
 
 DATABASE_ROUTERS = ['dbrouters.DatabaseAppsRouter']
@@ -220,7 +221,8 @@ WS_APPS = [
 	'parcheggi',
 	'percorso',
 	'risorse',
-	'servizi',			
+	'servizi',
+	'ztl',
 ]
 
 
@@ -235,6 +237,7 @@ XHTML_APPS = [
 	'risorse',
 	'servizi',
 	'xhtml',
+	'ztl',
 ]
 
 # Applicazioni ausiliarie
@@ -343,39 +346,40 @@ DESTINATARI_MAIL_CARICA_RETE = []
 CPD_LOG_PER_STATISTICHE = False
 
 CONSTANCE_CONFIG = {
-    'CPD_PIEDI_0': (2.8, u'Velocità camminatore lento'),
-    'CPD_PIEDI_1': (4.4, u'Velocità camminatore medio'),
-    'CPD_PIEDI_2': (5.3, u'Velocità camminatore veloce'),
-		'CPD_BICI_0': (8.0, u'Velocità ciclista lento'),
-		'CPD_BICI_1': (13.0, u'Velocità ciclista medio'),
-		'CPD_BICI_2': (16.5, u'Velocità ciclista veloce'),
-		'CPD_T_SAL_BUS': (30, u'Tempo di salita bus'),
-		'CPD_T_DISC_BUS': (20, u'Tempo di discesa bus'),
-		'CPD_T_SAL_METRO': (30, u'Tempo di salita metro'),
-		'CPD_T_DISC_METRO': (20, u'Tempo di discesa metro'),
-		'CPD_T_SAL_TRENO': (30, u'Tempo di salita treno'),
-		'CPD_T_DISC_TRENO': (20, u'Tempo di discesa treno'),
-		'CPD_T_SAL_FC': (30, u'Tempo di salita fc'),
-		'CPD_T_DISC_FC': (20, u'Tempo di discesa fc'),
-		'CPD_T_DISC_BICI': (20, u'Tempo necessario per lasciare la bici'),
-		'CPD_PENALIZZAZIONE_AUTO': (0.25, u'Coeff. di penalilzzaz. automobile'),
-		'CPD_PENALIZZAZIONE_CAR_SHARING': (2.0, u'Coeff. di penalilzzaz. car sharing'),
-		'CPD_PENALIZZAZIONE_BUS': (300, u'Tempo di penalizzazione per l\'uso di un bus'),
-		'CPD_PENALIZZAZIONE_METRO': (250, u'Tempo di penalizzazione per l\'uso di una metro'),
-		'CPD_PENALIZZAZIONE_FC': (270, u'Tempo di penalizzazione per l\'uso di una ferrovia concessa'),
-		'CPD_PENALIZZAZIONE_TRENO': (270, u'Tempo di penalizzazione per l\'uso di un treno'),
-		'CPD_INCENTIVO_CAPOLINEA': (240, u'Tempo di incentivo massimo prendere un mezzo al capolinea'),
-		'CPD_PENAL_PEDONALE_0_0': (1.8, u'Coeff. di penalilzzaz. iniz. camminatore lento'),
-		'CPD_PENAL_PEDONALE_1_0': (2.9, u'Coeff. di penalilzzaz. camminatore lento dopo 1 km'),
-		'CPD_PENAL_PEDONALE_EXP_0': (1.0, u'Exp. di penalilzzaz. camminatore lento'),
-		'CPD_PENAL_PEDONALE_0_1': (1.6, u'Coeff. di penalilzzaz. iniz. camminatore medio'),
-		'CPD_PENAL_PEDONALE_1_1': (2.5, u'Coeff. di penalilzzaz. camminatore medio dopo 1 km'),
-		'CPD_PENAL_PEDONALE_EXP_1': (0.85, u'Exp. di penalilzzaz. camminatore medio'),
-		'CPD_PENAL_PEDONALE_0_2': (1.4, u'Coeff. di penalilzzaz. iniz. camminatore veloce'),
-		'CPD_PENAL_PEDONALE_1_2': (1.7, u'Coeff. di penalilzzaz. camminatore veloce dopo 1 km'),
-		'CPD_PENAL_PEDONALE_EXP_2': (0.5, u'Exp. di penalilzzaz. camminatore veloce'),
-		'CPD_BICI_CAMBIO_STRADA': (25, U'Tempo di svolta in bicicletta'),
-		'CARPOOLING_COSTO_CHILOMETRICO': (0.166, u"Costo medio per percorrere 1km in automobile"),
+	'CPD_PIEDI_0': (2.8, u'Velocità camminatore lento'),
+	'CPD_PIEDI_1': (4.4, u'Velocità camminatore medio'),
+	'CPD_PIEDI_2': (5.3, u'Velocità camminatore veloce'),
+	'CPD_BICI_0': (8.0, u'Velocità ciclista lento'),
+	'CPD_BICI_1': (13.0, u'Velocità ciclista medio'),
+	'CPD_BICI_2': (16.5, u'Velocità ciclista veloce'),
+	'CPD_T_SAL_BUS': (30, u'Tempo di salita bus'),
+	'CPD_T_DISC_BUS': (20, u'Tempo di discesa bus'),
+	'CPD_T_SAL_METRO': (30, u'Tempo di salita metro'),
+	'CPD_T_DISC_METRO': (20, u'Tempo di discesa metro'),
+	'CPD_T_SAL_TRENO': (240, u'Buffer di sicurezza per non perdere il treno'),
+	'CPD_T_DISC_TRENO': (20, u'Tempo di discesa treno'),
+	'CPD_T_SAL_FC': (30, u'Tempo di salita fc'),
+	'CPD_T_DISC_FC': (20, u'Tempo di discesa fc'),
+	'CPD_T_DISC_BICI': (20, u'Tempo necessario per lasciare la bici'),
+	'CPD_T_INTERSCAMBIO': (240, u'Tempo di interscambio dei nodi di scambio'),
+	'CPD_PENALIZZAZIONE_AUTO': (0.25, u'Coeff. di penalilzzaz. automobile'),
+	'CPD_PENALIZZAZIONE_CAR_SHARING': (2.0, u'Coeff. di penalilzzaz. car sharing'),
+	'CPD_PENALIZZAZIONE_BUS': (300, u'Tempo di penalizzazione per l\'uso di un bus'),
+	'CPD_PENALIZZAZIONE_METRO': (250, u'Tempo di penalizzazione per l\'uso di una metro'),
+	'CPD_PENALIZZAZIONE_FC': (270, u'Tempo di penalizzazione per l\'uso di una ferrovia concessa'),
+	'CPD_PENALIZZAZIONE_TRENO': (270, u'Tempo di penalizzazione per l\'uso di un treno'),
+	'CPD_INCENTIVO_CAPOLINEA': (240, u'Tempo di incentivo massimo prendere un mezzo al capolinea'),
+	'CPD_PENAL_PEDONALE_0_0': (1.8, u'Coeff. di penalilzzaz. iniz. camminatore lento'),
+	'CPD_PENAL_PEDONALE_1_0': (2.9, u'Coeff. di penalilzzaz. camminatore lento dopo 1 km'),
+	'CPD_PENAL_PEDONALE_EXP_0': (1.0, u'Exp. di penalilzzaz. camminatore lento'),
+	'CPD_PENAL_PEDONALE_0_1': (1.6, u'Coeff. di penalilzzaz. iniz. camminatore medio'),
+	'CPD_PENAL_PEDONALE_1_1': (2.5, u'Coeff. di penalilzzaz. camminatore medio dopo 1 km'),
+	'CPD_PENAL_PEDONALE_EXP_1': (0.85, u'Exp. di penalilzzaz. camminatore medio'),
+	'CPD_PENAL_PEDONALE_0_2': (1.4, u'Coeff. di penalilzzaz. iniz. camminatore veloce'),
+	'CPD_PENAL_PEDONALE_1_2': (1.7, u'Coeff. di penalilzzaz. camminatore veloce dopo 1 km'),
+	'CPD_PENAL_PEDONALE_EXP_2': (0.5, u'Exp. di penalilzzaz. camminatore veloce'),
+	'CPD_BICI_CAMBIO_STRADA': (25, U'Tempo di svolta in bicicletta'),
+	'CARPOOLING_COSTO_CHILOMETRICO': (0.166, u"Costo medio per percorrere 1km in automobile"),
 }
 
 ALLOWED_HOSTS = [
@@ -383,3 +387,4 @@ ALLOWED_HOSTS = [
 ]
 
 GRAPH = 'osm'
+CPD_GIORNI_LOOKAHEAD = 7

@@ -58,3 +58,15 @@
 {% endif %}
 
 {% endblock %}
+
+{% block didyouknow %}
+	<h2>{% trans "Lo sapevi?" %}</h2>
+	<p>
+		{% blocktrans %}
+			Puoi saltare questa pagina! Nella <a href="/">home page
+			di Muoversi a Roma</a> inserisci la fermata, la linea o l'indirizzo
+			cercato, nella casella <b>Sono qui</b>. Si aprir&agrave; direttamente il Cerca Linea, e potrai consultare
+			i tempi di attesa dei bus che ti interessano.
+		{% endblocktrans %}
+	</p>
+{% endblock %}

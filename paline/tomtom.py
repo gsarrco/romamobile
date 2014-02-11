@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013 Roma servizi per la mobilità srl
+#    Copyright 2013-2014 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -33,17 +33,19 @@ import shapereader
 import cPickle as pickle
 import geomath
 import math
-#from globals import glb
-from tratto import TrattoRoot, TrattoPiedi, TrattoPiediArco, TrattoBici, TrattoBiciArco
+from tratto import TrattoRoot, TrattoPiedi, TrattoPiediArco, TrattoBici, TrattoBiciArco, TrattoAutoAttesaZTL
 from tratto import TrattoAuto, TrattoAutoArco
-from copy import copy
-import cPickle as pickle
 import raggiungibilita
+from django.contrib.gis.geos import Point
+from ztl.models import ZTL
+from gis.models import Multipoligono
 from pprint import pprint
 from paline.models import *
 from gis.models import punti2linestring
 from xml.etree import ElementTree as ET
-from pprint import pprint
+from servizi.utils import model2contenttype, transaction
+from paline.caricamento_rete.dbf import Dbf
+from django import db
 
 class Repository(object):
 	def __init__(self):
@@ -134,6 +136,7 @@ class ArcoTomTom(Arco):
 			tipo,
 			ztl,
 			special_type_id=12,
+			tpl=False,
 		):
 		Arco.__init__(self, s, t, (special_type_id, eid, count))
 		self.name = streets[nome]
@@ -143,7 +146,8 @@ class ArcoTomTom(Arco):
 		self.punti = punti
 		self.tipo = tipo
 		self.ztl = ztl
-		
+		self.tpl = tpl
+
 	def get_nome(self):
 		return streets.inverse_search(self.name)
 	
@@ -165,6 +169,7 @@ class ArcoTomTom(Arco):
 			'punti': self.punti,
 			'tipo': self.tipo,
 			'ztl': self.ztl,
+			'tpl': self.tpl,
 		}
 		
 	def to_model(self):
@@ -181,6 +186,7 @@ class ArcoTomTom(Arco):
 			geom=punti2linestring(self.punti),
 			tipo=self.tipo,
 			ztl=self.ztl,
+			tpl=self.tpl,
 		)
 
 		
@@ -198,6 +204,7 @@ class ArcoTomTom(Arco):
 			res['punti'],
 			res['tipo'],
 			res['ztl'],
+			tpl=res['tpl'] if 'tpl' in res else False,
 		)
 		grafo.add_arco(e)
 	
@@ -210,18 +217,32 @@ class ArcoTomTom(Arco):
 	
 	def get_distanza(self):
 		return self.w
+
+	def get_attesa_ztl(self, t, opz):
+		ztl_wait = 0
+		if len(self.ztl) > 0:
+			non_auth = self.ztl - opz['ztl']
+			rete = opz['rete']
+			if rete is not None:
+				# Se non ho informazioni sulla rete, considero tutte le ZTL percorribili
+				for z in non_auth:
+					w = rete.ztl[z].attesa(t, opz['rev'])
+					if w is not None:
+						ztl_wait = w
+						break
+		return ztl_wait
+
 	
 	def get_tempo(self, t, opz):
 		if opz['auto']:
-			ztl = 1 if not self.ztl else car_ztl_coeff
 			s = self.velocita * car_coeff[self.tipo]
-			if s > 0 and self.auto:
-				tempo = 3.6 * self.w / s
+			if s > 0 and self.auto and (not self.tpl or opz['tpl']):
+				s = self.velocita * car_coeff[self.tipo]
+				tempo = 3.6 * self.w / s + self.get_attesa_ztl(t, opz)
+				return (tempo / opz['penalizzazione_auto'], tempo)
 			else:
-				tempo = -1
-			return (tempo / (opz['penalizzazione_auto'] * ztl), tempo)
+				return (-1, -1)
 		else:
-			dijkstra = opz['dijkstra']
 			context = self.s.get_context(opz)
 			if not opz['primo_tratto_bici']:
 				bici = False
@@ -248,8 +269,11 @@ class ArcoTomTom(Arco):
 		context_s = self.s.get_context(opzioni)
 		context_t = self.t.get_context(opzioni)
 		if opzioni['auto']:
-			if type(t) != TrattoAuto:
+			ztl_wait = self.get_attesa_ztl(vars.time, opzioni)
+			if type(t) != TrattoAuto or ztl_wait > 0:
 				t = TrattoAuto(t.parent, vars.time, opzioni['carsharing'])
+			if ztl_wait > 0:
+				TrattoAutoAttesaZTL(t, vars.time, ztl_wait)
 			TrattoAutoArco(t, vars.time, self, 3.6 * self.w / (self.velocita * car_coeff[self.tipo]))
 		elif not context_s['primo_tratto_bici']:
 			if type(t) != TrattoPiedi:
@@ -284,7 +308,51 @@ def get_or_create_nodo(graph, id, x, y):
 	graph.add_nodo(n)
 	return n
 
-def load_from_shp(grafo, file_name):
+reset_count = [0]
+
+def get_ztl(x, y):
+	p = Point(x, y, srid=3004)
+	zs = Multipoligono.objects.filter(geom__contains=p, parent_type=model2contenttype(ZTL))
+	reset_count[0] += 1
+	if reset_count[0] == 100:
+		reset_count[0] = 0
+		db.reset_queries()
+	return set([ZTL.objects.get(pk=z.parent_id).codice for z in zs])
+
+
+def load_restrictions(file_name):
+	# VT:
+	# 11: Veicoli privati
+	# 12: Veicoli residenziali, per esempio ZTL
+	# 17: Bus
+
+	# DIR_POS:
+	# 1: Both
+	# 2: Positive
+	# 3: Negative
+	dirs = {
+		1: (True, True),
+		2: (True, False),
+		3: (False, True),
+	}
+	chrono()
+	print "Loading traffic restrictions"
+	dbf = Dbf()
+	dbf.openFile(file_name)
+	rs = {}
+	for row in dbf:
+		if row['RESTRTYP'] != 'LY' or row['FEATTYP'] != 4110:
+			continue
+		id = row['ID']
+		vt = int(row['VT'])
+		if vt in {11, 12, 17}:
+			if not id in rs:
+				rs[id] = {}
+			rs[id][vt] = dirs[row['DIR_POS']]
+	chrono()
+	return rs
+
+def load_from_shp(grafo, file_name, restrictions):
 	chrono()
 	print "Reading shapefile"
 	sr = shapereader.ShapeReader(file_name)
@@ -300,16 +368,29 @@ def load_from_shp(grafo, file_name):
 		verso = attr['ONEWAY']
 		velocita = attr['KPH']
 		tipo = attr['FRC']
-		ztl = False
 		if tipo != -1 and attr['FEATTYP'] == 4110:
-			ps = []
 			punti = [wgs84_to_gbfe(*p) for p in punti]
-			s = get_or_create_nodo(grafo, sid, *(punti[0]))
-			t = get_or_create_nodo(grafo, tid, *(punti[-1]))
+			ps = punti[0]
+			pt = punti[-1]
+			s = get_or_create_nodo(grafo, sid, *ps)
+			t = get_or_create_nodo(grafo, tid, *pt)
+			ztl = get_ztl(*ps)
+			ztl.update(get_ztl(*pt))
 			fw = True
 			bw = True
+			tpl = False
 			if verso == 'N':
-				ztl = True
+				fw = False
+				bw = False
+				if eid in restrictions:
+					rest = restrictions[eid]
+					if 11 in rest:
+						fw, bw = rest[11]
+					elif 12 in rest:
+						fw, bw = rest[12]
+					elif 17 in rest:
+						fw, bw = rest[17]
+						tpl = True
 			elif verso == 'FT':
 				bw = False
 			elif verso == 'TF':
@@ -326,6 +407,7 @@ def load_from_shp(grafo, file_name):
 				punti,
 				tipo,
 				ztl,
+				tpl=tpl
 			)
 			e2 = ArcoTomTom(
 				eid,
@@ -339,6 +421,7 @@ def load_from_shp(grafo, file_name):
 				list(reversed(punti)),
 				tipo,
 				ztl,
+				tpl=tpl
 			)
 			grafo.add_arco(e1)
 			grafo.add_arco(e2)
@@ -349,20 +432,32 @@ def load_from_shp(grafo, file_name):
 chrono_old = None
 def chrono():
 	global chrono_old
-	now = datetime.datetime.now()
+	now = datetime.now()
 	if chrono_old is not None:
 		print "Elapsed: %s" % (str(now - chrono_old),)
 	chrono_old = now
 	
 id_via_ostiense = (11, 13800207392955L)
-id_via_vasi = (11, 13800207577174L)
+id_via_vasi_old = (11, 13800207577174L)
+id_via_vasi = (11, 13800205535178L)
 id_raggiungibilita_osm = (11, 306048898) #(11, 246164532)
+
+def prepara_autocompletamento(cancella=False):
+	if cancella:
+		IndirizzoAutocompl.objects.all().delete()
+	with transaction():
+		for i in streets.s:
+			IndirizzoAutocompl.objects.get_or_create(indirizzo=i)
 
 def shapefile_to_pickle(retina=False):
 	g = Grafo()
-	load_from_shp(g, 'C:\\Users\\allulll\\Desktop\\grafo\\cpd\\RM_nw%s' % ('_mini' if retina else ''))
-	raggiungibilita.rendi_fortemente_connesso(g,  id_via_vasi)
-	g.serialize('tomtom%s.dat' % ('_mini' if retina else ''))
+	#rest = load_restrictions('C:\\Users\\allulll\\Desktop\\grafo\\cpd\\RM_rs.dbf')
+	rest = load_restrictions('paline/tomtom/RM_rs.dbf')
+	# rest = {}
+	#load_from_shp(g, 'C:\\Users\\allulll\\Desktop\\grafo\\cpd\\RM_nw%s' % ('_mini' if retina else ''), rest)
+	load_from_shp(g, 'paline/tomtom/RM_nw%s' % ('_mini' if retina else ''), rest)
+	raggiungibilita.rendi_fortemente_connesso(g,  id_via_vasi_old if retina else id_via_vasi)
+	g.serialize('tomtom%s.v3.dat' % ('_mini' if retina else ''))
 	
 	
 def test(retina=False):
@@ -507,5 +602,5 @@ def osm_to_pickle(retina=False):
 	g = Grafo()
 	parse_osm(g, retina)
 	raggiungibilita.rendi_fortemente_connesso(g,  id_raggiungibilita_osm)
-	g.serialize('osm%s.dat' % ('_mini' if retina else ''))
+	g.serialize('osm%s.v3.dat' % ('_mini' if retina else ''))
 	

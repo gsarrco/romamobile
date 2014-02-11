@@ -1,5 +1,5 @@
 #
-#    Copyright 2013 Roma servizi per la mobilità srl
+#    Copyright 2013-2014 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -25,6 +25,8 @@ main_panel = None
 def prnt(s, title=""):
 	#main_panel.aggiungi_errore(HTML(s), title)
 	s = str(s)
+	print s
+	return
 	s.replace('\n', '<br />')
 	RootPanel().add(HTML(s))
-	pass
+

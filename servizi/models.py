@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013 Roma servizi per la mobilità srl
+#    Copyright 2013-2014 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -584,7 +584,20 @@ class RicercaRecente(models.Model):
 			r.orario = n
 			r.descrizione = descrizione
 			r.save()
-		
+
+class RicercaErrata(models.Model):
+	ricerca = models.CharField(max_length=63, db_index=True)
+	orario_prima = models.DateTimeField(db_index=True, auto_now_add=True)
+	conteggio = models.IntegerField(default=1, db_index=True)
+	conversione = models.CharField(max_length=63, null=True, blank=True, default=None)
+
+	def __unicode__(self):
+		return "[%d] %s -> %s" % (self.conteggio, self.ricerca, self.conversione if self.conversione is not None else '')
+
+	class Meta:
+		verbose_name = u'Ricerca errata'
+		verbose_name_plural = u'Ricerche errate'
+
 
 # Notifiche
 class RichiestaNotifica(ConFasce):

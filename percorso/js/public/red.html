@@ -1,26 +1,26 @@
-<html>
+<html manifest="red.appcache">
     <head>
         <meta name="pygwt:module" content="main">
+				<meta name="viewport" content="initial-scale=1.0,minimum-scale=1.0,maximum-scale=1.0" />
+				<meta name="mobile-web-app-capable" content="yes">
+				<link rel="shortcut icon" sizes="196x196" href="icon.png">
         <link rel='stylesheet' href='index-red.css'>
+				<link rel="stylesheet" href="leaflet/leaflet.css" />
         <title>Muoversi a Roma</title>
     </head>
     <body bgcolor="white">
         <script language="javascript" src="bootstrap.js"></script>
-        <script type="text/javascript" src="http://maps.google.com/maps/api/js?sensor=false"></script>
+				<script src="leaflet/leaflet.js"></script>
         <div id="Loading-Message">
-        	<table cellspacing="0" cellpadding="0" style="width: 100%; height: 100%;">
-						<tbody>
-							<tr>
-								<td align="center" style="vertical-align: middle;">
-									<img src="loading.gif" />
-								</td>
-							</tr>
-						</tbody>	
-					</table>
+					<p>
+						<b>Muoversi a Roma</b><br />
+						Solo un istante...
+					</p>
+					<img src="bootstrap-loader.gif" alt="Un istante soltanto..." />
+					<p style="margin-top:30px;">
+						Connessione lenta? Apri la <a class="inline" href="http://muovi.roma.it">versione base</a>.
+					</p>
 				</div>
-				<a id="bitbucket" href="http://www.agenziamobilita.roma.it/servizi/open-data/" style="position:absolute;z-index:10000;top:0;right:0;">
-				  <!--<img src="https://bitbucket.org/zgramana/bitbucket-ribbons/raw/988dffc5fbeb/png/bitbucket-ribbon-maroon.png" />-->
-				</a>			
         <div><iframe id='__pygwt_historyFrame' style='width:0;height:0;border:0'></iframe></div>
 				<script type="text/javascript">
 				
@@ -33,7 +33,6 @@
 				    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
 				    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
 				  })();
-				
-				</script>        
+				</script>
     </body>
 </html>

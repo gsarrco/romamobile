@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013 Roma servizi per la mobilità srl
+#    Copyright 2013-2014 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -25,8 +25,9 @@ import paline.models
 from django.db import models, connections, transaction
 from log_servizi.models import ServerVersione
 import errors
-from servizi.utils import dict_cursor, project, populate_form, StyledSelect, BrRadioSelect,\
-	ricapitalizza
+from time import sleep
+from servizi.utils import dict_cursor, project, populate_form, StyledSelect, BrRadioSelect
+from servizi.utils import	ricapitalizza, template_to_mail
 from servizi.utils import messaggio, hist_redirect, group_excluded, richiedi_conferma
 from servizi.utils import modifica_url_con_storia_link, apply_ric, giorni_settimana
 from servizi.utils import prossima_data, dateandtime2datetime, datetime2mysql, getdef
@@ -44,11 +45,12 @@ from django.utils.encoding import force_unicode
 from django.utils.safestring import SafeString, SafeUnicode
 from django.utils import translation
 from django.http import HttpResponse
+from django.core.cache import cache
 from carpooling.models import get_vincoli
 from servizi import infopoint
 import rpyc
 import settings
-from copy import deepcopy
+from copy import deepcopy, copy
 import cPickle as pickle
 from paline import mapstraction, gmaps, tratto
 from paline import models as palinemodels
@@ -56,6 +58,7 @@ from pprint import pprint
 from parcheggi import models as parcheggi
 import re
 import urllib
+from hashlib import md5
 import traceback
 
 percorso1 = ServerVersione("percorso", 1)
@@ -157,9 +160,11 @@ def cerca(
 			'quando': quando,
 			'parcheggi_scambio': getdef(opzioni, 'parcheggi_scambio', True),
 			'parcheggi_autorimesse': getdef(opzioni, 'parcheggi_autorimesse', True),
+			'ztl': getdef(opzioni, 'ztl', [])
 		}
-		
+
 		return calcola_percorso_dinamico(request, True)
+
 
 	return out
 
@@ -167,7 +172,7 @@ def cerca(
 # Registrazione ws XML-RPC
 percorso1.xmlrpc("percorso.Cerca")(percorso1.logger("Cerca")(cerca))
 
-def infopoint_to_get_params(infopoint):
+def infopoint_to_get_params(infopoint, da=True):
 	params = {
 		'bus': 1 if infopoint['bus'] else 0,
 		'metro': 1 if infopoint['metro'] else 0,
@@ -178,13 +183,14 @@ def infopoint_to_get_params(infopoint):
 		'quando': infopoint['quando'],
 		'dt': datetime2mysql(infopoint['dt']),
 		'max_distanza_bici': infopoint['max_distanza_bici'] / 1000.0,
-		'da': infopoint_address_to_string(infopoint['punti'][0]).encode('utf8'),
 		'a': infopoint_address_to_string(infopoint['punti'][1]).encode('utf8'),
 		'cp': 1,
-		'lf': 0,
 		'tipi_ris': ','.join([str(x) for x in infopoint['tipi_ris']]),
 		'linee_escluse': ','.join(["%s:%s" % (k, infopoint['linee_escluse'][k]) for k in infopoint['linee_escluse']]) if len(infopoint['linee_escluse']) > 0 else '-',
+		'ztl': ','.join(infopoint['ztl']) if 'ztl' in infopoint else '',
 	}
+	if da:
+		params['da'] = infopoint_address_to_string(infopoint['punti'][0]).encode('utf8')
 	return urllib.urlencode(params)
 
 @percorso1.xmlrpc("percorso.AggiornaPosizione")
@@ -269,6 +275,15 @@ def info_linee_escluse(linee_escluse):
 class AggiungiPuntoForm(forms.Form):
 	address = forms.CharField(widget=forms.TextInput(attrs={'size':'20'}))
 
+def infopoint_to_cache_key(infopoint):
+	ck = copy(infopoint)
+	dt = infopoint['dt']
+	dt = datetime(dt.year, dt.month, dt.day, dt.hour, dt.hour, dt.minute)
+	ck['dt'] = dt
+	if 'percorso_auto_salvato' in ck:
+		del ck['percorso_auto_salvato']
+	return md5(pickle.dumps(ck)).hexdigest()
+
 def calcola_percorso_dinamico(request, webservice=False, ctx=None):
 	if ctx is None:
 		ctx = {}
@@ -293,6 +308,7 @@ def calcola_percorso_dinamico(request, webservice=False, ctx=None):
 	linee_escluse = set([k for k in infopoint['linee_escluse']])
 	carpooling = infopoint['carpooling']
 	tipi_ris = infopoint['tipi_ris'] if 'tipi_ris' in infopoint else []
+	ztl = infopoint['ztl'] if 'ztl' in infopoint else []
 	if carpooling > 0:
 		carpooling_vincoli = infopoint['carpooling_vincoli']
 	else:
@@ -305,24 +321,38 @@ def calcola_percorso_dinamico(request, webservice=False, ctx=None):
 			tipi_ris.append(parcheggi.AUTORIMESSE)
 	if mezzo == 4:
 		tipi_ris = [risorse.models.CAR_SHARING]
-
 	infopoint['tipi_ris'] = tipi_ris
 	infopoint['start'] = punti[0]
 	infopoint['stop'] = punti[-1]
 	ctx['mappa_statica'] = not re.search("Android|iPhone", request.META['HTTP_USER_AGENT'])
-	c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB)
 	ctx['carpooling'] = carpooling
 	t1 = datetime.now()
-	trs = pickle.loads(c.root.calcola_percorso(punti, piedi, bus, metro, ferro, ferro, pickle.dumps(data), bici, max_distanza_bici, linee_escluse, 1 if mezzo==3 else mezzo, carpooling, carpooling_vincoli, teletrasporto, rev, tipi_ris))
-	t2 = datetime.now()
-	ctx['tempo_calcolo'] = str(t2 - t1)
-	tr = trs['percorso']
-	infopoint['percorso_auto_salvato'] = trs['percorso_auto_salvato']
+	ck = infopoint_to_cache_key(infopoint)
+	tr = cache.get(ck)
+	att = 0
+	while att < 8 and tr == 'WAIT':
+		att += 1
+		sleep(2)
+		tr = cache.get(ck)
+	if tr == 'WAIT':
+		if webservice:
+			raise Exception("Service temporarily unavailable")
+		else:
+			return messaggio(request, _("Il servizio temporaneamente non &egrave; disponibile, riprova pi&ugrave; tardi."))
+	if tr is None:
+		cache.set(ck, 'WAIT', 60)
+		c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB)
+		trs = pickle.loads(c.root.calcola_percorso(punti, piedi, bus, metro, ferro, ferro, pickle.dumps(data), bici, max_distanza_bici, linee_escluse, 1 if mezzo==3 else mezzo, carpooling, carpooling_vincoli, teletrasporto, rev, tipi_ris, ztl))
+		t2 = datetime.now()
+		ctx['tempo_calcolo'] = str(t2 - t1)
+		tr = trs['percorso']
+		infopoint['percorso_auto_salvato'] = trs['percorso_auto_salvato']
+		cache.set(ck, tr, 60)
 	request.session['percorso-trattoroot'] = tr 
 	return formatta_calcola_percorso(request, webservice, ctx, tr)
 
 
-def formatta_calcola_percorso(request, webservice, ctx, tr, opzioni=None):
+def formatta_calcola_percorso(request, webservice, ctx, tr, opzioni=None, mail=None):
 	infopoint = request.session['infopoint']
 	punti = infopoint['punti']
 	if opzioni is None:
@@ -412,9 +442,12 @@ def formatta_calcola_percorso(request, webservice, ctx, tr, opzioni=None):
 	ctx['opzioni_bnr'] = mezzo == 3
 	ctx['opzioni_pnr'] = mezzo == 2
 	ctx['modo'] = mezzo
-	
 
-	return TemplateResponse(request, 'percorso-dinamico.html', ctx)
+	if mail is not None:
+		ctx['params'] = infopoint_to_get_params(infopoint)
+		template_to_mail(mail, 'percorso-mail.txt', ctx, True)
+	else:
+		return TemplateResponse(request, 'percorso-dinamico.html', ctx)
 
 def mappa_dinamico(request):
 	ctx = {}
@@ -573,6 +606,14 @@ def calcola_percorso_espandi(request, espandi='', ctx=None):
 	opzioni = {'espandi': espandi}
 	tr = request.session['percorso-trattoroot']
 	return formatta_calcola_percorso(request, False, ctx, tr, opzioni)
+
+def calcola_percorso_mail(request, addresses):
+	ctx = {}
+	infopoint = request.session['infopoint']
+	ctx['infopoint'] = infopoint
+	opzioni = {}
+	tr = request.session['percorso-trattoroot']
+	formatta_calcola_percorso(request, False, ctx, tr, opzioni, mail=addresses)
 
 
 def calcola_percorso(request, start, stop, mezzo, modo, data):

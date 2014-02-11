@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013 Roma servizi per la mobilità srl
+#    Copyright 2013-2014 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -20,8 +20,10 @@
 #
 
 # from xmlrpchandler import XMLRPCService, xmlrpcremote 
+from collections import defaultdict
 from paline.models import *
 from log_servizi.models import ServerVersione, Versione
+from servizi.infopoint import cerca_ricerca_errata
 from servizi.models import RicercaRecente
 import errors
 from servizi.utils import datetime2mysql, populate_form, aggiungi_banda, messaggio, hist_redirect, AtacMobileForm
@@ -144,14 +146,6 @@ def ProssimaPartenza(request, token, id_percorso, lingua):
 		raise errors.XMLRPC['XRE_NO_PERCORSO']
 	return datetime2mysql(pp)
 
-@paline7.metodo("Veicolo")
-def Veicolo(request, token, id_veicolo, id_percorso, lingua):
-	return ''
-	try:
-		percorso = Percorso.objects.by_date().get(id_percorso=id_percorso)
-	except:
-		raise errors.XMLRPC['XRE_NO_PERCORSO']
-	return percorso.getVeicolo(id_veicolo)
 
 @paline7.metodo("Mappa")
 def ws_mappa(request, token, tipo, id):
@@ -314,40 +308,57 @@ def trovalinea_veicoli_locale(request, id_palina, id_percorso="", capolinea=Fals
 		}
 	return str(render_to_string('map-baloon.html', ctx))
 
-def trovalinea_orari(request, token, id_percorso, data=None):
-	ret = {}
+def _orari(id_percorso, data=None, day_only=True):
+	ctx = {}
 	if data:
 		try:
-			giorno = mysql2date(data)
+			if type(data) != date and type(data) != datetime:
+				giorno = mysql2date(data)
+			else:
+				giorno = data
 		except Exception:
 			giorno = date.today()
 	else:
 		giorno = date.today()
-	
-	percorso = Percorso.objects.by_date().get(id_percorso=id_percorso)
-	
-	linea = Linea.objects.by_date().filter(percorso__id_percorso=id_percorso)[0]
-	notturna = linea.id_linea[0] == 'N'
-	
+
 	giorno = date2datetime(giorno)
-	ret['giorno_partenza'] = date2mysql(giorno)
-	if notturna:
-		giorno = giorno - timedelta(hours=2)
-	giorno_succ = giorno + timedelta(days=1)
-		
-	pcs = PartenzeCapilinea.objects.using('default').filter(id_percorso=id_percorso, orario_partenza__gt=giorno, orario_partenza__lte=giorno_succ)
-	
-	ore = [{'ora': "%2d" % x, 'minuti': []} for x in range(0, 25)]
+
+	inizio_giorno = giorno
+	fine_giorno = giorno + timedelta(days=1)
+	ctx['giorno_partenza'] = date2mysql(giorno)
+	giorno_prec = giorno - timedelta(hours=4)
+	giorno_succ = giorno + timedelta(hours=30)
+	giorni_sett = giorni_settimana()
+	wd_ieri = giorni_sett[giorno_prec.weekday()]
+	wd_domani = giorni_sett[giorno_succ.weekday()]
+	pcs = PartenzeCapilinea.objects.filter(id_percorso=id_percorso, orario_partenza__gte=giorno_prec, orario_partenza__lte=giorno_succ).order_by('orario_partenza')
+	ctx['nessuna_partenza'] = len(pcs) == 0
+	ore_ieri = [{'ora': _("%(orario)2d di %(giorno)s") % {'orario': x, 'giorno': wd_ieri}, 'minuti': []} for x in range(24)]
+	ore = [{'ora': "%2d" % x, 'minuti': []} for x in range(24)]
+	ore_domani = [{'ora': _("%(orario)2d di %(giorno)s") % {'orario': x, 'giorno': wd_domani}, 'minuti': []} for x in range(7)]
+	orario_old = None
 	for pc in pcs:
-		h = pc.orario_partenza.hour
-		if h == 0 and not notturna:
-			h = 24
-		ore[h]['minuti'].append("%02d" % pc.orario_partenza.minute)
-	if notturna:
-		ore = ore[22:] + ore[:22]
-	ret['orari_partenza'] = ore
-	ret['no_orari'] = percorso.no_orari
-	return ret
+		orario_new = pc.orario_partenza
+		h = orario_new.hour
+		if orario_new < inizio_giorno:
+			ore_ieri[h]['minuti'].append("%02d" % orario_new.minute)
+		elif orario_new >= fine_giorno:
+			# Ci interessa solo il primo "blocco" di corse del giorno successivo
+			if orario_old is not None and orario_new - orario_old > timedelta(minutes=90):
+				break
+			ore_domani[h]['minuti'].append("%02d" % orario_new.minute)
+			orario_old = orario_new
+		else:
+			ore[h]['minuti'].append("%02d" % orario_new.minute)
+			orario_old = orario_new
+	if not day_only:
+		ctx['orari_partenza'] = ore_ieri + ore + ore_domani
+	else:
+		ctx['orari_partenza'] = ore
+	return ctx
+
+def trovalinea_orari(request, token, id_percorso, data=None):
+	return _orari(id_percorso, data, True)
 
 TrovalineaOrariWS = paline7.metodo("Trovalinea.Orari")(trovalinea_orari)
 
@@ -359,8 +370,6 @@ def _percorso(request, id_percorso, ctx=None, id_veicolo=None, giorno_partenze=N
 		ctx['percorso'] = p
 		c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB)
 		fermate = pickle.loads(c.root.percorso_fermate(id_percorso))['fermate']
-		linea = p.linea
-		notturna = linea.id_linea[0] == 'N'
 		percorsi = list(Percorso.objects.by_date().select_related('linea').filter(linea=p.linea, soppresso=False))
 		percorsi.sort(cmp=_cmp_percorsi)
 		ctx['percorsi'] = percorsi
@@ -389,22 +398,7 @@ def _percorso(request, id_percorso, ctx=None, id_veicolo=None, giorno_partenze=N
 		ctx['abilitato'] = p.abilitata_complessivo()
 		oggi = datetime.now()
 		if giorno_partenze is not None:
-			giorno = date2datetime(giorno_partenze)
-			ctx['giorno_partenza_attivo'] = date2mysql(giorno)
-			if notturna:
-				giorno = giorno - timedelta(hours=2)
-			giorno_succ = giorno + timedelta(days=1)					
-			pcs = PartenzeCapilinea.objects.filter(id_percorso=id_percorso, orario_partenza__gt=giorno, orario_partenza__lte=giorno_succ)
-			ctx['nessuna_partenza'] = len(pcs) == 0
-			ore = [{'ora': "%2d" % x, 'minuti': []} for x in range(0, 25)]
-			for pc in pcs:
-				h = pc.orario_partenza.hour
-				if h == 0 and not notturna:
-					h = 24
-				ore[h]['minuti'].append("%02d" % pc.orario_partenza.minute)
-			if notturna:
-				ore = ore[22:] + ore[:22]
-			ctx['orari_partenza'] = ore
+			ctx.update(_orari(id_percorso, giorno_partenze, as_service))
 			gp = [oggi + timedelta(days=x) for x in range(-1, 6)]
 			ctx['giorni_partenza'] = [{'mysql': date2mysql(x), 'format': datefilter(x, _("l j F")).capitalize()} for x in gp]
 		else:
@@ -768,9 +762,23 @@ def linea(request, id_linea):
 		return _disambigua(request, linee=linee, ctx=ctx, per_palina=per_palina)
 	
 def _default(request, cerca, ctx, as_service):
+	cerca = cerca.strip()
+	if cerca == '':
+		ctx['errore'] = True
+		if as_service:
+			return ctx
+		else:
+			return TemplateResponse(request, 'paline.html', ctx)
+
 	if cerca.startswith('fermata:'):
 		cerca = cerca[8:]
-	
+
+	ctx['ricerca'] = cerca
+
+	res = cerca_ricerca_errata(cerca)
+	if res is not None and res[0] is not None:
+		cerca = res[0]
+
 	paline = Palina.objects.by_date().filter(id_palina=cerca, soppressa=False)
 	linee_raw = Linea.objects.by_date().filter(id_linea__istartswith=cerca)
 	linee = []
@@ -990,6 +998,17 @@ def _disservizio(request, paline, redirect_to, ctx=None):
 	ctx['form'] = form
 	ctx['pe_form'] = form
 	return TemplateResponse(request, 'paline-disservizio.html', ctx)
+
+def elenco_linee(request):
+	ctx = {}
+	ps = Percorso.objects.by_date().select_related('linea', 'arrivo').filter(soppresso=False).order_by('linea__id_linea')
+	ls = defaultdict(list)
+	for p in ps:
+		ls[p.linea.id_linea].append(p)
+	linee = [{'id': l, 'linea': ls[l][0].linea, 'percorsi': ls[l]} for l in ls]
+	linee.sort(key=lambda x: x['id'])
+	ctx['linee'] = linee
+	return TemplateResponse(request, 'paline-elenco-linee.html', ctx)
 
 @group_excluded('readonly')
 def disservizio(request, id_palina):
@@ -1234,7 +1253,7 @@ def get_veicoli_tutti_percorsi(request, token):
 	
 @paline7.metodo("GetOrarioUltimoAggiornamentoArrivi")
 def get_orario_ultimo_aggiornamento_arrivi(request, token):
-	"""
+	"""_
 	Restituisce i veicoli di tutti i percorsi
 	"""
 	c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB)
@@ -1270,4 +1289,3 @@ def get_stat_passaggi(request, token):
 		'tempi_attesa_percorsi': xmlrpclib.Binary(serializers.serialize("json", tempi_attesa_percorsi)),
 	}
 	
-

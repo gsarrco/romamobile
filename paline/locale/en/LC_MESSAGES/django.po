@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: muoversiaroma\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2013-11-20 10:01+0100\n"
-"PO-Revision-Date: 2013-11-20 10:08+0100\n"
+"POT-Creation-Date: 2014-01-08 12:15+0100\n"
+"PO-Revision-Date: 2014-01-08 12:16+0100\n"
 "Last-Translator: \n"
 "Language-Team: muoversiaroma <LL@li.org>\n"
 "MIME-Version: 1.0\n"
@@ -40,7 +40,7 @@ msgstr "%(fermate)d Bus stops (%(tempo)s)"
 msgid "%(linea)s %(cart)s direz. %(dest)s"
 msgstr " %(linea)s %(cart)s dest. %(dest)s"
 
-#: .\models.py:754 .\models.py:761 .\tratto.py:435 .\views.py:358
+#: .\models.py:754 .\models.py:761 .\tratto.py:435 .\views.py:359
 msgid "H:i"
 msgstr "g:i A"
 
@@ -174,82 +174,87 @@ msgstr "Arrival"
 msgid "Sei arrivato a %s"
 msgstr "Arrival at %s"
 
-#: .\views.py:213 .\views.py:534
+#: .\views.py:214 .\views.py:548
 #, python-format
 msgid "La palina %s non esiste"
 msgstr "The bus stop %s does not exist"
 
-#: .\views.py:224
+#: .\views.py:225
 msgid "La palina o il gruppo di paline richiesto non esiste"
 msgstr "Bus stop or group does not exist"
 
-#: .\views.py:391
+#: .\views.py:385 .\views.py:387
+#, python-format
+msgid "%(orario)2d di %(giorno)s"
+msgstr "%(giorno)s, h%(orario)2d"
+
+#: .\views.py:405
 msgid "l j F"
 msgstr "l j F"
 
-#: .\views.py:402 .\views.py:450 .\views.py:516
+#: .\views.py:416 .\views.py:464 .\views.py:530
 #, python-format
 msgid "Il percorso %s non esiste"
 msgstr "The route %s does not exist"
 
-#: .\views.py:566
+#: .\views.py:580
 #, python-format
 msgid "La fermata %s non esiste"
 msgstr "Bus stop %s does not exist"
 
-#: .\views.py:946
+#: .\views.py:964
 msgid "Autobus non segnalato"
 msgstr "Bus not forecasted"
 
-#: .\views.py:947
+#: .\views.py:965
 msgid "L'autobus segnalato non è passato"
 msgstr "Forecasted bus did not arrive"
 
-#: .\views.py:947
+#: .\views.py:965
 msgid "Autobus diretto al deposito"
 msgstr "Bus going to bus garage"
 
-#: .\views.py:988 .\views.py:997
+#: .\views.py:1006 .\views.py:1015
 msgid "Grazie per la segnalazione del disservizio."
 msgstr "Thanks for reporting."
 
-#: .\views.py:1009 .\views.py:1033 .\views.py:1179
+#: .\views.py:1027 .\views.py:1051 .\views.py:1197
 msgid "La fermata non esiste"
 msgstr "Bus stop does not exist"
 
-#: .\views.py:1019 .\views.py:1158
+#: .\views.py:1037 .\views.py:1176
 msgid "Il gruppo non esiste"
 msgstr "Group does not exist"
 
-#: .\views.py:1058
+#: .\views.py:1076
 msgid "Fermata preferita impostata"
 msgstr "Favorite bus stop set"
 
-#: .\views.py:1090
+#: .\views.py:1108
 msgid "Nome del gruppo modificato"
 msgstr "Group name set"
 
-#: .\views.py:1110
+#: .\views.py:1128
 msgid "Esclusioni impostate"
 msgstr "Exclusions set"
 
-#: .\views.py:1152
+#: .\views.py:1170
 msgid "Notifiche impostate"
 msgstr "Notifications set"
 
-#: .\views.py:1161
+#: .\views.py:1179
 msgid "Confermi di voler eliminare la fermata preferita?"
 msgstr "Do you really want to delete a favorite bus stop?"
 
-#: .\views.py:1164 .\views.py:1177
+#: .\views.py:1182 .\views.py:1195
 msgid "Fermata preferita eliminata"
 msgstr "Favorite bus stop deleted"
 
-#: .\views.py:1167
+#: .\views.py:1185
 msgid "Confermi di voler eliminare la fermata dal gruppo?"
 msgstr "Do you really want to delete a bus stop from a group?"
 
-#: .\views.py:1174
+#: .\views.py:1192
 msgid "Gruppo di fermate eliminato"
 msgstr "Bus stop group deleted"
 
@@ -804,6 +809,26 @@ msgstr ""
 "<a href='http://login.muoversiaroma.it/Login.aspx?IdSito=1'>Register or "
 "login</a> to set your favorite bus stops, notifications, and to report an "
 "issue."
+
+#: .\templates\paline.html.py:63
+msgid "Lo sapevi?"
+msgstr "Did you know?"
+
+#: .\templates\paline.html.py:65
+msgid ""
+"\n"
+"\t\t\tPuoi saltare questa pagina! Nella <a href=\"/\">home page\n"
+"\t\t\tdi Muoversi a Roma</a> inserisci la fermata, la linea o l'indirizzo\n"
+"\t\t\tcercato, nella casella <b>Sono qui</b>. Si aprir&agrave; direttamente "
+"il Cerca Linea, e potrai consultare\n"
+"\t\t\ti tempi di attesa dei bus che ti interessano.\n"
+"\t\t"
+msgstr ""
+"\n"
+"\t\tYou can skip this page! In Muoversi a Roma <a href=\"/\">home page</a> "
+"simply insert the item you are interested in, such as a bus stop, a bus "
+"line, or an address, in <b>I'm here</b> box. You'll get directly to the bus "
+"waiting times service."
 
 #~ msgid "Parti da %(partenza)s"
 #~ msgstr "Departure from %(partenza)s"

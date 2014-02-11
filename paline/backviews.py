@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013 Roma servizi per la mobilità srl
+#    Copyright 2013-2014 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -45,21 +45,20 @@ import settings
 def percorso_mappa(request, id_percorso, *args, **kwargs):
 	c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB)
 	out = pickle.loads(c.root.percorso_su_mappa_special(id_percorso, '/paline/s/img/'))
-	pprint(out)
 	return out
 
 @jsonrpc_method('paline_percorso_fermate', safe=True)
-def percorso_fermate(request, id_percorso):
+def percorso_fermate(request, id_percorso, id_veicolo):
 	p = Percorso.objects.by_date().get(id_percorso=id_percorso)
 	fs = Fermata.objects.by_date().filter(percorso=p).order_by('progressiva')
-	ps = []
-	for fr in fs:
-		f = fr.palina
-		if not f.soppressa:
-			ps.append({
-				'id_palina': f.id_palina,
-				'nome': f.nome_ricapitalizzato(),
-			})
+	# ps = []
+	# for fr in fs:
+	# 	f = fr.palina
+	# 	if not f.soppressa:
+	# 		ps.append({
+	# 			'id_palina': f.id_palina,
+	# 			'nome': f.nome_ricapitalizzato(),
+	# 		})
 	giorni = []
 	t = date.today()
 	for i in range(7):
@@ -68,11 +67,15 @@ def percorso_fermate(request, id_percorso):
 			'nome': datefilter(t, "l j F").capitalize(),
 		})
 		t += timedelta(days=1)
-	
+
+	percorso = views._percorso(request, id_percorso, id_veicolo=id_veicolo, as_service=True)
+
 	return {
-		'paline': ps,
+		'fermate': percorso['fermate'],
 		'giorni': giorni,
 		'id_percorso': id_percorso,
+		'percorso': percorso['percorso'],
+		'percorsi':  percorso['percorsi'],
 	}
 	
 @jsonrpc_method('paline_orari', safe=True)

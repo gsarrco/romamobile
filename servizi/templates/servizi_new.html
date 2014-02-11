@@ -8,6 +8,7 @@
 {% block content %}
 	<div class="right-head">
 		{% if not request.user|in_group:"readonly" %}
+			<a href="/webapp">{% trans "Web App" %}</a> |
 			{% if not request.user.is_authenticated %}
 				<a href="http://login.muoversiaroma.it/Login.aspx?IdSito={{ id_sito }}">{% trans "Accedi" %}</a>
 			{% else %}
