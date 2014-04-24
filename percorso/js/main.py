@@ -54,66 +54,42 @@ from pyjamas.JSONService import JSONProxy
 from pyjamas import History
 from pyjamas import DOM
 from prnt import prnt
-from util import StyledFixedColumnFlexTable, HTMLFlowPanel, DP, VP, HP, GP, SP, DeferrablePanel, DeferrableTabPanel
-from util import get_checked_radio, HidingPanel, MyAnchor, LoadingButton, SearchBox
-from util import wait_init, wait_start, wait_stop
+from util import StyledFixedColumnFlexTable, HTMLFlowPanel, DP, VP, HP, GP, SP, DeferrablePanel, DeferrableTabPanel, \
+	storage_get, storage_set, ScrollAdaptivePanel, QuestionDialogBox
+from util import get_checked_radio, HidingPanel, MyAnchor, LoadingButton, SearchBox, setAttribute
+from util import wait_init, wait_start, wait_stop, _, set_lang, get_lang, MenuPanel, GeneralMenuPanel
 from datetime import date, time, datetime, timedelta
 from Calendar import Calendar, DateField, TimeField
 from map import MapPanel, Layer, LayerPanel, get_location
 from cerca_percorso import CercaPercorsoPanel
 from cerca_linea import CercaLineaPanel
 from cerca_luogo import CercaLuogoPanel
-from info_traffico import InfoTrafficoPanel
+from news import NewsPanel
+from globals import base_url, make_absolute, flavor, set_user, set_control, ios
 from __pyjamas__ import JS
 
 from DissolvingPopup import DissolvingPopup
 from util import JsonHandler, redirect
 
-client = JSONProxy('/json/', ['paline_percorso', 'urldecode', 'servizi_autocompleta_indirizzo', 'paline_smart_search'])
+client = JSONProxy(base_url + '/json/', [
+	'paline_percorso',
+	'servizi_autocompleta_indirizzo',
+	'paline_smart_search',
+	'servizi_app_init',
+	'servizi_app_login',
+	'servizi_delete_fav',
+	'lingua_set',
+])
 
 
 class SearchMapPanel(VerticalPanel, KeyboardHandler, FocusHandler, DeferrablePanel):
 	def __init__(self, owner, map):
 		VerticalPanel.__init__(self)
-		DeferrablePanel.__init__(self)
+		DeferrablePanel.__init__(self, deferred_interval=200)
 		self.owner = owner
 		self.base = VP(
 			self,
 			[
-				{
-					'class': VP,
-					'style': 'search-help',
-					'name': 'search_help',
-					'sub': [
-						{
-							'class': HTML,
-							'args': ["""
-								<b>Una ricerca, tanti servizi</b><br />
-								Per i tempi di attesa bus, il cerca linea e il cerca percorso usa la casella qui sotto.
-								Inserisci il numero di fermata, la linea bus o l'indirizzo, oppure tocca la mappa.
-							"""],
-						},
-						{
-							'class': HP,
-							'horizontal_alignment': HasAlignment.ALIGN_CENTER,
-							'sub': [
-								{
-									'class': MyAnchor,
-									'name': 'chiudi_help',
-									'horizontal_alignment': HasAlignment.ALIGN_CENTER,
-									'call_setWidget': ([HTML("Chiudi suggerimento")], {}),
-									'call_addClickListener': ([self.onChiudiHelp], {}),
-								},
-								{
-									'class': MyAnchor,
-									'name': 'nascondi_help',
-									'call_setWidget': ([HTML("Non mostrare pi&ugrave;")], {}),
-									'call_addClickListener': ([self.onNascondiHelp], {}),
-								},
-							],
-						},
-					],
-				},
 				{
 					'class': HP,
 					'style': 'over-map-hp',
@@ -134,8 +110,7 @@ class SearchMapPanel(VerticalPanel, KeyboardHandler, FocusHandler, DeferrablePan
 										'class': SearchBox,
 										'name': 'query',
 										'call_addKeyboardListener': ([self], {}),
-										'call_addFocusListener': ([self], {}),
-										'args': [client.servizi_autocompleta_indirizzo, None, 3, 100, False],
+										'args': [client.servizi_autocompleta_indirizzo, None, 0, 100, False],
 										'style': 'over-map',
 								},
 								{
@@ -161,7 +136,7 @@ class SearchMapPanel(VerticalPanel, KeyboardHandler, FocusHandler, DeferrablePan
 						},
 						{
 							'class': LoadingButton,
-							'args': ['Cerca', self.onCerca],
+							'args': [_('Cerca'), self.onCerca],
 							'width': '30%',
 							'name': 'button',
 							'style': 'over-map',
@@ -171,19 +146,33 @@ class SearchMapPanel(VerticalPanel, KeyboardHandler, FocusHandler, DeferrablePan
 			],
 			add_to_owner=True,
 		)
-		JS("""if(localStorage && localStorage.nascondiHelp == '1') {self.onChiudiHelp();}""")
+		self.base.addStyleName('search-floating')
+		self.base.setWidth('460px')
+		# JS("""if(localStorage && localStorage.nascondiHelp == '1') {self.onChiudiHelp();}""")
 		self.map = map
 		self.map.setSize('100%', '100%')
 		self.add(map)
 		self.setCellHeight(self.map, '100%')
 		self.base.by_name('localizza').addClickListener(self.onLocalizza)
+		self.bottom = SimplePanel()
+		self.add(self.bottom)
+		self.preferiti = None
+		setAttribute(self.base.by_name('query'), 'placeholder', _("Linea, fermata o indirizzo"))
+		setAttribute(self.base.by_name('localizza'), 'title', _("Imposta posizione corrente"))
 
-	def onChiudiHelp(self):
-		self.base.remove(self.base.by_name('search_help'))
+	def do_or_defer(self, o, *args, **kwargs):
+		if not self.owner.small:
+			o(*args, **kwargs)
+		else:
+			DeferrablePanel.do_or_defer(self, o, *args, **kwargs)
 
-	def onNascondiHelp(self):
-		self.onChiudiHelp()
-		JS("""localStorage.nascondiHelp = 1;""")
+
+	def setBottomWidget(self, w=None):
+		if w is None:
+			self.bottom.clear()
+		else:
+			self.bottom.setWidget(w)
+		self.map.relayout
 
 	def onLocalizza(self):
 		self.owner.localizza()
@@ -205,7 +194,13 @@ class SearchMapPanel(VerticalPanel, KeyboardHandler, FocusHandler, DeferrablePan
 	def onCerca(self):
 		self.owner.setDirty()
 		self.ripristinaWidgets()
-		self.cercaLinea(self.base.by_name('query').getText())
+		q = self.base.by_name('query')
+		pk = q.pk
+		if pk != -1 and not str(pk).startswith('A'):
+			s = 'fav:' + pk
+		else:
+			s = q.getText()
+		self.cercaLinea(s)
 
 	def onCercaDone(self, res):
 		self.base.by_name('button').stop()
@@ -221,7 +216,7 @@ class SearchMapPanel(VerticalPanel, KeyboardHandler, FocusHandler, DeferrablePan
 
 	def cercaLinea(self, query, ):
 		self.base.by_name('button').start()
-		client.paline_smart_search(query, JsonHandler(self.onCercaDone))
+		client.paline_smart_search(query, get_lang(), JsonHandler(self.onCercaDone))
 
 	def onCercaErrore(self, el):
 		x, x_list, x_holder = self.getWidgets()
@@ -244,9 +239,6 @@ class SearchMapPanel(VerticalPanel, KeyboardHandler, FocusHandler, DeferrablePan
 	def onChange(self, el):
 		el.removeStyleName('validation-error')
 
-	def onFocus(self, text):
-		text.selectAll()
-
 	def onKeyDown(self, sender, keycode, modifiers):
 		if keycode == 13:
 			self.onCerca()
@@ -254,49 +246,145 @@ class SearchMapPanel(VerticalPanel, KeyboardHandler, FocusHandler, DeferrablePan
 	def onTabSelected(self):
 		self.owner.map.relayout()
 
+	def setSmallLayout(self):
+		self.base.setWidth('100%')
+		self.base.removeStyleName('search-floating')
+		self.base.addStyleName('search-fixed')
 
-class ControlPanel(HidingPanel):
+	def setLargeLayout(self):
+		self.base.setWidth('460px')
+		self.base.removeStyleName('search-fixed')
+		self.base.addStyleName('search-floating')
+
+class PreferitiPanel(SimplePanel, DeferrablePanel):
 	def __init__(self, owner):
-		super(ControlPanel, self).__init__()
+		SimplePanel.__init__(self)
+		DeferrablePanel.__init__(self, owner)
 		self.owner = owner
+		self.menu = None
+
+	def aggiorna_preferiti(self):
+		d = [
+			{
+				'id': p[1],
+				'text': p[2],
+				'listener': self.onPreferitoClick,
+				'action_listener': self.onPreferitoDelete,
+				'action_icon': 'close.png',
+			} for p in self.owner.preferiti
+		]
+		self.menu = MenuPanel(self.owner, d, title=None)
+		self.setWidget(self.menu)
+
+	def onPreferitoClick(self, mpi):
+		query = self.owner.map_tab.base.by_name('query')
+		query.setText(mpi.text)
+		query.pk = mpi.id
+		self.owner.setTabMappa()
+		self.owner.map_tab.onCerca()
+
+	def onPreferitoDeleteDone(self, res):
+		pass
+
+	def onPreferitoDeleteConferma(self, mpi):
+		def f():
+			mpi.setVisible(False)
+			client.servizi_delete_fav(mpi.id, JsonHandler(self.onPreferitoDeleteDone))
+		return f
+
+	def onPreferitoDelete(self, mpi):
+		QuestionDialogBox(_("Conferma"), _("Vuoi cancellare il preferito?"), [(_("S&igrave;"), self.onPreferitoDeleteConferma(mpi), None), (_("No"), None, None)]).show()
+
+
+
+class ControlPanel(GeneralMenuPanel):
+	def __init__(self, owner):
+		GeneralMenuPanel.__init__(self)
+		set_control(self)
+		self.owner = owner
+		self.user = None
 		self.dirty = False
-		self.map = None
-		self.map_tab = None
 		self.small = False
-		self.layers = None
 		self.posizione = None
-		self.split = VerticalSplitPanel()
-		self.split.setSize('100%', '100%')
-		self.split.setSplitPosition('90%')
+		self.preferiti = None
 
 		self.tab_holder = VerticalPanel()
 		self.tab_holder.setSize('100%', '100%')
+		self.setMainPanel(self.tab_holder)
 		
 		self.tab = DeferrableTabPanel(self)
 		self.tab.setSize('100%', '100%')
 		self.tab_holder.add(self.tab)
 		self.tab_holder.setCellHeight(self.tab, '100%')
-		self.split.setTopWidget(self.tab_holder)
 		p = DOM.getParent(self.tab.getElement())
 		DOM.setStyleAttribute(p, 'overflow-x', 'hidden')
 
 		self.cerca_percorso = CercaPercorsoPanel(self)
-		self.tab.add(self.cerca_percorso, HTML("Percorso"))
+		#self.tab.add(self.cerca_percorso, HTML(_("Percorso")))
+		self.tab.add(self.cerca_percorso, Image(_('toolbar/percorso.png'), Width='48px', Height='48px'))
 		self.tab.selectTab(0)
 		
-		self.cerca_linea = CercaLineaPanel(self, self.map)
+		self.cerca_linea = CercaLineaPanel(self)
 		self.cerca_linea.setSize('100%', '100%')
-		self.tab.add(self.cerca_linea, HTML("Linea"))
+		self.tab.add(self.cerca_linea,Image(_('toolbar/linea.png'), Width='48px', Height='48px'))
 			
-		self.cerca_luogo = CercaLuogoPanel(self, self.map)
+		self.cerca_luogo = CercaLuogoPanel(self)
 		self.cerca_luogo.setSize('100%', '100%')
-		self.tab.add(self.cerca_luogo, HTML("Luogo"))
+		self.tab.add(self.cerca_luogo, Image(_('toolbar/luogo.png'), Width='48px', Height='48px'))
 
-		self.add(self.split)
+		self.preferiti_tab = PreferitiPanel(self)
+		self.preferiti_tab.setSize('100%', '100%')
+		self.tab.add(self.preferiti_tab, Image(_('toolbar/preferiti.png'), Width='48px', Height='48px'))
 
 		self.old_width = self.tab.getClientWidth()
-		wait_init(self.tab_holder)
+		self.waiting = wait_init(self.tab_holder)
+		self.mp = MenuPanel(self, [
+			{
+				'id': 'login',
+				'text': _("Caricamento account utente"),
+				'listener': self.onLogin,
+			},
+			{
+				'id': 'news',
+				'text': _("News"),
+				'listener': self.onNews,
+			},
+			{
+				'id': 'legacy',
+				'text': _("Versione precedente"),
+				'listener': self.onLegacy,
+			},
+			{
+				'id': 'language',
+				'text': _("Language"),
+				'listener': self.onLanguage,
+			},
+			{
+				'id': 'logout',
+				'text': _("Esci"),
+				'listener': self.onLogout,
+			},],
+			icon = 'toolbar/back.png',
+		)
+		self.mp.by_id('logout').setVisible(False)
+		if flavor == 'app':
+			self.mp.by_id('legacy').setVisible(False)
+		if get_lang() != 'it':
+			self.mp.by_id('news').setVisible(False)
+		self.setMenuPanel(self.mp)
+		self.waiting.setGeneralMenuPanel(self)
 
+		self.map = MapPanel(self)
+		self.map_tab = SearchMapPanel(self, self.map)
+		self.map_tab.setSize('100%', '100%')
+		self.cerca_percorso.setMap(self.map)
+		self.cerca_linea.setMap(self.map)
+		self.cerca_luogo.setMap(self.map)
+
+		get_location(self.onLocation)
+
+	def setBottomWidget(self, w=None):
+		self.map_tab.setBottomWidget() #(w)
 
 	def relayout(self):
 		width = self.tab.getClientWidth()
@@ -305,12 +393,19 @@ class ControlPanel(HidingPanel):
 			self.cerca_percorso.do_or_defer(self.cerca_percorso.relayout)
 			self.cerca_linea.do_or_defer(self.cerca_linea.relayout)
 			self.cerca_luogo.do_or_defer(self.cerca_luogo.relayout)
+			# self.preferiti_tab.do_or_defer(self.preferiti_tab.relayout)
 			if self.small:
 				self.map_tab.do_or_defer(self.map.relayout)
+
+	def setPreferiti(self, fav):
+		self.preferiti = fav
+		self.preferiti_tab.aggiorna_preferiti()
 
 	def setDirty(self):
 		self.dirty = True
 
+	def isSmall(self):
+		return self.small
 
 	def center_and_zoom(self, layer):
 		if self.small:
@@ -318,11 +413,28 @@ class ControlPanel(HidingPanel):
 		else:
 			layer.centerOnMap()
 		
-	def onUrldecode(self, params):
-		"""
-		if 'lf' in params and params['lf'] == 0:
-			self.hide()
-		"""
+	def onAppInit(self, res):
+		# Session
+		storage_set('session_key', res['session_key'])
+
+		# User
+		self.user = res['user']
+		set_user(self.user)
+		if self.user is not None:
+			l = self.mp.by_id('login')
+			l.setText(_("Ciao, %s (Gestisci account)") % self.user['nome'])
+			l.setListener(self.onGestisciAccount)
+			self.mp.by_id('logout').setVisible(True)
+		else:
+			l = self.mp.by_id('login')
+			l.setText(_("Accedi"))
+			l.setListener(self.onLogin)
+			self.mp.by_id('logout').setVisible(False)
+
+		self.setPreferiti(res['fav'])
+
+		# Parameters
+		params = res['params']
 		cp_params = self.cerca_percorso.availableParams()
 		for p in cp_params:
 			if p in params:
@@ -339,23 +451,25 @@ class ControlPanel(HidingPanel):
 			self.tab.selectTab(1)
 		if ('cr' in params or 'cr_da' in params or 'cr_lista_tipi' in params) and not 'cr_a' in params:
 			self.tab.selectTab(2)
-		if 'info_traffico' in params:
-			self.info_traffico = InfoTrafficoPanel(self)
-			self.tab.add(self.info_traffico, HTML("Traffico"))
-			self.info_traffico.setMap(map)
-			
+
 	def setTabCercaPercorso(self):
 		self.tab.selectTab(0)
+		if not self.small:
+			self.owner.hide(False)
 		
 	def setTabCercaLinea(self):
 		self.tab.selectTab(1)
-		
+		if not self.small:
+			self.owner.hide(False)
+
 	def setTabCercaLuogo(self):
 		self.tab.selectTab(2)
+		if not self.small:
+			self.owner.hide(False)
 		
 	def setTabMappaPercorso(self):
 		if self.small:
-			self.tab.selectTab(3)
+			self.tab.selectTab(4)
 			self.tab.star_tab(0)
 		else:
 			self.tab.selectTab(0)
@@ -363,13 +477,14 @@ class ControlPanel(HidingPanel):
 	def setTabPercorsoMappa(self):
 		if self.small:
 			self.tab.selectTab(0)
-			self.tab.star_tab(3)
+			self.tab.star_tab(4)
 		else:
 			self.tab.selectTab(0)
+			self.owner.hide(False)
 			
 	def setTabMappaLinea(self):
 		if self.small:
-			self.tab.selectTab(3)
+			self.tab.selectTab(4)
 			self.tab.star_tab(1)
 		else:
 			self.tab.selectTab(1)
@@ -377,20 +492,21 @@ class ControlPanel(HidingPanel):
 	def setTabLineaMappa(self):
 		if self.small:
 			self.tab.selectTab(1)
-			self.tab.star_tab(3)
+			self.tab.star_tab(4)
 		else:
 			self.tab.selectTab(1)
+			self.owner.hide(False)
 			
 	def setTabMappaLuogo(self):
 		if self.small:
-			self.tab.selectTab(3)
+			self.tab.selectTab(4)
 			self.tab.star_tab(2)
 		else:
 			self.tab.selectTab(2)
 
 	def setTabMappa(self):
 		if self.small:
-			self.tab.selectTab(3)
+			self.tab.selectTab(4)
 		
 	def cercaPercorsoRisorse(self, da, tipi, a=None):
 		self.setTabCercaPercorso()
@@ -409,15 +525,6 @@ class ControlPanel(HidingPanel):
 		else:
 			self.setTabLineaMappa()
 		self.cerca_linea.cercaLinea(query, True, from_map=su_mappa)
-	
-	def setMap(self, map):
-		self.map = map
-		self.cerca_percorso.setMap(map)
-		self.cerca_linea.setMap(map)
-		self.cerca_luogo.setMap(map)
-		self.layers = LayerHolder(map)
-		self.split.setBottomWidget(self.layers)
-		get_location(self.onLocation)
 
 	def localizza(self):
 		self.dirty = False
@@ -426,10 +533,10 @@ class ControlPanel(HidingPanel):
 
 	def onLocation(self, lng, lat):
 		wait_stop()
-		self.posizione = 'Posizione attuale <punto:(%f,%f)>' % (lat, lng)
+		self.posizione = _('Posizione attuale <punto:(%f,%f)>') % (lat, lng)
 		if not self.dirty:
 			self.cerca_linea.createClLayer()
-			client.paline_smart_search(self.posizione, JsonHandler(self.cerca_linea.onCercaDone))
+			client.paline_smart_search(self.posizione, get_lang(), JsonHandler(self.cerca_linea.onCercaDone))
 
 	def cercaPercorsoDa(self, da):
 		self.cerca_percorso.impostaDa(da)
@@ -446,21 +553,18 @@ class ControlPanel(HidingPanel):
 	def cercaLuogo(self, luogo):
 		self.cerca_luogo.cercaLuogo(luogo, set_input=True)
 		self.setTabCercaLuogo()
-		
-	def setLayers(self, layers):
-		self.layers = layers
-		
+
 	def onBeforeTabSelected(self, sender, index):
 		return True
 	
 	def setSmallLayout(self):
+		self.map.animation_enabled = False
 		self.small = True
-		self.map_tab = SearchMapPanel(self, self.map)
-		self.map_tab.setSize('100%', '100%')
-		self.tab.add(self.map_tab, HTML("Mappa"))
+		self.tab.add(self.map_tab, Image(_('toolbar/mappa.png'), Width='48px', Height='48px'))
 		self.map_tab.setSize('100%', '100%') #self.tab.getClientHeight())
 		# self.tab.add(self.layers, "Layer")
 		self.map_tab.do_or_defer(self.map.relayout)
+		self.map_tab.setSmallLayout()
 		self.relayout()
 		self.setTabCercaPercorso()
 		self.setTabCercaLinea()
@@ -469,20 +573,132 @@ class ControlPanel(HidingPanel):
 		
 	def setLargeLayout(self):
 		self.small = False
-		print self.tab.getTabBar().getSelectedTab()
 		if self.tab.getTabBar().getSelectedTab() == 3: # Map
 			self.setTabCercaPercorso()
-		# self.tab.remove(self.layers)
-		self.map_tab.remove(self.map)
 		self.tab.remove(self.map_tab)
-		self.split.setTopWidget(self.tab_holder)
-		self.split.setBottomWidget(self.layers)
-		self.layers.setVisible(True)
+		self.map_tab.setLargeLayout()
 		self.relayout()
-		
+		self.map.animation_enabled = True
+
+	def onLoginWsDone(self, res):
+		storage_set('session_key', '')
+		self.restartApp()
+
+	def loginWs(self, url, ref):
+		if url.find('login_app_landing') != -1:
+			JS("""ref.close();""")
+			t = url.find('Token=')
+			token = url[t + 6:]
+			client.servizi_app_login(token, JsonHandler(self.onLoginWsDone))
+
+	def hide(self, hide=True):
+		self.owner.hide(hide)
+
+	def onLogin(self):
+		wait_start()
+		if flavor == 'web':
+			storage_set('session_key', '')
+			Window.setLocation('/servizi/login?IdSubSito=3')
+		else:
+			url = 'http://login.muoversiaroma.it/Login.aspx?IdSito=13'
+			JS("""
+				try {
+					ref = $wnd.open(url, '_blank', 'location=no');
+					ref.addEventListener('loadstop', function(event) {
+						self.loginWs(event.url, ref);
+					});
+				}
+				catch (err) {
+					alert("Generic error: " + err);
+				}
+			""")
+
+	def onNews(self):
+		news = NewsPanel(self)
+		self.display_menu(alternative_menu=news)
+
+	def onLegacy(self):
+		if flavor == 'web':
+			Window.setLocation('/base')
+
+	def onLinguaSetDone(self):
+		self.restartApp()
+
+	def onLanguageSet(self, mpi):
+		client.lingua_set(mpi.id, JsonHandler(self.onLinguaSetDone))
+		storage_set('hl', mpi.id)
+		wait_start()
+
+	def onLanguage(self):
+		lmp = MenuPanel(self, [
+			{
+				'id': 'it',
+				'text': _("Italiano"),
+				'listener': self.onLanguageSet,
+			},
+			{
+				'id': 'en',
+				'text': _("English"),
+				'listener': self.onLanguageSet,
+			},],
+			icon='toolbar/back.png',
+			title='Language',
+		)
+		self.display_menu(alternative_menu=lmp)
+
+
+	def onLogout(self):
+		if flavor == 'web':
+			Window.setLocation('/servizi/logout?IdSubSito=3')
+		else:
+			client.servizi_app_init('-', '', JsonHandler(self.onAppInit))
+
+
+	def onGestisciAccount(self):
+		url = 'http://login.muoversiaroma.it/GestioneAccount.aspx'
+		if flavor == 'web':
+			Window.setLocation(url)
+		else:
+			JS("""
+				try {
+					$wnd.open(url, '_blank', 'location=yes');
+				}
+				catch (err) {
+					alert("Generic error: " + err);
+				}
+			""")
+
+	def restartApp(self):
+		JS("""$wnd.location.reload();""")
+
+class LeftPanel(HidingPanel):
+	def __init__(self, owner):
+		HidingPanel.__init__(self, False)
+		self.owner = owner
+		self.small = False
+		self.split = VerticalSplitPanel()
+		self.split.setSize('100%', '100%')
+		self.split.setSplitPosition('90%')
+		self.control = ControlPanel(self)
+		self.control.setSize('100%', '100%')
+		self.split.setTopWidget(self.control)
+		self.add(self.split)
+		self.layers = LayerHolder(self.control.map)
+		self.split.setBottomWidget(self.layers)
+
+	def relayout(self):
+		self.control.relayout()
+
+	def setSmallLayout(self):
+		pass
+
+	def setLargeLayout(self):
+		self.split.setTopWidget(self.control)
+
 	def updateSplitter(self):
 		if not self.small:
 			self.split.setSplitPosition('90%')
+
 
 class LayerHolder(SimplePanel):
 	def __init__(self, map):
@@ -494,7 +710,7 @@ class LayerHolder(SimplePanel):
 		vp.setWidth('100%')
 		vp.addStyleName('indicazioni')
 		
-		titolo = HTML('Ora presenti sulla mappa')
+		titolo = HTML(_('Ora presenti sulla mappa'))
 		titolo.addStyleName('indicazioni-h1')
 		titolo.setWidth('100%')
 		vp.add(titolo)
@@ -506,52 +722,56 @@ class LayerHolder(SimplePanel):
 		self.add(vp)
 	
 
-class MainPanel(HorizontalPanel):
+class LargeLayoutPanel(HorizontalPanel):
 	def __init__(self):
 		HorizontalPanel.__init__(self)
 		
-		# control panel
-		self.control = ControlPanel(self)
-		self.control.setSize('0', '100%')
-		self.add(self.control)
-		self.setCellHeight(self.control, '100%')
-		#self.setCellWidth(self.control, '0')
-		
+		# left panel
+		self.left = LeftPanel(self)
+		self.left.setSize('0', '100%')
+		self.add(self.left)
+		self.setCellHeight(self.left, '100%')
+		self.control = self.left.control
+
 		# map panel
-		self.map = MapPanel(self)
-		self.map.setSize('100%', '100%')
-		self.add(self.map)
-		self.setCellWidth(self.map, '100%')
-		self.setCellHeight(self.map, '100%')
+		self.map = self.control.map
+		self.search_map = self.control.map_tab
+		self.add(self.search_map)
+		self.setCellWidth(self.search_map, '100%')
+		self.setCellHeight(self.search_map, '100%')
 
 		# the end
-		self.control.setMap(self.map)
-		self.control.addHideListener(self.onHide)
+		self.left.addHideListener(self.onHide)
 		self.setSize("100%", "100%")
-
-	def center_and_zoom(self, layer):
-		self.control.center_and_zoom(layer)
 
 	def onHide(self, source):
 		self.map.relayout()
+		self.left.split.setSplitPosition('90%')
+		self.left.relayout()
 				
 	def setSmallLayout(self):
-		self.remove(self.control)
-		self.remove(self.map)
-		self.add(self.control.tab_holder)
-		self.control.setSmallLayout()
+		pass
 		
 	def setLargeLayout(self):
-		self.control.setLargeLayout()
-		self.add(self.control)
-		self.setCellHeight(self.control, '100%')
-		self.add(self.map)
-		self.setCellWidth(self.map, '100%')
-		self.setCellHeight(self.map, '100%')
+		#self.add(self.left)
+		self.left.setLargeLayout()
+		self.setCellHeight(self.left, '100%')
+		self.add(self.search_map)
+		self.setCellWidth(self.search_map, '100%')
+		self.setCellHeight(self.search_map, '100%')
 		self.map.relayout()
 
 	def createMap(self):
 		self.map.create_map()
+		raw_params = getRawParams()
+		if raw_params.find('vms=1') != -1:
+			Layer(['pannelli', 0], _('Pannelli VMS'), self.map, self)
+
+	def getControlPanel(self):
+		return self.left.control
+
+	def updateSplitter(self):
+		self.left.updateSplitter()
 		
 def getRawParams():
 	return Window.getLocation().getSearch()[1:]
@@ -580,45 +800,92 @@ class GeneralPanel(VerticalPanel):
 			self.header.setCellHorizontalAlignment(self.copy, HasAlignment.ALIGN_RIGHT)
 
 		# main
-		self.main = MainPanel()
-		self.add(self.main)
-		self.setCellHeight(self.main, '100%')
+		self.llp = LargeLayoutPanel()
+		self.control = self.llp.getControlPanel()
+
+		if len(raw_params) > 0:
+			self.control.setDirty()
+		self.add(self.llp)
+		self.setCellHeight(self.llp, '100%')
 		self.setSize('100%', '100%')
+
+	def onAppInit(self, res):
+		self.control.onAppInit(res)
 
 	def setSmallLayout(self):
 		if not self.small:
 			self.small = True
 			if self.has_header:
 				self.remove(self.header)
-			self.main.setSmallLayout()
+			self.remove(self.llp)
+			self.add(self.control)
+			self.control.setSmallLayout()
+			self.llp.setSmallLayout()
 		
 	def setLargeLayout(self):
 		if self.small:
 			self.small = False
-			self.main.setLargeLayout()
+			self.remove(self.control)
+			self.llp.setLargeLayout()
+			self.control.setLargeLayout()
+			self.add(self.llp)
 			if self.has_header:
 				self.insert(self.header, 0)
 				self.setCellHeight(self.header, '58px')
-
-		
-	def onUrldecode(self, params):
-		self.main.control.onUrldecode(params)
 		
 	def onWindowResized(self):
-		if int(self.getClientWidth()) < 640:
+		if int(self.getClientWidth()) < 800:
 			self.setSmallLayout()
 		else:
 			self.setLargeLayout()
-		self.main.control.updateSplitter()
+		self.llp.updateSplitter()
 		self.relayout()
 
 	def createMap(self):
-		self.main.createMap()
+		self.llp.createMap()
 
 	def relayout(self):
-		self.main.control.relayout()
+		self.control.relayout()
+
+# def test():
+# 	print "Aggiungo listener"
+# 	JS("""
+# 		$wnd.document.addEventListener(
+# 			"pause",
+# 			function() {alert("Paused");},
+# 			false
+# 		);
+# 		$wnd.document.addEventListener(
+# 			"resume",
+# 			function() {alert("Resumed");},
+# 			false
+# 		);
+# 	""")
+# 	print "Lister aggiunti"
 	
 if __name__ == '__main__':
+	raw_params = getRawParams()
+	lang = 'it'
+	store_lang = False
+	stored_lang = storage_get('hl', '-')
+	if stored_lang != '-':
+		lang = stored_lang
+	elif raw_params.find('hl=it') != -1:
+		lang = 'it'
+		store_lang = True
+	elif raw_params.find('hl=en') != -1 or raw_params.find('HL=EN') != -1:
+		lang = 'en'
+		store_lang = True
+	if store_lang:
+		storage_set('hl', lang)
+	set_lang('it', lang)
+
+	# Workaround: don't show status bar on iOS, to avoid overlapping with app tool bar on iOS 7
+	if ios():
+		JS("""
+			$wnd.StatusBar.hide();
+		""")
+
 	rp = RootPanel()
 	splash = DOM.getElementById("Loading-Message")
 	par = DOM.getParent(splash)
@@ -628,7 +895,13 @@ if __name__ == '__main__':
 	gp.createMap()
 	gp.relayout()
 
-	if int(gp.getClientWidth()) < 640:
+	if int(gp.getClientWidth()) < 800:
 		gp.setSmallLayout()
-	client.urldecode(getRawParams(), JsonHandler(gp.onUrldecode))
+
+	session_key = storage_get('session_key', '')
+	client.servizi_app_init(session_key, getRawParams(), JsonHandler(gp.onAppInit))
+
 	Window.addWindowResizeListener(gp)
+	gp.getElement().scrollIntoView()
+
+

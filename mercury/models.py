@@ -26,9 +26,10 @@ from rpyc.utils.server import ThreadedServer
 from threading import Thread
 from Queue import Queue
 import cPickle as pickle
-from django.db.models import Q
+from django.db.models import Q, F
 from time import sleep
 from datetime import date, time, datetime, timedelta
+from contextlib import contextmanager
 import os
 import random
 import settings
@@ -80,6 +81,7 @@ config = {
 
 class PeerType(models.Model):
 	name = models.CharField(max_length=31)
+	max_queue_length = models.IntegerField(default=-1)
 	
 	def __unicode__(self):
 		return self.name
@@ -99,35 +101,56 @@ class Peer(models.Model):
 	active = models.BooleanField(blank=True, default=True)
 	blocked_until = models.DateTimeField(blank=True, null=True, db_index=True, default=None)
 	daemon = models.ForeignKey('Daemon', blank=True, null=True, default=None)
+	queue_length = models.IntegerField(default=0)
 	
 	def __unicode__(self):
 		return "%s" % self.type
-	
+
+	@contextmanager
+	def get_queue(self):
+		try:
+			print "Acquisico coda"
+			self.queue_length = F('queue_length') + 1
+			self.save()
+			yield
+		finally:
+			print "Rilascio coda"
+			self.queue_length = F('queue_length') - 1
+			self.save()
+
+
 	def get_receivers(self):
-		routes = Route.objects.filter(sender=self.type, active=True)
-		out = []
-		for r in routes:
-			out.extend(Peer.objects.filter(
-				Q(blocked_until__isnull=True) | Q(blocked_until=datetime.now()),
-				type=r.receiver,
-				active=True
-			))
+		out = Peer.objects.filter(
+			Q(blocked_until__isnull=True) | Q(blocked_until=datetime.now()),
+			type__bstar__sender=self,
+			type__bstar__active=True,
+			active=True
+		).order_by('queue_length')
 		return out
 	
 	@classmethod
 	def get_receivers_static(cls, name):
-		routes = Route.objects.filter(sender__name=name, active=True)
-		out = []
-		for r in routes:
-			out.extend(Peer.objects.filter(
-				Q(blocked_until__isnull=True) | Q(blocked_until=datetime.now()),
-				type=r.receiver,
-				active=True
-			))
+		out = cls.objects.filter(
+			Q(blocked_until__isnull=True) | Q(blocked_until=datetime.now()),
+			type__bstar__sender__name=name,
+			type__bstar__active=True,
+			active=True
+		).order_by('queue_length')
 		return out
-		
-	def connect_any(self):
-		ss = self.get_receivers()
+
+	def connect_any(self, by_queue=False):
+		ss = list(self.get_receivers())
+
+		if by_queue:
+			l = ss[0].queue_length
+			if l > ss[0].type.max_queue_length:
+				raise Exception("Servizio momentaneamente non disponibile")
+			n = len(ss)
+			i = 1
+			while i < n and ss[i].queue_length == l:
+				i += 1
+			ss = ss[:i]
+
 		random.shuffle(ss)
 		for s in ss:
 			try:
@@ -137,10 +160,22 @@ class Peer(models.Model):
 				#s.save()
 				pass
 		return None
+
 	
 	@classmethod
-	def connect_any_static(cls, name):
-		ss = cls.get_receivers_static(name)
+	def connect_any_static(cls, name, by_queue=False):
+		ss = list(cls.get_receivers_static(name))
+
+		if by_queue:
+			l = ss[0].queue_length
+			if l > ss[0].type.max_queue_length:
+				raise Exception("Servizio momentaneamente non disponibile")
+			n = len(ss)
+			i = 1
+			while i < n and ss[i].queue_length == l:
+				i += 1
+			ss = ss[:i]
+
 		random.shuffle(ss)
 		for s in ss:
 			try:
@@ -150,7 +185,8 @@ class Peer(models.Model):
 				#s.save()
 				pass
 		return None
-	
+
+
 	def connect_all(self):
 		ss = self.get_receivers()
 		cs = []
@@ -277,24 +313,25 @@ class Mercury(Thread):
 				'param': pickle.dumps(param, protocol=2),
 			})
 	
-	def sync_any(self, method, param):
+	def sync_any(self, method, param, by_queue=False):
 		if self.peer is not None:
-			c = self.peer.connect_any()
+			c = self.peer.connect_any(by_queue)
 		else:
-			c = Peer.connect_any_static(self.type.name)
+			c = Peer.connect_any_static(self.type.name, by_queue)
 		return pickle.loads(getattr(c.root, method)(pickle.dumps(param, 2)))
 	
 	@classmethod
-	def sync_any_static(cls, name, method, param):
-		c = Peer.connect_any_static(name)
+	def sync_any_static(cls, name, method, param, by_queue):
+		c = Peer.connect_any_static(name, by_queue)
 		return pickle.loads(getattr(c.root, method)(pickle.dumps(param, 2)))
 	
-	def rpyc_connect_any(self):
+	def rpyc_connect_any(self, by_queue=False):
 		if self.peer is not None:
-			c = self.peer.connect_any()
+			c = self.peer.connect_any(by_queue)
 		else:
-			c = Peer.connect_any_static(self.type.name)
+			c = Peer.connect_any_static(self.type.name, by_queue)
 		return c
+
 	
 	def rpyc_connect_all(self):
 		if self.peer is not None:
@@ -304,8 +341,9 @@ class Mercury(Thread):
 		return cs
 	
 	@classmethod
-	def rpyc_connect_any_static(cls, name):
-		return Peer.connect_any_static(name)	
+	def rpyc_connect_any_static(cls, name, by_queue=False):
+		return Peer.connect_any_static(name, by_queue)
+
 	
 	@classmethod
 	def rpyc_connect_all_static(cls, name):
@@ -328,6 +366,15 @@ def autopickle(f):
 	def g(self, param):
 		return pickle.dumps(f(self, pickle.loads(param)), 2)
 	return g
+
+def queued(daemon):
+	def deco(f):
+		def g(*args, **kwargs):
+			peer = Peer.objects.filter(daemon=daemon)[0]
+			with peer.get_queue():
+				return f(*args, **kwargs)
+		return g
+	return deco
 
 class MercuryListener(rpyc.Service):
 	def exposed_ping(self):
@@ -375,7 +422,7 @@ class Daemon(models.Model):
 	ready = models.BooleanField(blank=True, default=False)
 	pid = models.IntegerField(default=-1)
 	action = models.CharField(max_length=1, default='N', choices=daemon_action_choices)
-	
+
 	@classmethod
 	def get_process_daemon(cls, name):
 		return cls.objects.get(control__name=name, pid=os.getpid()) 
@@ -387,4 +434,3 @@ class Daemon(models.Model):
 	def __unicode__(self):
 		return u"[%s] %s (%s)" % (self.active_since, self.control, self.pid)
 
-	

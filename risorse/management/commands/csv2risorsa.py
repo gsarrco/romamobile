@@ -73,7 +73,7 @@ def farmacia_non_comunale(row, geom):
 	
 def carsharing(row, geom):
 	risorse.CarSharing(
-		nome_luogo=row['Parcheggio'],
+		nome_luogo=row['nome'],
 		geom=geom,
 	).save()
 
@@ -98,6 +98,22 @@ def parcheggio_scambio(row, geom):
 		nome_luogo=row['nome'],
 		posti=posti,
 		indirizzo=indirizzo,
+		geom=geom,
+	).save()
+
+def biblioteca(row, geom):
+	risorse.Biblioteca(
+		nome_luogo=row['nome'],
+		municipio=row['municipio'],
+		indirizzo=row['indirizzo'],
+		cap=row['cap'],
+		zona=row['zona'],
+		url_scheda=row['url_scheda'],
+		url_cerca=row['url_cerca'],
+		accessibilita=row['accessibilita'],
+		email=row['email'],
+		tel=row['tel'],
+		tipo_biblio=row['tipo'],
 		geom=geom,
 	).save()
 
@@ -143,6 +159,7 @@ class Command(BaseCommand):
 		# Ogni elemento è una terna (funzione, campo_geocoding, modello_da_svuotare); questi ultimi possono valere None
 		modelli = {
 			'autorimessa': [autorimessa, 'indirizzo', parcheggi.Autorimessa],
+			'biblioteca': [biblioteca, None, risorse.Biblioteca],
 			'parcheggio_scambio': [parcheggio_scambio, None, parcheggi.ParcheggioScambio],
 			'esercizio_commerciale': [esercizio_commerciale, ['Via', 'Civico'], risorse.EsercizioCommerciale],
 			'farmacia_comunale': [farmacia_comunale, 'INDIRIZZO', risorse.Farmacia],

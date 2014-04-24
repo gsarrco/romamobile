@@ -574,7 +574,8 @@ def parse_osm(graph, mini=False):
 										lunghezza,
 										punti,
 										tipo,
-										False,
+										set(), # Oppure determinare le ZTL
+										tpl=False, # Oppure determinare se corsia preferenziala
 									)
 									count += 1
 									graph.add_arco(e)
@@ -590,8 +591,9 @@ def parse_osm(graph, mini=False):
 										lunghezza,
 										punti,
 										tipo,
-										False,
-									)																
+										set(), # Oppure determinare le ZTL
+										tpl=False, # Oppure determinare se corsia preferenziala
+									)
 									count += 1
 									graph.add_arco(e)
 								s = t

@@ -29,8 +29,8 @@ from django.contrib.auth.models import User, Group
 import cPickle as pickle
 import hashlib
 from django.core.cache import cache
-from gis.models import Punto, Polilinea
 import random
+
 
 RICERCHE_RECENTI_MAX_LENGTH = 10
 RICERCHE_RECENTI_MAX_AGE = timedelta(days=60)
@@ -294,6 +294,10 @@ class Stato(object):
 		a.save()
 
 
+def enforce_session(request):
+	if request.session.session_key is None:
+		request.session.create()
+
 class UtenteGenerico(models.Model):
 	utente = models.ForeignKey(User, null=True, blank=True, default=None)
 	sessione = models.CharField(max_length=40, db_index=True, blank=True, null=True, default=None)
@@ -302,14 +306,15 @@ class UtenteGenerico(models.Model):
 	@classmethod
 	def by_request(cls, request):
 		if request is None:
-			return
+			raise UtenteGenerico.DoesNotExist()
+		enforce_session(request)
 		try:
 			if request.user.is_authenticated():
 				return cls.objects.filter(utente=request.user)[0]
 			else:
 				return cls.objects.filter(sessione=request.session.session_key)[0]
 		except Exception:
-			return
+			raise UtenteGenerico.DoesNotExist()
 		
 	@classmethod
 	def update(cls, request):
@@ -321,6 +326,7 @@ class UtenteGenerico(models.Model):
 				ug = cls(utente=request.user)
 				ug.save()
 		else:
+			enforce_session(request)
 			ugs = cls.objects.filter(sessione=request.session.session_key)
 			if len(ugs) > 0:
 				ug = ugs[0]
@@ -560,15 +566,17 @@ class RicercaRecente(models.Model):
 		return cls.objects.filter(utente_generico=ug)	
 	
 	@classmethod
-	def by_request(cls, request):
+	def by_request(cls, request, limit=True):
 		rrs = cls.get_queryset_by_request(request)
 		rrs.filter(orario__lt=datetime.now() - RICERCHE_RECENTI_MAX_AGE).delete()
-		return rrs.order_by('-orario')[:RICERCHE_RECENTI_MAX_LENGTH]
+		if limit:
+			return rrs.order_by('-orario')[:RICERCHE_RECENTI_MAX_LENGTH]
+		return rrs.order_by('-orario')
 	
 	@classmethod
 	def update(cls, request, ricerca, descrizione):
-		if request is None:
-			return		
+		if request is None or "punto:" in ricerca:
+			return
 		n = datetime.now()
 		rrs = cls.get_queryset_by_request(request).filter(ricerca=ricerca)
 		if len(rrs) == 0:

@@ -45,8 +45,6 @@ from django.utils.translation import ugettext as _
 import django.contrib.auth.views
 from django.db.models import Q
 from django.template.defaultfilters import date as datefilter, urlencode
-from percorso.views import _validate_address, calcola_percorso_dinamico
-from paline.views import _default
 from paline.models import PalinaPreferita #, PercorsoSalvato
 from percorso.models import IndirizzoPreferito
 import settings
@@ -54,6 +52,9 @@ from carpooling import models as carpooling
 from pprint import pprint
 from mercury.models import Mercury
 from autenticazione.models import Sottosito
+from collections import OrderedDict
+#from pympler import tracker, muppy
+#import gc
 
 from django.views.defaults import page_not_found, server_error
 
@@ -122,7 +123,6 @@ def info_utente(request, token):
 	u = request.user
 	fav = get_fav(request)
 	fav_list = [(k, fav[k][0], fav[k][1]) for k in fav]
-	fav_list.sort(key=lambda x: x[2])	
 	if u.is_authenticated():
 		return {
 			'user': {
@@ -170,7 +170,7 @@ def servizio(request, token, prodotto, servizio, lingua, apertoDalMenu):
 		'nome': s.descrizione,
 		'servizio': s.servizio.servizio.nome,
 	}
-		
+
 
 def from_fav(request, fav):
 	t, pk = fav[0], int(fav[1:])
@@ -183,20 +183,47 @@ def from_fav(request, fav):
 	elif t == 'I':
 		p = IndirizzoPreferito.objects.get(user=request.user, pk=pk)
 		return p.indirizzo_composito()
-		
-	
+
+
 def get_fav(request):
 	u = request.user
-	fav = {}
+	fav = OrderedDict()
 	if u.is_authenticated():
-		fav.update(dict([('fermata:%s' % p.id_palina, ('P%d' % p.pk, p.nome)) for p in PalinaPreferita.objects.filter(gruppo__user=u, gruppo__singleton=True)]))
-		fav.update(dict([(i.indirizzo_composito(), ('I%d' % i.pk, i.nome)) for i in IndirizzoPreferito.objects.filter(user=u)]))
-	
+		fav.update(OrderedDict([('fermata:%s' % p.id_palina, ('P%d' % p.pk, p.nome)) for p in PalinaPreferita.objects.filter(gruppo__user=u, gruppo__singleton=True)]))
+		fav.update(OrderedDict([(i.indirizzo_composito(), ('I%d' % i.pk, i.nome)) for i in IndirizzoPreferito.objects.filter(user=u)]))
+
 	rrs = RicercaRecente.by_request(request)
-	fav.update(dict([(r.ricerca, ("R%d" % r.pk, r.descrizione)) for r in rrs]))
+	fav.update(OrderedDict([(r.ricerca, ("R%d" % r.pk, r.descrizione)) for r in rrs]))
 
 	return fav
-	
+
+def delete_fav(request, id_fav):
+	u = request.user
+	t = id_fav[0]
+	pk = int(id_fav[1:])
+	if t == 'P':
+		PalinaPreferita.objects.filter(gruppo__user=u, gruppo__singleton=True, pk=pk).delete()
+	elif t == 'I':
+		IndirizzoPreferito.objects.filter(user=u, pk=pk).delete()
+	elif t == 'R':
+		RicercaRecente.by_request(request, limit=False).filter(pk=pk).delete()
+
+def sostituisci_preferiti(request, address):
+	if address.startswith('fav:'):
+		try:
+			tipo = address[4]
+			pk = address[5:]
+			u = request.user
+			if tipo == 'R':
+				return RicercaRecente.by_request(request, limit=False).get(pk=pk).ricerca
+			elif tipo == 'P':
+				return "fermata:%s" % PalinaPreferita.objects.get(gruppo__user=u, pk=pk).id_palina
+			elif tipo == 'I':
+				return IndirizzoPreferito.objects.get(user=u, pk=pk).indirizzo
+		except:
+			pass
+	return address
+
 
 def base(request):
 	request.session['js_version'] = False
@@ -204,11 +231,11 @@ def base(request):
 
 def webapp(request):
 	request.session['js_version'] = True
-	return HttpResponseRedirect('/percorso/js')
+	return HttpResponseRedirect('/percorso/js?hl=%s' % request.lingua.codice)
 
 def servizi_new(request):
-	if getdef(request.session, 'js_version', True):
-		return HttpResponseRedirect('/percorso/js')
+	# if getdef(request.session, 'js_version', True):
+	# 	return HttpResponseRedirect('/percorso/js?hl=%s' % request.lingua.codice)
 
 	ctx = {}
 	servizi_pubblico = ['news', 'risorse', 'bike', 'carpooling', 'paline', 'percorso']
@@ -221,10 +248,6 @@ def servizi_new(request):
 
 	fav = get_fav(request)
 	fav_list = [fav[k] for k in fav]
-	fav_list.sort(key=lambda x: x[1])	
-	
-
-	
 	fav_list = [('-', _('Ricerche recenti:'))] + fav_list	
 
 
@@ -254,6 +277,15 @@ def servizi_new(request):
 			'messaggio': n.titolo,
 		})
 	
+
+	# Altri messaggi (custom)
+	us.append({
+		'link': '/info/carpooling',
+		'messaggio': u'Nuovo servizio Car pooling',
+	})
+
+	request.ctx['notifiche'].extend(us)
+
 	
 	# Percorsi salvati
 	try:
@@ -400,7 +432,7 @@ def backend(request):
 	if redirect is not None:
 		return HttpResponseRedirect(redirect)
 	ctx['menu'] = menu
-	print menu
+	#print menu
 	return TemplateResponse(request, 'backend.html', ctx)
 
 def backend_logout(request):

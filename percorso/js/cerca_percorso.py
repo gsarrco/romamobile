@@ -51,23 +51,24 @@ from pyjamas.ui.Widget import Widget
 from pyjamas.ui.Hyperlink import Hyperlink
 from pyjamas import Window
 from pyjamas.Timer import Timer
-from pyjamas.ui.Tooltip import TooltipListener
 from pyjamas.JSONService import JSONProxy
 from pyjamas import History
 from pyjamas import DOM
 from prnt import prnt
-from util import StyledFixedColumnFlexTable, HTMLFlowPanel, DP, VP, HP, GP, SP
+from util import StyledFixedColumnFlexTable, HTMLFlowPanel, DP, VP, HP, GP, SP, enforce_login
 from util import get_checked_radio, HidingPanel, ValidationErrorRemover, MyAnchor
-from util import ToggleImage, SearchBox, DeferrablePanel, ScrollAdaptivePanel
-from util import wait_start, wait_stop
+from util import ToggleImage, FavSearchBox, DeferrablePanel, ScrollAdaptivePanel
+from util import wait_start, wait_stop, _, get_lang
 from datetime import date, time, datetime, timedelta
 from Calendar import Calendar, DateField, TimeField
 from map import MapPanel, Layer, LayerPanel, Marker
+from globals import base_url, make_absolute
+
 
 from DissolvingPopup import DissolvingPopup
 from util import JsonHandler, redirect
 
-client = JSONProxy('/json/', [
+client = JSONProxy(base_url + '/json/', [
 	'percorso_cerca',
 	'urldecode',
 	'risorse_lista_tipi',
@@ -75,6 +76,7 @@ client = JSONProxy('/json/', [
 	'percorso_get_params',
 	'percorso_email',
 	'servizi_autocompleta_indirizzo',
+	'carpooling_dettaglio_offerta',
 ])
 
 class LineaLabel(HorizontalPanel):
@@ -128,7 +130,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 					'sub': [
 						{
 							'class': Label,
-							'args': ['Dove'],
+							'args': [_('Dove')],
 							'style': 'indicazioni-h1',
 							'height': None,
 						},
@@ -139,18 +141,17 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 							'sub': [
 								{
 									'class': Label,
-									'args': ["Da: "],
+									'args': [_("Da: ")],
 									'expand': False,
 								},
 								{
 									'class': HP,
 									'sub': [
 											{
-												'class': SearchBox,
+												'class': FavSearchBox,
 												'name': 'da',
 												'call_addKeyboardListener': ([self], {}),
-												'call_addFocusListener': ([self], {}),
-												'args': [client.servizi_autocompleta_indirizzo, None, 3, 100, False],
+												'args': [client.servizi_autocompleta_indirizzo, None, 0, 100, False],
 											},
 											{
 												'class': HP,
@@ -174,18 +175,17 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 								},
 								{
 									'class': Label,
-									'args': ["A: "],
+									'args': [_("A: ")],
 									'expand': False,
 								}, 
 								{
 									'class': HP,
 									'sub': [
 											{
-												'class': SearchBox,
+												'class': FavSearchBox,
 												'name': 'a',
 												'call_addKeyboardListener': ([self], {}),
-												'call_addFocusListener': ([self], {}),
-												'args': [client.servizi_autocompleta_indirizzo, None, 3, 100, False],
+												'args': [client.servizi_autocompleta_indirizzo, None, 0, 100, False],
 											},
 											{
 												'class': HP,
@@ -214,7 +214,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 							'sub': [
 								{
 									'class': Button,
-									'args': ["Cerca", self.onCerca],
+									'args': [_("Cerca"), self.onCerca],
 									'name': 'cerca',
 									'width': '49%',
 								},
@@ -225,7 +225,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 								},
 								{
 									'class': Button,
-									'args': ["Ritorno", self.onScambia],
+									'args': [_("Ritorno"), self.onScambia],
 									'name': 'scambia',
 									'width': '49%',
 								},
@@ -233,71 +233,91 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 						},
 						{
 							'class': Label,
-							'args': ['Come: Trasporto pubblico'],
+							'args': [_('Come: Trasporto pubblico')],
 							'style': 'indicazioni-h1',
 							'name': 'come_header',
 							'height': None,
 						},
 						{
-							'class': GP,
-							'column_count': 3,
+							'class': HP,
+							'width': None,
 							'sub': [
 								{
-									'class': ToggleImage,
-									'args': ['modo_tpl_s.png', 'modo-inactive', 'modo-active', self.onModo, 1, False],
-									'name': 'modo_tpl',
-									'expand': False,
-									'call_setTooltip': (["Trasporto pubblico"], {}),
+									'class': GP,
+									'column_count': 3,
+									'sub': [
+										{
+											'class': ToggleImage,
+											'args': ['modo_tpl.png', 'modo-inactive', 'modo-active', self.onModo, 1, False],
+											'name': 'modo_tpl',
+											'expand': False,
+											'call_setTooltip': ([_("Trasporto pubblico")], {}),
+											'call_setSize': (['39px', '40px'], {}),
+										},
+										{
+											'class': ToggleImage,
+											'args': ['modo_bnr.png', 'modo-inactive', 'modo-active', self.onModo, 3, False],
+											'name': 'modo_bnr',
+											'expand': False,
+											'call_setTooltip': ([_("Bike and ride")], {}),
+											'call_setSize': (['79px', '40px'], {}),
+										},
+										{
+											'class': ToggleImage,
+											'args': ['modo_carpooling.png', 'modo-inactive', 'modo-active', self.onModo, 5, False],
+											'name': 'modo_carpooling',
+											'expand': False,
+											'call_setTooltip': ([_("Car pooling")], {}),
+											'call_setSize': (['39px', '40px'], {}),
+											'call_setVisible': ([False], {}),
+										},
+										{
+											'class': ToggleImage,
+											'args': ['modo_auto.png', 'modo-inactive', 'modo-active', self.onModo, 0, False],
+											'name': 'modo_auto',
+											'expand': False,
+											'call_setTooltip': ([_("Trasporto privato")], {}),
+											'call_setSize': (['39px', '40px'], {}),
+										},
+										{
+											'class': ToggleImage,
+											'args': ['modo_pnr.png', 'modo-inactive', 'modo-active', self.onModo, 2, False],
+											'name': 'modo_pnr',
+											'expand': False,
+											'call_setTooltip': ([_("Park and ride")], {}),
+											'call_setSize': (['79px', '40px'], {}),
+										},
+										{
+											'class': ToggleImage,
+											'args': ['modo_carsharing.png', 'modo-inactive', 'modo-active', self.onModo, 4, False],
+											'name': 'modo_carsharing',
+											'expand': False,
+											'call_setTooltip': ([_("Car sharing")], {}),
+											'call_setSize': (['39px', '40px'], {}),
+										},
+									],
 								},
-								{
-									'class': ToggleImage,
-									'args': ['modo_bnr_s.png', 'modo-inactive', 'modo-active', self.onModo, 3, False],
-									'name': 'modo_bnr',
-									'expand': False,
-									'call_setTooltip': (["Bike and ride"], {}),
-								},
-								{
-									'class': ToggleImage,
-									'args': ['modo_carsharing_s.png', 'modo-inactive', 'modo-active', self.onModo, 4, False],
-									'name': 'modo_carsharing',
-									'expand': False,
-									'call_setTooltip': (["Car sharing"], {}),
-								},
-								{
-									'class': ToggleImage,
-									'args': ['modo_auto_s.png', 'modo-inactive', 'modo-active', self.onModo, 0, False],
-									'name': 'modo_auto',
-									'expand': False,
-									'call_setTooltip': (["Trasporto privato"], {}),
-								},
-								{
-									'class': ToggleImage,
-									'args': ['modo_pnr_s.png', 'modo-inactive', 'modo-active', self.onModo, 2, False],
-									'name': 'modo_pnr',
-									'expand': False,
-									'call_setTooltip': (["Park and ride"], {}),
-								},							
 							],
-						},								
+						},
 					],
 				},
 				{
 					'class': DP,
 					'name': 'opzioni_avanzate',
-					'title': 'Opzioni avanzate',
+					'title': _('Opzioni avanzate'),
 					'sub': [{
 						'class': VP,
 						'style': 'indicazioni',
 						'sub': [
 							{
 								'class': Label,
-								'args': ['Opzioni'],
+								'args': [_('Opzioni')],
 								'style': 'indicazioni-h1',
 								'height': None,
 							},
 							{
 								'class': CheckBox,
-								'args': ['Cerca un luogo lungo il percorso', True],
+								'args': [_('Cerca un luogo lungo il percorso'), True],
 								'name': 'luogo',
 								'click_listener': self.onCercaLuogo,
 							},
@@ -317,7 +337,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 								'sub': [
 									{
 										'class': Label,
-										'args': ['Permessi di accesso ZTL'],
+										'args': [_('Permessi di accesso ZTL')],
 										'style': 'indicazioni-h2',
 									},
 									{
@@ -340,51 +360,51 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 								'sub': [
 									{
 										'class': Label,
-										'args': ['Propensione spostamenti a piedi'],
+										'args': [_('Propensione spostamenti a piedi')],
 										'style': 'indicazioni-h2',
 									},									
 									{
 										'class': RadioButton,
-										'args': ['piedi', 'Bassa (camminatore lento)'],
+										'args': ['piedi', _('Bassa (camminatore lento)')],
 										'name': 'piedi_0',	
 									},
 									{
 										'class': RadioButton,
-										'args': ['piedi', 'Media'],
+										'args': ['piedi', _('Media')],
 										'name': 'piedi_1',
 										'checked': True,
 									},
 									{
 										'class': RadioButton,
-										'args': ['piedi', 'Alta (camminatore veloce)'],
+										'args': ['piedi', _('Alta (camminatore veloce)')],
 										'name': 'piedi_2',
 									},
 									{
 										'class': Label,
-										'args': ['Mezzi pubblici da utilizzare'],
+										'args': [_('Mezzi pubblici da utilizzare')],
 										'style': 'indicazioni-h2',
 									},									
 									{
 										'class': CheckBox,
-										'args': ['Autobus e tram', True],
+										'args': [_('Autobus e tram'), True],
 										'name': 'bus',
 										'checked': True,						
 									},
 									{
 										'class': CheckBox,
-										'args': ['Metropolitana', True],
+										'args': [_('Metropolitana'), True],
 										'name': 'metro',
 										'checked': True,						
 									},
 									{
 										'class': CheckBox,
-										'args': ['Ferrovie urbane', True],
+										'args': [_('Ferrovie urbane'), True],
 										'name': 'ferro',
 										'checked': True,						
 									},
 									{
 										'class': CheckBox,
-										'args': ['Teletrasporto', True],
+										'args': [_('Teletrasporto'), True],
 										'name': 'teletrasporto',
 										'checked': False,
 										'call_setVisible': ([False], {}),	
@@ -399,7 +419,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 								'sub': [
 									{
 										'class': HTML,
-										'args': ['Max distanza in bici:&nbsp;'],
+										'args': [_('Max distanza in bici:&nbsp;')],
 										'vertical_alignment': HasAlignment.ALIGN_MIDDLE,
 									},
 									{
@@ -411,7 +431,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 									},
 									{
 										'class': HTML,
-										'args': ['&nbsp;km'],
+										'args': [_('&nbsp;km')],
 										'vertical_alignment': HasAlignment.ALIGN_MIDDLE,
 									},		
 								],
@@ -423,18 +443,18 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 								'sub': [
 									{
 										'class': Label,
-										'args': ['Parcheggi Park and Ride'],
+										'args': [_('Parcheggi Park and Ride')],
 										'style': 'indicazioni-h2',
 									},									
 									{
 										'class': CheckBox,
-										'args': ['Parcheggi di scambio', True],
+										'args': [_('Parcheggi di scambio'), True],
 										'name': 'parcheggi_scambio',
 										'checked': True,					
 									},
 									{
 										'class': CheckBox,
-										'args': ['Autorimesse private', True],
+										'args': [_('Autorimesse private'), True],
 										'name': 'parcheggi_autorimesse',
 										'checked': False,	
 									},
@@ -442,20 +462,20 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 							},
 							{
 								'class': Label,
-								'args': ['Quando'],
+								'args': [_('Quando')],
 								'style': 'indicazioni-h1',
 								'height': None,
 							},
 							{
 								'class': RadioButton,
-								'args': ['quando', 'Adesso'],
+								'args': ['quando', _('Adesso')],
 								'name': 'quando_0',
 								'checked': True,
 								'click_listener': self.onQuando01,					
 							},
 							{
 								'class': RadioButton,
-								'args': ['quando', 'Fra 5 minuti'],
+								'args': ['quando', _('Fra 5 minuti')],
 								'name': 'quando_1',
 								'click_listener': self.onQuando01,						
 							},
@@ -465,14 +485,14 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 								'sub': [
 									{
 										'class': RadioButton,
-										'args': ['quando', 'Parti alle:&nbsp;', True],
+										'args': ['quando', _('Parti alle:&nbsp;'), True],
 										'name': 'quando_2',
 										'click_listener': self.onQuando23,
 										'vertical_alignment': HasAlignment.ALIGN_MIDDLE,					
 									},											
 									{
 										'class': RadioButton,
-										'args': ['quando', 'Arriva alle:&nbsp;', True],
+										'args': ['quando', _('Arriva alle:&nbsp;'), True],
 										'name': 'quando_3',
 										'click_listener': self.onQuando23,
 										'vertical_alignment': HasAlignment.ALIGN_MIDDLE,					
@@ -492,7 +512,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 									},
 									{
 										'class': HTML,
-										'args': ['&nbsp;&nbsp;Ore:&nbsp;'],
+										'args': [_('&nbsp;&nbsp;Ore:&nbsp;')],
 										'vertical_alignment': HasAlignment.ALIGN_MIDDLE,
 									},											
 									{
@@ -507,7 +527,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 							{
 								'class': HTML,
 								'args': [
-									"""
+									_("""
 									<p>
 										Questo servizio calcola il miglior percorso con i mezzi
 										Atac, Roma TPL e le ferrovie regionali Trenitalia.
@@ -516,10 +536,10 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 									<p>
 									</p>
 										Il software, sviluppato dall'Agenzia per la Mobilit&agrave;
-										di Roma, &egrave; <a href="http://www-test.agenziamobilita.roma.it/servizi/open-data/codice-sorgente.html" target="_blank">rilasciato
+										di Roma, &egrave; <a href="http://www.agenziamobilita.roma.it/servizi/open-data/codice-sorgente.html" target="_blank">rilasciato
 										con licenza open source.</a>
 									</p>
-									"""
+									""")
 								],
 							},
 						]
@@ -538,7 +558,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 		self.modo = 1
 		self.get_ztl = []
 		ztl_all = self.base.by_name('ztl_all')
-		ztl_all.setWidget(HTML('Seleziona tutte'))
+		ztl_all.setWidget(HTML(_('Seleziona tutte')))
 		ztl_all.addClickListener(self.onZtlAll)
 		self.risultati = None
 		n = datetime.now()
@@ -564,10 +584,11 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 	def scrollaAPercorso(self):
 		if self.risultati is not None:
 			self.risultati.getElement().scrollIntoView()
+
 		
 	def cambiaModo(self, modo):
-		modi = ['modo_auto', 'modo_tpl', 'modo_pnr', 'modo_bnr', 'modo_carsharing']
-		come = ['Trasporto privato', 'Trasporto pubblico', 'Park and Ride', 'Bike and Ride', 'Car Sharing']
+		modi = ['modo_auto', 'modo_tpl', 'modo_pnr', 'modo_bnr', 'modo_carsharing', 'modo_carpooling']
+		come = [_('Trasporto privato'), _('Trasporto pubblico'), _('Park and Ride'), _('Bike and Ride'), _('Car Sharing'),  _('Car Pooling')]
 		self.base.by_name(modi[self.modo]).setActive(False)
 		self.modo = modo
 		self.base.by_name(modi[self.modo]).setActive(True)
@@ -590,7 +611,10 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 			bnr = True
 		elif self.modo == 4:
 			tpl = True
-			luoghi = False			
+			luoghi = False
+		elif self.modo == 5:
+			tpl = True
+			luoghi = False
 		self.base.by_name('opzioni_tpl').setVisible(tpl)
 		self.base.by_name('opzioni_bnr').setVisible(bnr)
 		self.base.by_name('opzioni_pnr').setVisible(pnr)
@@ -599,7 +623,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 			self.base.by_name('luogo').setChecked(False)
 			self.base.by_name('risorse').setVisible(False)
 		self.base.by_name('luogo').setVisible(luoghi)
-		self.base.by_name('come_header').setText("Come: %s" % come[self.modo])
+		self.base.by_name('come_header').setText(_("Come: %s") % come[self.modo])
 		if car:
 			self.getZtl()
 
@@ -725,6 +749,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 		if param == 'ztl':
 			self.get_ztl = value.split(",")
 		if param == 'cp':
+			self.owner.hide(False)
 			self.cercaPercorso()
 	
 		
@@ -736,8 +761,8 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 				
 	def setMap(self, map):
 		self.map = map
-		self.map.addRightClickOption("Cerca percorso da qui", self.onRightClickDa)
-		self.map.addRightClickOption("Cerca percorso fino a qui", self.onRightClickA)
+		self.map.addRightClickOption(_("Cerca percorso da qui"), self.onRightClickDa)
+		self.map.addRightClickOption(_("Cerca percorso fino a qui"), self.onRightClickA)
 		
 	# def onRealtime(self):
 	# 	self.realtime_status = not self.realtime_status
@@ -748,7 +773,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 		
 	def onRightClickDa(self, lat, lng):
 		da = self.base.by_name('da')
-		da.setText('punto:(%s,%s)' % (lat, lng))
+		da.setText('punto:(%0.4f,%0.4f)' % (lat, lng))
 		a = self.base.by_name('a')
 		if a.getText() != '':
 			self.onCerca()
@@ -758,7 +783,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 			m = Marker(
 				self.cp_layer,
 				(lng, lat),
-				'/paline/s/img/partenza_percorso.png',
+				make_absolute('/paline/s/img/partenza_percorso.png'),
 				icon_size=(32, 32),
 				anchor=(16, 32),
 			)
@@ -766,7 +791,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 			
 	def onRightClickA(self, lat, lng):
 		a = self.base.by_name('a')
-		a.setText('punto:(%s,%s)' % (lat, lng))
+		a.setText('punto:(%0.4f,%0.4f)' % (lat, lng))
 		da = self.base.by_name('da')
 		if da.getText() != '':
 			self.onCerca()				
@@ -776,7 +801,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 			m = Marker(
 				self.cp_layer,
 				(lng, lat),
-				'/paline/s/img/arrivo_percorso.png',
+				make_absolute('/paline/s/img/arrivo_percorso.png'),
 				icon_size=(32, 32),
 				anchor=(16, 32),
 			)			
@@ -804,7 +829,6 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 			self.onCerca()
 			
 	def onCerca(self):
-		self.owner.setDirty()
 		self.linee_escluse = None
 		self.cercaPercorso()
 		
@@ -813,7 +837,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 		if self.cp_layer is not None:
 			self.cp_layer.destroy()
 		self.map.hideAllLayers()
-		self.cp_layer = Layer('cp_layer', 'Percorso trovato', self.map)
+		self.cp_layer = Layer('cp_layer', _('Percorso trovato'), self.map)
 
 	def impostaDa(self, da):
 		self.base.by_name('da').setText(da)
@@ -822,6 +846,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 		self.base.by_name('a').setText(a)
 		
 	def cercaPercorso(self, tipi_risorse=None, su_mappa=False):
+		self.owner.setDirty()
 		cerca = self.base.by_name('cerca')
 		n = datetime.now().strftime('%d/%m/%Y %H:%M')
 		quando = get_checked_radio(self.base, 'quando', range(4))
@@ -872,7 +897,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 				'bici': self.modo == 3,
 				'max_distanza_bici': max_distanza_bici,
 				'teletrasporto': self.base.by_name('teletrasporto').isChecked(),
-				'carpooling': self.carpooling,
+				'carpooling': 2 if self.modo == 5 else 0,
 				'rev': quando == 3,
 				'tipi_ris': tipi_ris,
 				'parcheggi_scambio': self.base.by_name('parcheggi_scambio').isChecked(),
@@ -890,11 +915,10 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 				a_in,
 				opzioni,				
 				n,
-				'it',
+				get_lang(),
 				offset,
 				JsonHandler(callback, self.onCercaErroreRemoto)
 			)
-			
 		
 	def onEscludiFactory(self, id_linea, linea):
 		def onEscludi():
@@ -1039,7 +1063,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 								{
 									'class': Label,
 									'style': 'indicazioni-h1',
-									'args': ['Riepilogo'],
+									'args': [_('Riepilogo')],
 								},
 								{
 									'class': Image,
@@ -1069,7 +1093,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 						},
 						{
 							'class': Label,
-							'args': ['Esclusioni'],
+							'args': [_('Esclusioni')],
 							'style': 'indicazioni-h1',
 							'height': None,
 							'name': 'esclusioni-header'
@@ -1081,7 +1105,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 						},
 						{
 							'class': Label,
-							'args': ['Indicazioni'],
+							'args': [_('Indicazioni')],
 							'style': 'indicazioni-h1',
 							'height': None,
 						},									
@@ -1093,14 +1117,14 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 						},									
 						{
 							'class': HTML,
-							'args': ["""&copy; %d
-								<a class="inl" href="http://www.agenziamobilita.roma.it">Roma servizi per la mobilit&agrave; s.r.l.</a>""" % datetime.now().year
+							'args': [_("""&copy; %d
+								<a class="inl" href="http://www.agenziamobilita.roma.it">Roma servizi per la mobilit&agrave; s.r.l.</a>""") % datetime.now().year
 							],
 						},									
 					]
 				}		
 			],
-			title='Percorso trovato',
+			title=_('Percorso trovato'),
 		)
 		self.risultati.setOpen(True)
 		indicazioni = self.risultati.by_name('indicazioni')
@@ -1110,9 +1134,9 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 		# Riepilogo
 		stat = res['stat']
 		riepilogo = self.risultati.by_name('riepilogo')
-		riepilogo.add(HTML("<b>Durata spostamento:</b> %s" % stat['tempo_totale_format']))
-		riepilogo.add(HTML("<b>Distanza percorsa:</b> %s<br />" % stat['distanza_totale_format']))
-		riepilogo.add(HTML("<b>Di cui a piedi:</b> %s" % stat['distanza_piedi_format']))
+		riepilogo.add(HTML(_("<b>Durata spostamento:</b> %s") % stat['tempo_totale_format']))
+		riepilogo.add(HTML(_("<b>Distanza percorsa:</b> %s<br />") % stat['distanza_totale_format']))
+		riepilogo.add(HTML(_("<b>Di cui a piedi:</b> %s") % stat['distanza_piedi_format']))
 		
 		# Esclusioni
 		if len(res['linee_escluse']) > 0:
@@ -1127,7 +1151,10 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 				self.linee_escluse[id_linea] = nome_linea
 		else:
 			self.risultati.by_name('esclusioni-header').setVisible(False)
+
 		# Indicazioni
+		self.owner.setBottomWidget()
+		carpooling_trovato = False
 		for i in res['indicazioni']:
 			count += 1
 			
@@ -1135,37 +1162,40 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 			if 'tratto' in i:
 				out = HTMLFlowPanel()
 				t = i['tratto']
-				indicazioni.addStyledWidget(Image("/percorso/s/img/%s" % t['icona']), expand=False, center=True, style="tratto")
+				indicazioni.addStyledWidget(Image(make_absolute("/percorso/s/img/%s" % t['icona'])), expand=False, center=True, style="tratto")
 				mezzo = t['mezzo']
 				tipo_attesa = t['tipo_attesa']
 				if mezzo == 'Z':
 					out.addHtml('Teletrasporto')
 				elif mezzo == 'I':
-					out.addHtml('Cambia linea')
+					out.addHtml(_('Cambia linea'))
 				else:
 					if mezzo in ['P', 'C', 'CP', 'A', 'CS']:
 						if mezzo =='P':
-							out.addHtml('A piedi')
+							out.addHtml(_('A piedi'))
 						elif mezzo == 'C':
-							out.addHtml('In bici')
+							out.addHtml(_('In bici'))
 						elif mezzo == 'CP':
-							out.addHtml('Car pooling')
+							out.addHtml(_('Car pooling'))
+							w = CarPoolingChiediPanel(self, t['id'])
+							self.owner.setBottomWidget(w)
+							carpooling_trovato = True
 						elif mezzo == 'A':
-							out.addHtml('In automobile')
+							out.addHtml(_('In automobile'))
 						elif mezzo == 'CS':
-							out.addHtml('Car sharing')
+							out.addHtml(_('Car sharing'))
 						if tipo_attesa == 'Z':
 							out.addBr()
-							out.addHtml('Apertura ZTL ore&nbsp;')
+							out.addHtml(_('Apertura ZTL ore&nbsp;'))
 							out.addHtml(" %s" % t['tempo_attesa'])
 					else:
 						if mezzo == 'B':
-							out.addHtml('Linea&nbsp;')
+							out.addHtml(_('Linea&nbsp;'))
 						linea = t['linea']
 						id_linea = t['id_linea']
 						ll = LineaLabel(linea)
 						out.add(ll)
-						out.addHtml("&nbsp;direz. " + t['dest'])
+						out.addHtml(_("&nbsp;direz. ") + t['dest'])
 						out.addBr()
 						ll.addCloseListener(self.onEscludiFactory(id_linea, linea))
 						id_percorso = t['id'].split('-')[-1]
@@ -1173,13 +1203,13 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 						if mezzo == 'B':
 							self.percorsi_realtime.append(id_percorso)
 						if tipo_attesa == 'O':
-							out.addHtml('Partenza ore&nbsp;')
+							out.addHtml(_('Partenza ore&nbsp;'))
 						elif tipo_attesa == 'S':
-							out.addHtml('Attesa circa&nbsp;')
+							out.addHtml(_('Attesa circa&nbsp;'))
 						elif tipo_attesa == 'P' and t['numero'] == 0:
-							out.addHtml('In arrivo fra&nbsp;')
+							out.addHtml(_('In arrivo fra&nbsp;'))
 						elif tipo_attesa == 'P' and t['numero'] > 0:
-							out.addHtml('In arrivo dopo&nbsp;')
+							out.addHtml(_('In arrivo dopo&nbsp;'))
 						out.addHtml(" %s" % t['tempo_attesa'])
 					out.addBr()
 					sp = SimplePanel()
@@ -1208,7 +1238,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 					[
 						{
 							'class': Image,
-							'args': ["/percorso/s/img/%s" % icona],
+							'args': [make_absolute("/percorso/s/img/%s" % icona)],
 							'width': '24px',
 							'height': '24px',
 							'horizontal_alignment': HasAlignment.ALIGN_CENTER,
@@ -1227,7 +1257,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 				indicazioni.addStyledWidget(vp, expand=False, center=True, style="nodo")
 				tipo = n['tipo']
 				if tipo == 'F':
-					out.addHtml("Fermata&nbsp;")
+					out.addHtml(_("Fermata&nbsp;"))
 				if tipo == 'L':
 					ll = LineaLabel(n['nome'])
 					out.add(ll)
@@ -1241,24 +1271,33 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 				indicazioni.addStyledWidget(out)
 				
 		risultati_holder.add(self.risultati)
-		self.risultati.getElement().scrollIntoView()
-		
+
+		if self.modo == 5 and not carpooling_trovato:
+			self.owner.setBottomWidget(CarPoolingNessunRisultatoPanel(self))
+		elif self.modo == 0:
+			self.owner.setBottomWidget(CarPoolingOffriPassaggioPanel(self))
+
 		self.cp_layer.deserialize(res['mappa'], callbacks={
 			'drop_start': self.onRightClickDa,
 			'drop_stop': self.onRightClickA,
 		})
 		self.owner.center_and_zoom(self.cp_layer)
-		self.do_or_defer(self.scrollaAPercorso)
-		
+		if self.owner.isSmall():
+			self.do_or_defer(self.scrollaAPercorso)
+
 		# if len(self.percorsi_realtime) > 0:
 		# 	self.realtime_status = False
 		# 	self.realtime.setVisible(True)
 		# 	self.realtime.setText("Tempo reale off")
+
+		# Prova
+		# self.owner.setBottomWidget(HTML("Ti piace il percorso trovato?"))
+
 		
 	def onScambia(self):
-		da, a = self.base.by_name('da').getText(), self.base.by_name('a').getText()
-		self.base.by_name('da').setText(a)
-		self.base.by_name('a').setText(da)
+		da, a = self.base.by_name('da').getStatus(), self.base.by_name('a').getStatus()
+		self.base.by_name('da').setStatus(*a)
+		self.base.by_name('a').setStatus(*da)
 
 	def onGetLink(self):
 		LinkDialog(self, self.base.by_name('da').getText(), self.base.by_name('a').getText())
@@ -1276,16 +1315,16 @@ class LinkDialog(DialogBox, FocusHandler):
 			[
 				{
 					'class': HTML,
-					'args': ['Link al percorso completo:'],
+					'args': [_('Link al percorso completo:')],
 					'style': 'indicazioni-h1',
 					'height': None,
 				},
 				{
 					'class': HTML,
-					'args': ["""
+					'args': [_("""
 						Questo link mostrer&agrave; le indicazioni e la mappa del percorso
 						da %s a %s.
-					""" % (origine, destinazione)],
+					""") % (origine, destinazione)],
 					'height': None,
 				},
 				{
@@ -1297,16 +1336,16 @@ class LinkDialog(DialogBox, FocusHandler):
 				},
 				{
 					'class': HTML,
-					'args': ['Link al cerca percorso fino a %s:' % destinazione],
+					'args': [_('Link al cerca percorso fino a %s:') % destinazione],
 					'style': 'indicazioni-h1',
 					'height': None,
 				},
 				{
 					'class': HTML,
-					'args': ["""
+					'args': [_("""
 						Questo link chieder&agrave; un punto di partenza, a partire dal quale
 						cercher&agrave; il percorso fino a %s.
-					""" % destinazione],
+					""") % destinazione],
 					'height': None,
 				},
 				{
@@ -1317,7 +1356,7 @@ class LinkDialog(DialogBox, FocusHandler):
 				},
 				{
 					'class': Button,
-					'args': ['Chiudi', self.onChiudi],
+					'args': [_('Chiudi'), self.onChiudi],
 					'horizontal_alignment': HasAlignment.ALIGN_RIGHT,
 					'height': None,
 				},
@@ -1353,7 +1392,7 @@ class EmailDialog(DialogBox):
 			[
 				{
 					'class': HTML,
-					'args': ['Indirizzo email del destinatario:'],
+					'args': [_('Indirizzo email del destinatario:')],
 					'style': 'indicazioni-h1',
 					'height': None,
 				},
@@ -1367,12 +1406,12 @@ class EmailDialog(DialogBox):
 					'sub': [
 						{
 							'class': Button,
-							'args': ['Invia', self.onInvia],
+							'args': [_('Invia'), self.onInvia],
 							'height': None,
 						},
 						{
 							'class': Button,
-							'args': ['Annulla', self.onAnnulla],
+							'args': [_('Annulla'), self.onAnnulla],
 							'height': None,
 						},
 					]
@@ -1401,3 +1440,222 @@ class EmailDialog(DialogBox):
 		base_url = 'http://muovi.roma.it/percorso/js/?'
 		self.base.by_name('route').setText(base_url + res['route'])
 		self.base.by_name('to').setText(base_url + res['to'])
+
+
+class CarPoolingChiediPanel(SimplePanel):
+	def __init__(self, owner, id_offerta):
+		SimplePanel.__init__(self)
+		self.owner = owner
+		self.id_offerta = id_offerta
+
+		self.base = VP(
+			self,
+			[
+				{
+					'class': HTML,
+					'args': [_("Trovato un passaggio in car pooling")],
+					'height': None,
+					'style': 'indicazioni-h1',
+				},
+				{
+					'class': HTML,
+					'args': [_("Trovata un'offerta di passaggio in car pooling compatibile con il tuo spostamento.")],
+					'height': None,
+					'name': 'main',
+				},
+				{
+					'class': HP,
+					'sub': [
+						{
+							'class': Button,
+							'args': [_('Chiedi un passaggio'), self.onChiedi],
+							'height': None,
+						},
+						{
+							'class': Button,
+							'args': [_('Cerca un altro passaggio'), self.onEscludi],
+							'height': None,
+						},
+					]
+				},
+			],
+			add_to_owner=True,
+		)
+		self.addStyleName('indicazioni')
+		self.id_linea_esclusa = None
+		self.nome_linea_esclusa = None
+		client.carpooling_dettaglio_offerta(id_offerta, False, JsonHandler(self.onDettaglioOffertaDone))
+
+	def onDettaglioOffertaDone(self, res):
+		html = """
+			<b>Da:</b> %(da_indirizzo)s (%(da_orario)s)<br />
+			<b>A:</b> %(a_indirizzo)s (%(a_orario)s)<br />
+			<b>Contributo suggerito:</b> %(costo)s &euro;<br />
+			<b>Feedback offerente:</b> %(feedback_offerente)s / 5.0<br />
+		"""	% res
+		self.base.by_name('main').setHTML(html)
+		self.id_linea_esclusa = res['id_linea_esclusa']
+		self.nome_linea_esclusa = res['nome_linea_esclusa']
+
+	def onDettaglioOffertaChiediDone(self, res):
+		self.owner.owner.setBottomWidget(CarPoolingChiestoPanel(self.owner))
+
+	@enforce_login
+	def onChiedi(self):
+		client.carpooling_dettaglio_offerta(self.id_offerta, True, JsonHandler(self.onDettaglioOffertaChiediDone))
+
+	def onEscludi(self, res):
+		if self.id_linea_esclusa is not None:
+			if self.owner.linee_escluse is None:
+				self.owner.linee_escluse = {}
+			self.owner.linee_escluse[self.id_linea_esclusa] = self.nome_linea_esclusa
+			self.owner.cercaPercorso()
+
+
+class CarPoolingChiestoPanel(SimplePanel):
+	def __init__(self, owner):
+		SimplePanel.__init__(self)
+		self.owner = owner
+
+		self.base = VP(
+			self,
+			[
+				{
+					'class': HTML,
+					'args': [_("Richiesta effettuata")],
+					'height': None,
+					'style': 'indicazioni-h1',
+				},
+				{
+					'class': HTML,
+					'args': [_("""
+						La tua richiesta di passaggio &egrave; stata inviata. Riceverai una notifica con ulteriori dettagli
+						quando l'offerente avr&agrave; accettato o rifiutato la richiesta.
+					""")],
+					'height': None,
+					'name': 'main',
+				},
+				{
+					'class': HP,
+					'sub': [
+						{
+							'class': Button,
+							'args': [_('Chiudi'), self.onChiudi],
+							'height': None,
+						},
+					]
+				},
+
+			],
+			add_to_owner=True,
+		)
+		self.addStyleName('pannello-carpooling')
+
+	def onChiudi(self):
+		self.owner.owner.setBottomWidget(None)
+
+
+class CarPoolingNessunRisultatoPanel(SimplePanel):
+	def __init__(self, owner):
+		SimplePanel.__init__(self)
+		self.owner = owner
+
+		self.base = VP(
+			self,
+			[
+				{
+					'class': HTML,
+					'args': [_("Nessun passaggio trovato")],
+					'height': None,
+					'style': 'indicazioni-h1',
+				},
+				{
+					'class': HTML,
+					'args': [_("""
+						Nessun'offerta di passaggio soddisfa la tua richiesta. Ti proponiamo un percorso con i soli mezzi
+						pubblici. In alternativa prova a modificare l'orario della ricerca, oppure
+						offri tu stesso un passaggio in car pooling!
+					""")],
+					'height': None,
+					'name': 'main',
+				},
+				{
+					'class': HP,
+					'sub': [
+						{
+							'class': Button,
+							'args': [_('Offri un passaggio'), self.onOffri],
+							'height': None,
+						},
+						{
+							'class': Button,
+							'args': [_('Chiudi'), self.onChiudi],
+							'height': None,
+						},
+					]
+				},
+
+			],
+			add_to_owner=True,
+		)
+		self.addStyleName('pannello-carpooling')
+
+	def onOffri(self):
+		self.owner.cambiaModo(0)
+		self.owner.cercaPercorso()
+
+	def onChiudi(self):
+		self.owner.owner.setBottomWidget(None)
+
+
+class CarPoolingOffriPassaggioPanel(SimplePanel):
+	def __init__(self, owner):
+		SimplePanel.__init__(self)
+		self.owner = owner
+
+		self.base = VP(
+			self,
+			[
+				{
+					'class': HTML,
+					'args': [_("Condividi il tuo viaggio")],
+					'height': None,
+					'style': 'indicazioni-h1',
+				},
+				{
+					'class': HTML,
+					'args': [_("""
+						Fai car pooling, offri un passaggio! Se vuoi condividere il tuo viaggio, Muoversi a Roma lo proporr&agrave;
+						ad altri utenti che cercano un percorso, proprio come se la tua auto diventasse un autobus.
+						Potrai anche accordarti con le persone a cui offri un passaggio per ricevere un contributo
+						alle spese di viaggio, suggerito da Muoversi a Roma.
+					""")],
+					'height': None,
+					'name': 'main',
+				},
+				{
+					'class': HP,
+					'sub': [
+						{
+							'class': Button,
+							'args': [_('Offri un passaggio'), self.onOffri],
+							'height': None,
+						},
+						{
+							'class': Button,
+							'args': [_('No, grazie'), self.onChiudi],
+							'height': None,
+						},
+					]
+				},
+			],
+			add_to_owner=True,
+		)
+		self.addStyleName('pannello-carpooling')
+
+	@enforce_login
+	def onOffri(self):
+		pass
+
+	def onChiudi(self):
+		self.owner.owner.setBottomWidget(None)

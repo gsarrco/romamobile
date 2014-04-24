@@ -24,6 +24,7 @@ from django.db import models
 from servizi.models import Luogo
 from gis import models as gis
 from django.contrib.auth.models import User
+from servizi.utils import instance2dict
 import os, os.path
 from django.core.files import File
 import settings
@@ -71,7 +72,7 @@ class Risorsa(Luogo):
 			tipo, created = TipoRisorsa.objects.get_or_create(nome=self.tipo_auto)
 			kwargs['tipo'] = tipo
 			if created:
-				tipo.icon = icon_auto
+				tipo.icon = self.icon_auto
 				tipo.icon_width, tipo.icon_height = self.icon_size_auto
 				tipo.save()
 				
@@ -167,3 +168,39 @@ try:
 	CAR_SHARING = TipoRisorsa.objects.get(nome='Parcheggi car sharing').pk
 except Exception:
 	CAR_SHARING = -1
+
+@registra_modello_risorsa
+class Biblioteca(Risorsa):
+	tipo_auto = 'Biblioteche di Roma'
+	GeoModel = gis.Punto
+	icon_auto = 'biblio.png'
+	icon_size_auto = (24, 24)
+	municipio = models.CharField(max_length=63, blank=True, null=True)
+	indirizzo = models.CharField(max_length=127, blank=True, null=True)
+	cap = models.CharField(max_length=63, blank=True, null=True)
+	zona = models.CharField(max_length=63, blank=True, null=True)
+	url_scheda = models.CharField(max_length=255, blank=True, null=True)
+	url_cerca = models.CharField(max_length=255, blank=True, null=True)
+	accessibilita = models.CharField(max_length=63, blank=True, null=True)
+	tipo_biblio = models.CharField(max_length=63, blank=True, null=True)
+	email = models.CharField(max_length=255, blank=True, null=True)
+	tel = models.CharField(max_length=255, blank=True, null=True)
+
+	def __unicode__(self):
+		return self.nome_luogo
+
+	def descrizione(self):
+		return """
+			<a href="%(url_scheda)s">%(nome_luogo)s</a><br />
+			%(municipio)s - %(zona)s<br />
+			%(indirizzo)s<br />
+			%(cap)s<br />
+			Tel. %(tel)s<br />
+			Email: %(email)s<br />
+			Accessibilit&agrave;: %(accessibilita)s<br /><br />
+			<a href="%(url_cerca)s">Cerca libro</a><br />
+		""" % instance2dict(self)
+
+	class Meta:
+		verbose_name = u'Biblioteca di Roma'
+		verbose_name_plural = u'Biblioteche di Roma'

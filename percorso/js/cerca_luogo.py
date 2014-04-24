@@ -55,16 +55,17 @@ from pyjamas import DOM
 from prnt import prnt
 from util import StyledFixedColumnFlexTable, HTMLFlowPanel, DP, VP, HP, GP, SP, DeferrablePanel, ScrollAdaptivePanel
 from util import get_checked_radio, HidingPanel, ValidationErrorRemover, MyAnchor, LoadingButton
-from util import SearchBox
+from util import SearchBox, _, get_lang
 from datetime import date, time, datetime, timedelta
 from Calendar import Calendar, DateField, TimeField
 from map import MapPanel, Layer, LayerPanel, Marker
+from globals import make_absolute, base_url
 
 from DissolvingPopup import DissolvingPopup
 from util import JsonHandler, redirect
 
 
-client = JSONProxy('/json/', ['risorse_lista_tipi', 'servizi_autocompleta_indirizzo'])
+client = JSONProxy(base_url + '/json/', ['risorse_lista_tipi', 'servizi_autocompleta_indirizzo'])
 
 
 class CercaLuogoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, DeferrablePanel):
@@ -84,7 +85,7 @@ class CercaLuogoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 	
 						{
 							'class': Label,
-							'args': ['Indirizzo'],
+							'args': [_('Indirizzo')],
 							'style': 'indicazioni-h1',
 							'height': None,
 						},			
@@ -99,8 +100,7 @@ class CercaLuogoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 											'class': SearchBox,
 											'name': 'query',
 											'call_addKeyboardListener': ([self], {}),
-											'call_addFocusListener': ([self], {}),
-											'args': [client.servizi_autocompleta_indirizzo, None, 3, 100, False],
+											'args': [client.servizi_autocompleta_indirizzo, None, 0, 100, False],
 										},
 										{
 											'class': HP,
@@ -124,7 +124,7 @@ class CercaLuogoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 								},
 								{
 									'class': LoadingButton,
-									'args': ['Cerca', self.onCerca],
+									'args': [_('Cerca'), self.onCerca],
 									'width': '30%',
 									'name': 'button',
 								},									
@@ -158,7 +158,7 @@ class CercaLuogoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 		self.cr_lista_tipi = []
 		self.cr_a = None
 		rp = self.base.by_name('risorse_percorso')
-		rp.setWidget(HTML('Cerca luogo lungo un percorso'))
+		rp.setWidget(HTML(_('Cerca luogo lungo un percorso')))
 		rp.addClickListener(self.onRisorsePercorso)
 		client.risorse_lista_tipi([], JsonHandler(self.onRisorsaListaTipiDone))
 		
@@ -205,11 +205,11 @@ class CercaLuogoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 		
 	def setMap(self, map):
 		self.map = map
-		self.map.addRightClickOption("Luoghi vicini", self.onRightClick)
+		self.map.addRightClickOption(_("Luoghi vicini"), self.onRightClick)
 		
 	def onRightClick(self, lat, lng):
 		query = self.base.by_name('query')
-		query.setText('punto:(%s,%s)' % (lat, lng))
+		query.setText('punto:(%0.4f,%0.4f)' % (lat, lng))
 		self.owner.setTabMappaLuogo()
 		self.onCerca()
 
@@ -240,7 +240,7 @@ class CercaLuogoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 					'sub': [
 						{
 							'class': Label,
-							'args': ['Risultati'],
+							'args': [_('Risultati')],
 							'style': 'indicazioni-h1',
 							'height': None,
 						},									
@@ -259,7 +259,7 @@ class CercaLuogoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 					]
 				}		
 			],
-			title='Luoghi trovati',
+			title=_('Luoghi trovati'),
 		)
 		self.risultati.setOpen(True)
 		self.risultati_holder.add(self.risultati)

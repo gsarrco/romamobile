@@ -26,7 +26,7 @@ import infotp
 from datetime import datetime, timedelta, time, date
 import Queue
 from threading import Thread, Lock
-from grafo import Arco, Nodo, Grafo
+from grafo import Arco, Nodo, Grafo, DijkstraPool
 import shapefile
 import math
 from copy import copy
@@ -56,6 +56,7 @@ from ztl.views import Orari, orari_per_ztl
 from ztl import models as ztl
 import xmlrpclib
 import tomtom
+from collections import defaultdict
 from pprint import pprint
 
 LINEE_MINI = ['90', '542', '61', 'MEB', 'MEB1', '998', 'MEA', 'FR1']
@@ -858,7 +859,24 @@ class ReteTrattoPercorso(object):
 		return {
 			'da_fermata': dist_tratto,
 			'da_capolinea': dist_tratto + self.s.distanza_da_partenza,
-		}		
+		}
+
+class ReteCorsa(object):
+	def __init__(self, percorso, veicolo=None):
+		super(ReteCorsa).__init__()
+		self.veicolo = veicolo
+		self.percorso = percorso
+		self.n = len(percorso.tratti_percoroso) + 1
+		self.orari = [None for x in range(self.n)]
+		if veicolo is not None:
+			pass
+
+	def aggiorna(self):
+		"""
+		Aggiorna la posizione e i tempi del veicolo, se il veicolo sta continuando la corsa, e restituisce True.
+
+		Se il veicolo ha iniziato un'altra corsa, restituisce False
+		"""
 		
 
 class ReteVeicolo(object):
@@ -1149,6 +1167,7 @@ class Rete(object):
 		return out
 					
 	def push_serializza_dinamico(self):
+		db.close_connection()
 		cs = Mercury.rpyc_connect_all_static(settings.MERCURY_GIANO)
 		if len(cs) > 0:
 			res = pickle.dumps(self.serializza_dinamico(), 2)
@@ -1610,7 +1629,14 @@ class Rete(object):
 			[config.CPD_PENAL_PEDONALE_0_0, config.CPD_PENAL_PEDONALE_0_1, config.CPD_PENAL_PEDONALE_0_2][piedi],
 			[config.CPD_PENAL_PEDONALE_1_0, config.CPD_PENAL_PEDONALE_1_1, config.CPD_PENAL_PEDONALE_1_2][piedi],
 			[config.CPD_PENAL_PEDONALE_EXP_0, config.CPD_PENAL_PEDONALE_EXP_1, config.CPD_PENAL_PEDONALE_EXP_2][piedi],
-		)										
+		)
+
+		if teletrasporto:
+			heuristic_speed = 0
+		elif carpooling or auto:
+			heuristic_speed = 33.3
+		else:
+			heuristic_speed = 16.0
 		
 		return {
 			'metro': metro and not auto,
@@ -1654,6 +1680,8 @@ class Rete(object):
 			'rete': self,
 			'ztl': set() if ztl is None else ztl,
 			'tpl': tpl,
+			'rev': False,
+			'heuristic_speed': heuristic_speed,
 		}
 
 		
@@ -2516,31 +2544,35 @@ def carica_rete_su_grafo(r, g, retina=False, versione=None):
 			for a in archi_conn:
 				g.add_arco(a)
 		g.serialize(geocoding_file, [geocoder.ArcoGeocoder], [geocoder.NodoGeocoder])
-		
-	# Nodi luogo e connessione
-	print "Aggiungo e collego nodi luogo"
-	for risorsa in risorse.modelli_risorse:
-		print risorsa.__name__
-		for a in risorsa.objects.all():
-			if a.geom is None:
-				print "No luogo: " + a.nome_luogo
-			else:
-				n = NodoRisorsa(a)
-				g.add_nodo(n)
-				archi_conn = gc.connect_to_node(n)
-				for a in archi_conn:
-					g.add_arco(a)		
-	
-		
-	# Elimino archi rimossi da database
-	print "Elimino archi rimossi da database"
-	ars = ArcoRimosso.objects.filter(rimozione_attiva=True)
-	for a in ars:
-		try:
-			print a, a.eid
-			g.rm_arco(g.archi[a.eid])
-		except Exception, e:
-			logging.error(u'Arco rimosso %s non trovato', a.descrizione)
+
+	if not retina:
+		# Nodi luogo e connessione
+		print "Aggiungo e collego nodi luogo"
+		for risorsa in risorse.modelli_risorse:
+			print risorsa.__name__
+			for a in risorsa.objects.all():
+				if a.geom is None:
+					print "No luogo: " + a.nome_luogo
+				else:
+					n = NodoRisorsa(a)
+					g.add_nodo(n)
+					archi_conn = gc.connect_to_node(n)
+					for a in archi_conn:
+						g.add_arco(a)
+
+		# Elimino archi rimossi da database
+		print "Elimino archi rimossi da database"
+		ars = ArcoRimosso.objects.filter(rimozione_attiva=True)
+		for a in ars:
+			try:
+				print a, a.eid
+				g.rm_arco(g.archi[a.eid])
+			except Exception, e:
+				logging.error(u'Arco rimosso %s non trovato', a.descrizione)
+
+	# Orari Ferrovie del Lazio
+	fn = os.path.join(path_rete, 'rete', 'fr.txt')
+	carica_orari_fr_da_file(r, g, fn)
 
 	db.reset_queries()
 		
@@ -2553,8 +2585,6 @@ def carica_rete_e_grafo(retina=False, versione=None):
 	registra_classi_grafo(g)
 	g.deserialize('%s%s.v3.dat' % (settings.GRAPH, '_mini' if retina else ''))
 	carica_rete_su_grafo(rete, g, retina, versione)
-	fn = u'fr.txt'
-	carica_orari_fr_da_file(rete, g, fn)
 	return (rete, g)
 
 # Frequenza bus
@@ -2876,4 +2906,27 @@ def salva_archi_tomtom_su_db(grafo, num=1, den=1):
 				s = a.to_model()
 				s.save()
 			
-			
+def analisi_velocita_archi(r, g, opz=None):
+	if opz is None:
+		opz = r.get_opzioni_calcola_percorso(True, True, True, True, 1)
+	# dijkstra = DijkstraPool(g, 1)
+	# opz['dijkstra'] = dijkstra
+	n = datetime.now()
+	d = defaultdict(int)
+	for eid in g.archi:
+		tipo = eid[0]
+		if tipo not in [12, 16, 97, 98, 99]:
+			e = g.archi[eid]
+			cs = e.s.get_coordinate()
+			ct = e.t.get_coordinate()
+			if cs is not None and ct is not None:
+				ip, tv = e.get_tempo(n, opz)
+				dist = geomath.distance(cs[0], ct[0])
+				if ip > 0:
+					v = dist / tv
+					if v > d[tipo]:
+						d[tipo] = v
+					if v > 18:
+						print v, eid, e, e.s.rete_fermata.rete_palina.nome
+	return d
+

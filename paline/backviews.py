@@ -29,14 +29,18 @@ from parcheggi import models as parcheggi
 from mercury.models import Mercury
 from risorse import models as risorse
 from datetime import datetime, timedelta, time, date
+from pannelli import backviews as pannellibw
 from django.template.defaultfilters import date as datefilter, urlencode
 from jsonrpc import jsonrpc_method
 import rpyc
 import cPickle as pickle
 import gmaps
 import views
+from paline.views import paline7, _dettaglio_paline
 from pprint import pprint
 from percorso.views import infopoint_to_cp
+from django.utils import translation
+from servizi.views import get_fav
 import logging
 import settings
 
@@ -48,7 +52,7 @@ def percorso_mappa(request, id_percorso, *args, **kwargs):
 	return out
 
 @jsonrpc_method('paline_percorso_fermate', safe=True)
-def percorso_fermate(request, id_percorso, id_veicolo):
+def percorso_fermate(request, id_percorso, id_veicolo, lang):
 	p = Percorso.objects.by_date().get(id_percorso=id_percorso)
 	fs = Fermata.objects.by_date().filter(percorso=p).order_by('progressiva')
 	# ps = []
@@ -59,6 +63,7 @@ def percorso_fermate(request, id_percorso, id_veicolo):
 	# 			'id_palina': f.id_palina,
 	# 			'nome': f.nome_ricapitalizzato(),
 	# 		})
+	translation.activate(lang)
 	giorni = []
 	t = date.today()
 	for i in range(7):
@@ -79,7 +84,8 @@ def percorso_fermate(request, id_percorso, id_veicolo):
 	}
 	
 @jsonrpc_method('paline_orari', safe=True)
-def percorso_orari(request, id_percorso, data):
+def percorso_orari(request, id_percorso, data, lang):
+	translation.activate(lang)
 	orari = views.trovalinea_orari(None, '', id_percorso, data)
 	#print orari 
 	return orari
@@ -116,10 +122,11 @@ def stato_traffico(request, verso):
 	return out	
 	
 @jsonrpc_method('mappa_layer', safe=True)
-def mappa_layer(request, nome):
+def mappa_layer(request, nome, lang):
+	#pprint(nome)
+	translation.activate(lang)
 	tipo = nome[0]
 	id = nome[1]
-	print tipo, id
 	c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB)
 	
 	if tipo == 'traffico_bus':
@@ -172,7 +179,7 @@ def mappa_layer(request, nome):
 		pprint(id)
 		address = id[0]
 		tipi_ris = id[1]
-		start = infopoint_to_cp(address)
+		start = infopoint_to_cp(request, address)
 		if start['stato'] != 'OK':
 			out = {'errore': start}
 		else:
@@ -180,13 +187,17 @@ def mappa_layer(request, nome):
 			max_distanza = 2000
 			out = pickle.loads(c.root.risorse_vicine(start, tipi_ris, 5, max_distanza))
 			out['descrizione'] = 'Luoghi trovati'
+
+	elif tipo == 'pannelli':
+		out = pannellibw.mappa_layer(request, nome)
 	
 	# pprint(out)
 	return out
 
 
 @jsonrpc_method('paline_smart_search', safe=True)
-def paline_smart_search(request, query):
+def paline_smart_search(request, query, lang):
+	translation.activate(lang)
 	#print "Smart"
 	ctx = {
 		'errore': False,
@@ -197,7 +208,66 @@ def paline_smart_search(request, query):
 		'paline_extra': [],
 		'percorsi': [], 	
 	}
-	out = views._default(None, query, ctx, True)
+	out = views._default(request, query, ctx, True)
 	# pprint(out)
 	return out
 
+@paline7.metodo("Mappa")
+def ws_mappa(request, token, tipo, id):
+	return mappa_layer(request, (tipo, id), 'it')
+
+@jsonrpc_method('paline_previsioni', safe=True)
+def previsioni(request, id_palina, lingua):
+	translation.activate(lingua)
+	try:
+		p = Palina.objects.by_date().get(id_palina=id_palina)
+	except:
+		raise errors.XMLRPC['XRE_NO_ID_PALINA']
+	prev = _dettaglio_paline(request, p.nome, [p], aggiungi=p.id_palina, as_service=True)
+	prev['collocazione'] = p.descrizione
+	if request.user.is_authenticated():
+		preferito = PalinaPreferita.objects.filter(gruppo__user=request.user, id_palina=id_palina).count() > 0
+	else:
+		preferito = False
+	prev['esiste_preferito'] = preferito
+	return prev
+
+@jsonrpc_method('paline_previsioni', safe=True)
+def previsioni(request, id_palina, lingua):
+	translation.activate(lingua)
+	try:
+		p = Palina.objects.by_date().get(id_palina=id_palina)
+	except:
+		raise errors.XMLRPC['XRE_NO_ID_PALINA']
+	prev = _dettaglio_paline(request, p.nome, [p], aggiungi=p.id_palina, as_service=True)
+	prev['collocazione'] = p.descrizione
+	if request.user.is_authenticated():
+		preferito = PalinaPreferita.objects.filter(gruppo__user=request.user, id_palina=id_palina).count() > 0
+	else:
+		preferito = False
+	prev['esiste_preferito'] = preferito
+	return prev
+
+@jsonrpc_method('paline_preferiti', safe=True)
+def preferiti(request, tipo, nome, descrizione, esiste):
+	out = {}
+	if esiste:
+		g = GruppoPalinePreferite(user=request.user, nome=descrizione, singleton=True)
+		g.save()
+		p = PalinaPreferita(id_palina=nome, nome=descrizione, gruppo=g)
+		p.save()
+	else:
+		p = PalinaPreferita.objects.filter(gruppo__user=request.user, id_palina=nome)[0]
+		g = p.gruppo
+		if g.palinapreferita_set.count() == 1:
+			g.delete()
+		else:
+			p.delete()
+
+	# Get new favorites
+	fav = get_fav(request)
+	fav_list = [(k, fav[k][0], fav[k][1]) for k in fav]
+	fav_list.sort(key=lambda x: x[2])
+	out['fav'] = fav_list
+
+	return out

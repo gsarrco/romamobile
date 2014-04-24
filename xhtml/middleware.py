@@ -65,7 +65,7 @@ def set_menu_nav(request):
 	elem = HistoryElem('/', {})
 	elem.future_params = request.GET
 	request.session['history'] = [elem]
-	print request.session['history']
+	# print request.session['history']
 	if 'history_service_depth' in request.session:
 		del request.session['history_service_depth']
 	request.servizio = None
@@ -141,7 +141,7 @@ class Middleware:
 					if not 'fpage' in request.REQUEST:
 						request.GET = MergeDict(hist[nav].params, request.GET)
 					future = hist[nav].get_future_params()
-					print "PARAMETRI FUTURI:", future
+					# print "PARAMETRI FUTURI:", future
 					if future is not None:
 						request.history_future = future
 					hist = hist[:nav + 1] 
@@ -195,6 +195,7 @@ class Middleware:
 		# Inizializza la stringa di debug
 		request.ctx['am_debug'] = ''
 		request.ctx['beta'] = settings.TEST_LEVEL >= 1
+		request.ctx['lingua'] = request.lingua
 		
 		# Determina l'eventuale servizio chiamato
 		try:

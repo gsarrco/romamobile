@@ -23,7 +23,7 @@
 import uuid
 import hashlib
 from django.db.models import Max, Min, Q
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import User, Group
 from django import forms
 from django.utils.safestring import mark_safe
 from django.utils.encoding import force_unicode
@@ -814,3 +814,39 @@ def render_text_template(name, ctx):
 		else:
 			out.append(l)
 	return Template("".join(out)).render(Context(ctx))
+
+def add_user_to_group(user_name, group_name):
+	u = User.objects.get(username=user_name)
+	u.groups.add(Group.objects.get(name=group_name))
+	u.save()
+
+def instance2dict(instance, key_format=None):
+	"""
+	Returns a dictionary containing field names and values for the given
+	instance
+	"""
+	from django.db.models.fields import DateField
+	from django.db.models.fields.related import ForeignKey
+	if key_format:
+		assert '%s' in key_format, 'key_format must contain a %s'
+	key = lambda key: key_format and key_format % key or key
+
+	pk = instance._get_pk_val()
+	d = {}
+	for field in instance._meta.fields:
+		attr = field.name
+		value = getattr(instance, attr)
+		if value is not None:
+			if isinstance(field, ForeignKey):
+				value = value._get_pk_val()
+			elif isinstance(field, DateField):
+				value = value.strftime('%Y-%m-%d')
+		d[key(attr)] = value
+	for field in instance._meta.many_to_many:
+		if pk:
+			d[key(field.name)] = [
+				obj._get_pk_val()
+				for obj in getattr(instance, field.attname).all()]
+		else:
+			d[key(field.name)] = []
+	return d

@@ -58,9 +58,11 @@ from __pyjamas__ import JS
 
 from DissolvingPopup import DissolvingPopup
 from util import JsonHandler, redirect, MenuCmd, HTMLFlowPanel, SearchPopup, DeferrablePanel, MyAnchor
+from util import _, get_lang
+from globals import base_url, make_absolute
 
 
-client = JSONProxy('/json/', ['mappa_layer'])
+client = JSONProxy(base_url + '/json/', ['mappa_layer'])
 
 def list_to_point_array(l):
 	JS("""punti = Array();""")
@@ -73,7 +75,6 @@ class MapPanel(SimplePanel, DeferrablePanel):
 		SimplePanel.__init__(self)
 		DeferrablePanel.__init__(self)
 		self.owner = owner
-		self.owner.add(self)
 		self.setSize('100%', '100%')
 		self.layers = []
 		self.layer_panels = []
@@ -81,6 +82,7 @@ class MapPanel(SimplePanel, DeferrablePanel):
 		self.setID('map-container')
 		self.display_callback=display_callback
 		self.open_bubble = None
+		self.animation_enabled = True
 		
 	def addRightClickOption(self, option, callback):
 		self.right_click_options.append((option, callback))
@@ -114,6 +116,7 @@ class MapPanel(SimplePanel, DeferrablePanel):
 			this.map.addControl(zoom_ctrl);
 			osm = $wnd['L'].tileLayer('http://{s}.mqcdn.com/tiles/1.0.0/map/{z}/{x}/{y}.png', {
 				attribution: mapquestAttrib,
+				detectRetina: true,
 				maxZoom: 18,
 				subdomains: ['otile1', 'otile2', 'otile3', 'otile4']
 			});
@@ -204,7 +207,7 @@ class MapPanel(SimplePanel, DeferrablePanel):
 				if onDone is not None:
 					onDone(l)
 				return
-		client.mappa_layer((func_name, func_id), JsonHandler(self.onLoadNewLayerFactory(layer_name, onDone, info_panel, on_error)))
+		client.mappa_layer((func_name, func_id), get_lang(), JsonHandler(self.onLoadNewLayerFactory(layer_name, onDone, info_panel, on_error)))
 		
 	def hideAllLayers(self):
 		for l in self.layers:
@@ -214,6 +217,7 @@ class InfoPanel(HorizontalPanel):
 	def __init__(self, owner, icon, name, desc, distance, onClic=None):
 		HorizontalPanel.__init__(self)
 		self.addStyleName('palina')
+		icon = make_absolute(icon)
 		self.image = Image(icon)
 		self.add(self.image)
 		self.hfp = HTMLFlowPanel()
@@ -249,7 +253,7 @@ class Layer:
 		if self.owner is None:
 			map_panel.addLayer(self)
 		else:
-			client.mappa_layer(name, JsonHandler(self.onMappaLayerDone))
+			client.mappa_layer(name, get_lang(), JsonHandler(self.onMappaLayerDone))
 
 			
 	def onMappaLayerDone(self, res):
@@ -287,7 +291,7 @@ class Layer:
 			Timer(res['refresh'] * 1000, self.onRefresh)
 			
 	def onRefresh(self):
-		client.mappa_layer(self.name, JsonHandler(self.onMappaLayerDone))
+		client.mappa_layer(self.name, get_lang(), JsonHandler(self.onMappaLayerDone))
 			 
 	def setVisible(self, visible=True):
 		self.visible = visible
@@ -317,6 +321,7 @@ class Layer:
 	def centerOnMap(self):
 		map = self.map_panel.map
 		n = len(self.features)
+		animate = self.map_panel.animation_enabled
 		"""
 		for f in self.features:
 			if isinstance(f, Marker):
@@ -324,10 +329,13 @@ class Layer:
 				m = f.point
 		"""
 		if n > 0:
-			JS("""map.fitBounds(self.group.getBounds());""")
 			if n == 1:
-				JS("""map.setZoom(16);""")
-		
+				JS("""
+					latlng = self.group.getBounds().getCenter();
+					map.setView(latlng, 16, {animate: animate});
+				""")
+			else:
+				JS("""map.fitBounds(self.group.getBounds(), {animate: animate});""")
 		
 class LayerPanel(VerticalPanel):
 	def __init__(self, map):
@@ -336,7 +344,7 @@ class LayerPanel(VerticalPanel):
 		self.cbs = []
 		self.names = {}
 		self.map.addLayerPanel(self)
-		self.no_layers = HTML("Cerca un percorso, una linea o una fermata per mostrarla sulla mappa.")
+		self.no_layers = HTML(_("Cerca un percorso, una linea o una fermata per mostrarla sulla mappa."))
 		self.add(self.no_layers)
 		self.setWidth('100%')
 		
@@ -395,7 +403,8 @@ class Marker:
 		visible=True,
 		name=None,
 		open=False,
-		drop_callback=None
+		drop_callback=None,
+		max_width=None,
 	):
 		self.layer = layer
 		self.visible = visible
@@ -413,6 +422,7 @@ class Marker:
 		else:
 			ajs = None
 		draggable = False if drop_callback is None else True
+		icon_path = make_absolute(icon_path)
 		JS("""
 			self.point = new $wnd['L'].latLng(x, y);
 			mImg = new $wnd['L'].icon({
@@ -439,6 +449,8 @@ class Marker:
 		if infobox is not None or infobox_listener is not None:
 			if infobox_listener is None and self.name is not None:
 				infobox_listener = self.openBubbleListener
+			if infobox_listener is not None:
+				infobox = infobox + _('<br/>Caricamento...')
 			JS("""
 				marker.bindPopup(infobox);
 			""")
@@ -462,7 +474,7 @@ class Marker:
 		if new_content is not None:
 			self.bubble.setContent(new_content)
 		elif self.name is not None:
-			client.mappa_layer(self.name, JsonHandler(self.onMappaLayerDone))
+			client.mappa_layer(self.name, get_lang(), JsonHandler(self.onMappaLayerDone))
 		self.marker.openPopup()
 
 		

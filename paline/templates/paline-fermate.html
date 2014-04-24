@@ -39,7 +39,11 @@
 
 {% block content %}
 
-<h2>{% blocktrans with l=percorso.linea.id_linea c=percorso.decodificaCarteggio d=percorso.arrivo.nome_ricapitalizzato %} Percorso {{ l }} {{ c }} Direz. {{ d }}{% endblocktrans %}</h2>
+{% if percorso.descrizione %}
+	<h2>{{ percorso.descrizione }}</h2>
+{% else %}
+	<h2>{% blocktrans with l=percorso.linea.id_linea c=percorso.decodificaCarteggio d=percorso.arrivo.nome_ricapitalizzato %} Percorso {{ l }} {{ c }} Direz. {{ d }}{% endblocktrans %}</h2>
+{% endif %}
 {% if id_veicolo %}
 	<p><span class="b">{% trans "Arrivi previsti per la vettura: " %}</span>{{ id_veicolo }}</p>
 {% endif %}
@@ -66,14 +70,14 @@
 	</div>
 	<p>
 		<img class="dot" width="13" height="7" src="/news/s/img/right_bullet.gif" alt="*" />
-		<a href="/percorso/js/?id_percorso={{ percorso.id_percorso }}&amp;lf=0" target="_blank">{% trans "Mappa interattiva" %}</a>
+		<a href="/percorso/js/?hl={{ lingua.codice }}&amp;id_percorso={{ percorso.id_percorso }}&amp;lf=0" target="_blank">{% trans "Mappa interattiva" %}</a>
 	</p>
 {% else %}
 	<p>
 		<img class="dot" width="13" height="7" src="/news/s/img/right_bullet.gif" alt="*" />
 		<a href="{% nohist %}/paline/mappa/static/{{percorso.id_percorso}}{% endnohist %}">{% trans "Mappa base" %}</a><br />
 		<img class="dot" width="13" height="7" src="/news/s/img/right_bullet.gif" alt="*" />
-		<a href="/percorso/js/?id_percorso={{ percorso.id_percorso }}&amp;lf=0" target="_blank">{% trans "Mappa interattiva" %}</a>	
+		<a href="/percorso/js/?hl={{ lingua.codice }}&amp;id_percorso={{ percorso.id_percorso }}&amp;lf=0" target="_blank">{% trans "Mappa interattiva" %}</a>
 	</p>
 {% endif %}
 
@@ -151,8 +155,12 @@
 {% for p in percorsi %}
 	{% if p != percorso %}
 		<img class="dot" src="/xhtml/s/img/red_bullet.gif" height="5" width="13" alt="*" />
-		<a href='{% hist %}/paline/percorso/{{ p.id_percorso }}{% endhist %}'>{{ p.linea.id_linea }}
-		{% if p.decodeCarteggio %}{{ p.decodeCarteggio }} {% endif %}{% blocktrans with dest=p.arrivo.nome_ricapitalizzato %}Direz. {{ dest }}{% endblocktrans %}</a>
+		{% if p.descrizione %}
+			<a href='{% hist %}/paline/percorso/{{ p.id_percorso }}{% endhist %}'>{{ p.descrizione }}</a>
+		{% else %}
+			<a href='{% hist %}/paline/percorso/{{ p.id_percorso }}{% endhist %}'>{{ p.linea.id_linea }}
+			{% if p.decodeCarteggio %}{{ p.decodeCarteggio }} {% endif %}{% blocktrans with dest=p.arrivo.nome_ricapitalizzato %}Direz. {{ dest }}{% endblocktrans %}</a>
+		{% endif %}
 		{% if not p.linea.monitorata %}
 			<br /><img class="dot" src="/xhtml/s/img/blank_bullet.gif" height="5" width="13" alt="*" />
 			({% trans "non monitorata" %})
