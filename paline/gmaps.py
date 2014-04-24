@@ -89,14 +89,29 @@ class Map(RPyCAllowRead):
 	def add_polyline(self, points, opacity=1, color='#000000', thickness=1, id_toggle=None, zIndex=0):
 		self.polylines.append({
 			'points': points,
-			'opacity': opacity,
-			'thickness': thickness,
+			'opacity': float(opacity),
+			'thickness': float(thickness),
 			'color': color,
 			'id_toggle': id_toggle,
 			'zIndex': zIndex,
 		})
 				
-	def add_marker(self, point, icon, icon_size=(20, 20), infobox=None, label=None, id_toggle=None, anchor=None, name=None, open=False, drop_callback='', desc='', distance=None):
+	def add_marker(
+		self,
+		point,
+		icon,
+		icon_size=(20, 20),
+		infobox=None,
+		label=None,
+		id_toggle=None,
+		anchor=None,
+		name=None,
+		open=False,
+		drop_callback='',
+		desc='',
+		distance=None,
+		max_width=None,
+	):
 		self.markers.append({
 			'point': point,
 			'icon': icon,
@@ -111,6 +126,7 @@ class Map(RPyCAllowRead):
 			'drop_callback': drop_callback,
 			'desc': desc,
 			'distance': distance,
+			'max_width': max_width,
 		})
 		
 	def add_marker_busstop(self, point, icon, id_palina, icon_size=(20, 20), infobox=None, label=None, capolinea=None, id_toggle=None, anchor=None, id_percorso=None, open=False, drop_callback='', desc='', distance=None):

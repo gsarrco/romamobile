@@ -119,10 +119,8 @@ def carica_rete(no_load=False, no_validate=False):
 			g = graph.Grafo()
 			tpl.registra_classi_grafo(g)
 			#tomtom.load_from_shp(g, 'C:\\Users\\allulll\\Desktop\\grafo\\cpd\\RM_nw%s' % ('_mini' if retina else ''))
-			g.deserialize('tomtom.dat')
+			g.deserialize('%s.v3.dat' % settings.GRAPH)
 			tpl.carica_rete_su_grafo(r, g, False, versione=versione)
-			fn = u'fr.txt'
-			tpl.carica_orari_fr_da_file(r, g, fn)
 		
 		except Exception, e:
 			print "Validazione fallita"
@@ -134,7 +132,6 @@ def carica_rete(no_load=False, no_validate=False):
 			raise e
 	print "Rete aggiornata con successo"
 	return versione
-	
 
 def carica_rete_in_memoria(path_base):
 	path = lambda f: os.path.join(path_base, f)

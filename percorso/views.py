@@ -60,15 +60,18 @@ import re
 import urllib
 from hashlib import md5
 import traceback
+from servizi.views import sostituisci_preferiti
 
 percorso1 = ServerVersione("percorso", 1)
+percorso2 = ServerVersione("percorso", 2)
 
 def safe_string_to_unicode(s):
 	if type(s) == SafeString or type(s) == SafeUnicode:
 		return unicode(s)
 	return s
 
-def infopoint_to_cp(address):
+def infopoint_to_cp(request, address):
+	address = sostituisci_preferiti(request, address)
 	return infopoint.geocode_place(address)
 	
 def infopoint_address_to_string(add):
@@ -115,8 +118,8 @@ def cerca(
 	translation.activate(lang)
 	out = {}
 
-	start = infopoint_to_cp(indirizzo_partenza)
-	stop = infopoint_to_cp(indirizzo_arrivo)
+	start = infopoint_to_cp(request, indirizzo_partenza)
+	stop = infopoint_to_cp(request, indirizzo_arrivo)
 	
 	if start['stato'] != 'OK':
 		out['errore-partenza'] = start
@@ -160,7 +163,9 @@ def cerca(
 			'quando': quando,
 			'parcheggi_scambio': getdef(opzioni, 'parcheggi_scambio', True),
 			'parcheggi_autorimesse': getdef(opzioni, 'parcheggi_autorimesse', True),
-			'ztl': getdef(opzioni, 'ztl', [])
+			'ztl': getdef(opzioni, 'ztl', []),
+			'versione': getdef(opzioni, 'versione', 2),
+			'hl': lang,
 		}
 
 		return calcola_percorso_dinamico(request, True)
@@ -168,9 +173,23 @@ def cerca(
 
 	return out
 
+def cerca1(
+	request,
+	token,
+	indirizzo_partenza,
+	indirizzo_arrivo,
+	opzioni,
+	orario,
+	lang,
+	offset=0,
+):
+	opzioni['versione'] = 1
+	return cerca(request, token, indirizzo_partenza, indirizzo_arrivo, opzioni, orario, lang, offset)
+
 
 # Registrazione ws XML-RPC
-percorso1.xmlrpc("percorso.Cerca")(percorso1.logger("Cerca")(cerca))
+percorso1.xmlrpc("percorso.Cerca")(percorso1.logger("Cerca")(cerca1))
+percorso2.xmlrpc("percorso.Cerca")(percorso1.logger("Cerca")(cerca))
 
 def infopoint_to_get_params(infopoint, da=True):
 	params = {
@@ -188,12 +207,14 @@ def infopoint_to_get_params(infopoint, da=True):
 		'tipi_ris': ','.join([str(x) for x in infopoint['tipi_ris']]),
 		'linee_escluse': ','.join(["%s:%s" % (k, infopoint['linee_escluse'][k]) for k in infopoint['linee_escluse']]) if len(infopoint['linee_escluse']) > 0 else '-',
 		'ztl': ','.join(infopoint['ztl']) if 'ztl' in infopoint else '',
+		'hl': getdef(infopoint, 'hl', 'it'),
 	}
 	if da:
 		params['da'] = infopoint_address_to_string(infopoint['punti'][0]).encode('utf8')
 	return urllib.urlencode(params)
 
 @percorso1.xmlrpc("percorso.AggiornaPosizione")
+@percorso2.xmlrpc("percorso.AggiornaPosizione")
 @percorso1.logger("AggiornaPosizione")
 def aggiorna_posizione_ws(
 	request, 
@@ -213,7 +234,7 @@ def aggiorna_posizione_ws(
 		'palina': id_palina,
 		'place': 'Roma',
 		'indirizzo': "%s (%s)" % (p.nome_ricapitalizzato(), p.id_palina),
-		'ricerca': address,		
+		'ricerca': address,
 	}
 	infopoint['dt'] = datetime.now()
 	indicazioni, mappa = calcola_percorso_dinamico(request, True)
@@ -284,6 +305,7 @@ def infopoint_to_cache_key(infopoint):
 		del ck['percorso_auto_salvato']
 	return md5(pickle.dumps(ck)).hexdigest()
 
+
 def calcola_percorso_dinamico(request, webservice=False, ctx=None):
 	if ctx is None:
 		ctx = {}
@@ -309,6 +331,8 @@ def calcola_percorso_dinamico(request, webservice=False, ctx=None):
 	carpooling = infopoint['carpooling']
 	tipi_ris = infopoint['tipi_ris'] if 'tipi_ris' in infopoint else []
 	ztl = infopoint['ztl'] if 'ztl' in infopoint else []
+	if not 'hl' in infopoint:
+		infopoint['hl'] = request.lingua.codice
 	if carpooling > 0:
 		carpooling_vincoli = infopoint['carpooling_vincoli']
 	else:
@@ -341,7 +365,7 @@ def calcola_percorso_dinamico(request, webservice=False, ctx=None):
 			return messaggio(request, _("Il servizio temporaneamente non &egrave; disponibile, riprova pi&ugrave; tardi."))
 	if tr is None:
 		cache.set(ck, 'WAIT', 60)
-		c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB)
+		c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB, by_queue=True)
 		trs = pickle.loads(c.root.calcola_percorso(punti, piedi, bus, metro, ferro, ferro, pickle.dumps(data), bici, max_distanza_bici, linee_escluse, 1 if mezzo==3 else mezzo, carpooling, carpooling_vincoli, teletrasporto, rev, tipi_ris, ztl))
 		t2 = datetime.now()
 		ctx['tempo_calcolo'] = str(t2 - t1)
@@ -355,8 +379,10 @@ def calcola_percorso_dinamico(request, webservice=False, ctx=None):
 def formatta_calcola_percorso(request, webservice, ctx, tr, opzioni=None, mail=None):
 	infopoint = request.session['infopoint']
 	punti = infopoint['punti']
+	versione = getdef(infopoint, 'versione', 2)
 	if opzioni is None:
 		opzioni = {}
+	opzioni['versione'] = versione
 	data = infopoint['dt']
 	ctx['linee_escluse'] = info_linee_escluse(infopoint['linee_escluse'])
 	if webservice:
@@ -460,7 +486,6 @@ def mappa_dinamico(request):
 
 def mappa_statica_dinamico(request, zoom=None, center_x=None, center_y=None):
 	ctx = {}
-	c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB)
 	tr = request.session['percorso-trattoroot']
 	mappa = gmaps.Map()
 	tratto.formatta_percorso(tr, 'mappa', mappa, {})
@@ -630,7 +655,7 @@ def _place_choice(elem):
 		return (place, loc, "i")
 	return (place, loc) 
 	
-def _validate_address(address, partenza):
+def _validate_address(request, address, partenza):
 	af = None
 	pf = None
 	error_messages = []
@@ -658,7 +683,7 @@ def _validate_address(address, partenza):
 				'ricerca': address,				
 			}			
 	else:
-		res = infopoint_to_cp(address)
+		res = infopoint_to_cp(request, address)
 		if address == '':
 			error_messages.append(_("indirizzo di %s (manca)") % cosa)
 			error_fields.append("%s_address" % what)
@@ -792,8 +817,8 @@ def default(request):
 
 	if f.is_bound and 'Submit' in request.GET:
 		cd = f.data
-		a1, p1, em1, ef1, start = _validate_address(cd['start_address'],  True)
-		a2, p2, em2, ef2, stop = _validate_address(cd['stop_address'], False)
+		a1, p1, em1, ef1, start = _validate_address(request, cd['start_address'],  True)
+		a2, p2, em2, ef2, stop = _validate_address(request, cd['stop_address'], False)
 		error_messages.extend(em1 + em2)
 		error_fields.extend(ef1 + ef2)
 		
@@ -881,8 +906,8 @@ def elimina_indirizzo(request, id):
 
 
 def visualizza_percorso(request, start_address, start_place, stop_address, stop_place, mezzo, opzioni):
-	a1, p1, em1, ef1, start = _validate_address(start_address, start_place, True)
-	a2, p2, em2, ef2, stop = _validate_address(stop_address, stop_place, False)
+	a1, p1, em1, ef1, start = _validate_address(request, start_address, start_place, True)
+	a2, p2, em2, ef2, stop = _validate_address(request, stop_address, stop_place, False)
 	return calcola_percorso(request, start, stop, mezzo, opzioni, datetime.now())
 
 

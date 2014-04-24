@@ -142,13 +142,13 @@
 		</div>
 		<p>
 			<img class="dot" width="13" height="7" src="/news/s/img/right_bullet.gif" alt="*" />
-			<a href="/percorso/js/?query={{ palina.id_palina }}&amp;cl=1&amp;lf=0" target="_blank">{% trans "Mappa interattiva" %}</a>	
+			<a href="/percorso/js/?hl={{ lingua.codice }}&amp;query={{ palina.id_palina }}&amp;cl=1&amp;lf=0" target="_blank">{% trans "Mappa interattiva" %}</a>
 		</p>		
 	{% else %}
 		<img class="dot" width="13" height="7" src="/news/s/img/right_bullet.gif" alt="*" />
 		<a href="{% nohist %}/paline/mappa-palina/static/{{palina.id_palina}}#mappa{% endnohist %}">{% trans "Mappa base" %}</a><br />
 		<img class="dot" width="13" height="7" src="/news/s/img/right_bullet.gif" alt="*" />
-		<a href="/percorso/js/?query={{ palina.id_palina }}&amp;cl=1&amp;lf=0" target="_blank">{% trans "Mappa interattiva" %}</a>		
+		<a href="/percorso/js/?hl={{ lingua.codice }}&amp;query={{ palina.id_palina }}&amp;cl=1&amp;lf=0" target="_blank">{% trans "Mappa interattiva" %}</a>
 	{% endif %}
 
 {% endif %}

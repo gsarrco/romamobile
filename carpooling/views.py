@@ -39,13 +39,19 @@ from django.http import HttpResponseRedirect
 from django.contrib.auth.models import User, Group
 from pprint import pprint
 
+def is_utente_carpooling(user):
+	try:
+		return UtenteCarPooling.from_user(user).abilitato
+	except:
+		return False
+
 def controllo_diritti(view_func):
 	def wrap(request, *args, **kwargs):
-		if UtenteCarPooling.from_user(request.user).abilitato:
-				return view_func(request, *args, **kwargs)
-		#return HttpResponseRedirect('/carpooling')
+		if is_utente_carpooling(request.user):
+			return view_func(request, *args, **kwargs)
 		return TemplateResponse(request, 'carpooling.html')
 	return wrap
+
 
 @controllo_diritti
 @group_required('carpooling')
@@ -55,7 +61,7 @@ def aggiungi_punto(request):
 	i = int(request.GET['index'])
 	f = AggiungiPuntoForm(request.GET)
 	cd = f.data
-	a, p, em, ef, punto = _validate_address(cd['address'],  True)
+	a, p, em, ef, punto = _validate_address(request, cd['address'],  True)
 	if len(em) > 0:
 		class CorreggiAggiungiPuntoForm(AggiungiPuntoForm):
 			address = a
@@ -324,8 +330,8 @@ def mostra_form(request, offri=True):
 	
 	if f.is_bound and 'Submit' in request.GET:
 		cd = f.data
-		a1, p1, em1, ef1, start = _validate_address(cd['start_address'],  True)
-		a2, p2, em2, ef2, stop = _validate_address(cd['stop_address'], False)
+		a1, p1, em1, ef1, start = _validate_address(request, cd['start_address'],  True)
+		a2, p2, em2, ef2, stop = _validate_address(request, cd['stop_address'], False)
 		error_messages.extend(em1 + em2)
 		error_fields.extend(ef1 + ef2)
 		

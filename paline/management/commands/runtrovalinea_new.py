@@ -39,13 +39,15 @@ class Command(BaseCommand):
 		for k in args:
 			if not k in commands:
 				dt = k.replace('T', ' ')
-		Trovalinea = TrovalineaFactory('mini' in args, 'cpd' in args, 'tr' in args, 'shell' in args, 'special' in args, dt, 'download' in args)
+
 		name = settings.MERCURY_CPD
 		if 'tr' in args:
 			name = settings.MERCURY_GIANO
 		
 		giano = PeerType.objects.get(name=name)
 		giano_daemon = Daemon.get_process_daemon(name)
+		Trovalinea = TrovalineaFactory('mini' in args, 'cpd' in args, 'tr' in args, 'shell' in args, 'special' in args, dt, 'download' in args, daemon=giano_daemon)
+
 		m = Mercury(giano, Trovalinea, daemon=giano_daemon, watchdog_daemon=giano_daemon)
 		if not 'tr' in args:
 			try:
@@ -57,4 +59,4 @@ class Command(BaseCommand):
 				print "Serializzazione richiesta fallita"
 		
 		giano_daemon.set_ready()
-		
+

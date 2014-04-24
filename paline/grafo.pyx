@@ -32,7 +32,7 @@ from Queue import Queue
 from contextlib import contextmanager
 from threading import Lock
 from pprint import pprint
-
+from geomath import distance
 """
 Classi per rappresentare un grafo astratto
 
@@ -57,6 +57,7 @@ cdef class DijkstraVars(object):
 	cdef double dist
 	cdef long pqi
 	cdef double prio
+	cdef double heu
 	cpdef long versione_cp
 	cpdef object time
 	cdef long context_i
@@ -73,6 +74,7 @@ cdef class DijkstraVars(object):
 		self.time = -1
 		self.versione_cp = 0
 		self.context_i = 0
+		self.heu = -1
 		
 	property time:
 		def __get__(self):
@@ -387,7 +389,8 @@ opzioni_cp = {
 	'wd_giorno_succ': 0,
 	'penal_pedonale_0': 1.6,
 	'penal_pedonale_1': 2.5,
-	'penal_pedonale_exp': 0.85,	
+	'penal_pedonale_exp': 0.85,
+	'heuristic_speed': 0,
 }
 
 context_cp = {
@@ -534,6 +537,7 @@ cpdef inline double datetime_to_double(dt):
 	return dt.year * 980294400 + dt.month * 2678400 + dt.day * 86400 + dt.hour * 3600 + dt.minute * 60 + dt.second
 """
 
+
 cdef class Dijkstra(object):
 	cdef object graph
 	cdef PQ pq
@@ -593,6 +597,18 @@ cdef class Dijkstra(object):
 	
 	def rimuovi_arco_ingresso(self, e):
 		pass
+
+
+	cpdef heuristic(self, NodoDijkstra n, DijkstraVars nv, old_heu, double xd, double yd, double speed):
+		# print "Heu", xd, yd
+		if nv.heu == -1:
+			c = n.get_coordinate()
+			if c is None:
+				nv.heu = old_heu
+			else:
+				nv.heu = distance(c[0], (xd, yd)) / speed
+		# print nv.heu
+		return nv.heu
 		
 
 	cpdef dijkstra(self, NodoDijkstra s, object targets, int complete=False, object dep_time=None, object opt=opzioni_cp, get_unreachable=False, s_context=context_cp):
@@ -606,15 +622,18 @@ cdef class Dijkstra(object):
 		"""
 		cdef NodoDijkstra v, w
 		cdef long cnt, remaining
-		cdef double min_priority, new_prio, inc_prio
+		cdef double min_priority, new_prio, inc_prio, heuristic_speed
 		self.cleanup()
 		self.versione_cp += 1
 		cdef long versione_cp = self.versione_cp
 		opt['dijkstra'] = self
 		opt['rev'] = False
+		heuristic_speed = opt['heuristic_speed']
 		vars = self.vars
 		sv = <DijkstraVars>(vars[s.dijkstra_index])
-		sv.dist = 0
+		coord = list(targets)[0].get_coordinate()[0]
+		xt, yt = coord
+		sv.dist = self.heuristic(s, sv, -1, xt, yt, heuristic_speed)
 		ai = ArcoIngresso(self.pool, s)
 		aiv = <DijkstraVars>(vars[ai.s.dijkstra_index])
 		aiv.context_i = 0
@@ -633,6 +652,7 @@ cdef class Dijkstra(object):
 			v = self.pq.delete_min()
 			vv = <DijkstraVars>(vars[v.dijkstra_index])
 			pred = vv.pred
+			old_heu = vv.heu
 			w = <NodoDijkstra>(pred.s)
 			wv = <DijkstraVars>(vars[w.dijkstra_index])
 			vv.context_i = wv.context_i
@@ -656,7 +676,8 @@ cdef class Dijkstra(object):
 						wv.versione_cp = versione_cp
 						wv.pred = e
 						wv.settled = False
-						new_prio = min_priority + inc_prio
+						wv.heu = -1
+						new_prio = min_priority - old_heu + self.heuristic(w, wv, old_heu, xt, yt, heuristic_speed) + inc_prio
 						wv.prio = new_prio
 						wv.time = time + timedelta(seconds=tempo_arco)
 						self.pq.insert(w, wv, new_prio)
@@ -664,7 +685,7 @@ cdef class Dijkstra(object):
 					inc_prio, tempo_arco = e.get_tempo(time, opt)
 					#print "inc_prio nodo esistente", inc_prio
 					if tempo_arco >= 0:
-						new_prio = min_priority + inc_prio
+						new_prio = min_priority - old_heu + self.heuristic(w, wv, old_heu, xt, yt, heuristic_speed) + inc_prio
 						#new_dist = dist + e.w
 						if new_prio < wv.prio:
 							wv.prio = new_prio
@@ -924,15 +945,17 @@ class DijkstraPool(object):
 	@contextmanager
 	def get_dijkstra(self, n=1):
 		ds = []
-		with lock:
-			for i in range(n):
-				ds.append(self.queue.get())
-		if n == 1:
-			yield ds[0]
-		else:
-			yield ds
-		for d in ds:
-			self.queue.put(d)
+		try:
+			with lock:
+				for i in range(n):
+					ds.append(self.queue.get())
+			if n == 1:
+				yield ds[0]
+			else:
+				yield ds
+		finally:
+			for d in ds:
+				self.queue.put(d)
 	
 	def add_nodo(self, n):
 		if len(self.free_list) == 0:

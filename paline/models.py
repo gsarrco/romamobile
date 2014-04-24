@@ -574,6 +574,7 @@ class Percorso(VersionatoPaline, Disabilitabile):
 			'abilitata': abilitato,
 			'id_news': -1 if abilitato else self.id_news_disabilitazione_complessivo(),
 			'gestore': self.linea.gestore.descrizione,
+			'descrizione': self.descrizione,
 		}
 	
 	def getFermate(self):

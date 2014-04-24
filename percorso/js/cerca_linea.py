@@ -53,24 +53,28 @@ from pyjamas.JSONService import JSONProxy
 from pyjamas import History
 from pyjamas import DOM
 from prnt import prnt
-from util import StyledFixedColumnFlexTable, HTMLFlowPanel, DP, VP, HP, GP, SP, DeferrablePanel, ScrollAdaptivePanel
+from util import StyledFixedColumnFlexTable, HTMLFlowPanel, DP, VP, HP, GP, SP, DeferrablePanel, ScrollAdaptivePanel, \
+	PreferitiImage
 from util import get_checked_radio, HidingPanel, ValidationErrorRemover, MyAnchor, LoadingButton
-from util import SearchBox, wait_start, wait_stop, getdefault
+from util import FavSearchBox, wait_start, wait_stop, getdefault, _, get_lang
 from datetime import date, time, datetime, timedelta
 from Calendar import Calendar, DateField, TimeField
 from map import MapPanel, Layer, LayerPanel, Marker, get_location
+from globals import base_url, make_absolute
+
 
 from DissolvingPopup import DissolvingPopup
 from util import JsonHandler, redirect
 
 
-client = JSONProxy('/json/', [
+client = JSONProxy(base_url + '/json/', [
 	'paline_smart_search',
 	'urldecode',
 	'paline_percorso_fermate',
 	'paline_orari',
 	'servizi_autocompleta_indirizzo',
-	'paline7_Previsioni',
+	'paline_previsioni',
+	'paline_preferiti',
 ])
 
 INTERVALLO_TIMER = 30000
@@ -80,7 +84,7 @@ class PalinaPanel(HorizontalPanel):
 		HorizontalPanel.__init__(self)
 		self.addStyleName('palina')
 		self.owner = owner
-		i = Image(img)
+		i = Image(make_absolute(img))
 		i.addStyleName('palina-img')
 		self.add(i)
 		vp = VerticalPanel()
@@ -99,15 +103,15 @@ class PalinaPanel(HorizontalPanel):
 		if 'linee_info' in p:
 			for l in p['linee_info']:
 				linea = HTMLFlowPanel()
-				linea.add(Image('/paline/s/img/bus.png'))
+				linea.add(Image(make_absolute('/paline/s/img/bus.png')))
 				linea.addAnchor(l['id_linea'], owner.onLineaFactory(l['id_linea']))
-				linea.addHtml("&nbsp;Direz. %s" % l['direzione'])
+				linea.addHtml(_("&nbsp;Direz. %s") % l['direzione'])
 				vp.add(linea)
 		if 'linee_extra' in p and len(p['linee_extra']) > 0:
 			altre = HTMLFlowPanel()
-			altre.add(Image('/paline/s/img/bus.png'))
+			altre.add(Image(make_absolute('/paline/s/img/bus.png')))
 			vp.add(altre)
-			altre.addHtml('Altre linee:&nbsp;')
+			altre.addHtml(_('Altre linee:&nbsp;'))
 			for l in p['linee_extra']:
 				altre.addAnchor(l, owner.onLineaFactory(l))
 				altre.addHtml("&nbsp;")
@@ -128,10 +132,13 @@ class PercorsoPanel(HTMLFlowPanel):
 	def __init__(self, owner, p):
 		HTMLFlowPanel.__init__(self)
 		self.owner = owner
-		self.add(Image('/paline/s/img/bus.png'))
+		self.add(Image(make_absolute('/paline/s/img/bus.png')))
 		if 'arrivo' in p:
 			p['direzione'] = p['arrivo']
-		self.addAnchor('%s %s Direz. %s' % (p['id_linea'], p['carteggio_dec'], p['direzione']), owner.onPercorsoFactory(p['id_percorso']))
+		if p['descrizione'] is not None and p['descrizione'] != '':
+			self.addAnchor(p['descrizione'], owner.onPercorsoFactory(p['id_percorso']))
+		else:
+			self.addAnchor(_('%s %s Direz. %s') % (p['id_linea'], p['carteggio_dec'], p['direzione']), owner.onPercorsoFactory(p['id_percorso']))
 
 class OrarioPanel(VerticalPanel):
 	def __init__(self, owner, o, id_percorso):
@@ -150,7 +157,7 @@ class OrarioPanel(VerticalPanel):
 			self.remove(self.orari)
 			self.orari = None
 		else:
-			client.paline_orari(self.id_percorso, self.giorno, JsonHandler(self.onOrarioDone))
+			client.paline_orari(self.id_percorso, self.giorno, get_lang(), JsonHandler(self.onOrarioDone))
 			
 	def onOrarioDone(self, res):
 		self.orari = VerticalPanel()
@@ -158,16 +165,16 @@ class OrarioPanel(VerticalPanel):
 		for h in res['orari_partenza']:
 			m = h['minuti']
 			if len(m) > 0:
-				self.orari.add(HTML('<b>%s:</b> %s' % (
+				self.orari.add(HTML(_('<b>%s:</b> %s') % (
 					h['ora'],
 					' '.join(m),
 				)))
 				trovato = True
 		if not trovato:
 			if res['no_orari']:
-				self.orari.add(HTML('Siamo spiacenti, non sono disponibili gli orari di partenza dal capolinea per il percorso selezionato.'))
+				self.orari.add(HTML(_('Siamo spiacenti, non sono disponibili gli orari di partenza dal capolinea per il percorso selezionato.')))
 			else:
-				self.orari.add(HTML('Nella giornata selezionata il percorso non &egrave; attivo.'))
+				self.orari.add(HTML(_('Nella giornata selezionata il percorso non &egrave; attivo.')))
 		self.add(self.orari)
 
 class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, DeferrablePanel):
@@ -187,7 +194,7 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 	
 						{
 							'class': Label,
-							'args': ['Fermata, linea o indirizzo'],
+							'args': [_('Fermata, linea o indirizzo')],
 							'style': 'indicazioni-h1',
 							'height': None,
 						},			
@@ -199,11 +206,10 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 									'width': '70%',
 									'sub': [							
 										{
-												'class': SearchBox,
+												'class': FavSearchBox,
 												'name': 'query',
 												'call_addKeyboardListener': ([self], {}),
-												'call_addFocusListener': ([self], {}),
-												'args': [client.servizi_autocompleta_indirizzo, None, 3, 100, False],
+												'args': [client.servizi_autocompleta_indirizzo, None, 0, 100, False],
 										},
 										{
 											'class': HP,
@@ -227,7 +233,7 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 								},
 								{
 									'class': LoadingButton,
-									'args': ['Cerca', self.onCerca],
+									'args': [_('Cerca'), self.onCerca],
 									'width': '30%',
 									'name': 'button',
 								},
@@ -268,6 +274,7 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 		if param == 'query':
 			self.base.by_name('query').setText(value)	
 		if param == 'cl':
+			self.owner.setTabMappaLinea()
 			q = self.base.by_name('query').getText()
 			if q is not None:
 				self.cercaLinea(q, set_tab=True)
@@ -284,26 +291,25 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 		
 	def onChange(self, el):
 		el.removeStyleName('validation-error')
-		
-	def onFocus(self, text):
-		text.selectAll()
-				
+
 	def setMap(self, map):
 		self.map = map
-		self.map.addRightClickOption("Fermate vicine", self.onRightClick)
+		self.map.addRightClickOption(_("Fermate vicine"), self.onRightClick)
 		
 	def onRightClick(self, lat, lng):
 		query = self.base.by_name('query')
-		query.setText('punto:(%s,%s)' % (lat, lng))
+		query.setText('punto:(%0.4f,%0.4f)' % (lat, lng))
 		self.owner.setTabMappaLinea()
 		self.createClLayer()
-		m = Marker(
-			self.cl_layer,
-			(lng, lat),
-			'/paline/s/img/arrivo_percorso.png',
-			anchor=(16, 32),
-			icon_size=(32, 32),
-		)	
+		def add_marker():
+			m = Marker(
+				self.cl_layer,
+				(lng, lat),
+				make_absolute('/paline/s/img/arrivo_percorso.png'),
+				anchor=(16, 32),
+				icon_size=(32, 32),
+			)
+		self.owner.map_tab.do_or_defer(add_marker)
 		self.onCerca()
 
 	def onKeyDown(self, sender, keycode, modifiers):
@@ -336,7 +342,7 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 		if self.cl_layer is not None:
 			self.cl_layer.destroy()
 		self.map.hideAllLayers()
-		self.cl_layer = Layer('cp_layer', 'Fermate trovate', self.map)	
+		self.cl_layer = Layer('cp_layer', _('Fermate trovate'), self.map)
 		
 	def dettaglioPalina(self, id_palina):
 		wait_start()
@@ -344,8 +350,10 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 		self.modo_realtime = 'palina'
 		self.id_palina = id_palina
 		# self.owner.setTabMappa()
-		self.map.loadNewLayer(id_palina, 'palina-singola', id_palina)
-		client.paline7_Previsioni(id_palina, 'it', JsonHandler(self.onDettaglioPalinaDone))
+		def load_layer():
+			self.map.loadNewLayer(id_palina, 'palina-singola', id_palina)
+		self.owner.map_tab.do_or_defer(load_layer)
+		client.paline_previsioni(id_palina, get_lang(), JsonHandler(self.onDettaglioPalinaDone))
 
 
 	def _converti_dotazioni_bordo(self, x, dotaz):
@@ -362,8 +370,9 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 		self.startTimer()
 
 	def aggiornaArrivi(self, res):
+		wait_stop()
+		risultati_holder = self.base.by_name('risultati_holder')
 		if self.risultati is not None:
-			risultati_holder = self.base.by_name('risultati_holder')
 			risultati_holder.remove(self.risultati)
 
 		self.risultati = DP(
@@ -373,16 +382,34 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 					'class': VP,
 					'style': 'indicazioni',
 					'name': 'dettaglio',
+					'height': None,
 					'sub': [
 						{
-							'class': Label,
-							'args': ['%s (%s)' % (res['nome'], self.id_palina)],
-							'style': 'indicazioni-h1',
-							'height': None,
+							'class': HP,
+							'sub': [
+								{
+									'class': PreferitiImage,
+									'args': ['P', self.id_palina, '%s (%s)' % (res['nome'], self.id_palina), res['esiste_preferito'], client.paline_preferiti],
+									'width': '25px',
+								},
+								{
+									'class': Label,
+									'args': ['%s (%s)' % (res['nome'], self.id_palina)],
+									'style': 'indicazioni-h1',
+									'height': None,
+								},
+								{
+									'class': Image,
+									'args': ['reload.png'],
+									'width': '18px',
+									'call_addClickListener': ([self.onReload], {}),
+									'vertical_alignment': HasAlignment.ALIGN_MIDDLE,
+								},
+							]
 						},
 						{
 							'class': HTML,
-							'args': ["Linee della fermata"],
+							'args': [_("Linee della fermata")],
 							'style': 'indicazioni-h2',
 							'height': None,
 						},
@@ -394,7 +421,7 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 						},
 						{
 							'class': HTML,
-							'args': ["Tutti gli arrivi"],
+							'args': [_("Tutti gli arrivi")],
 							'style': 'indicazioni-h2',
 							'height': None,
 							'name': 'arrivi_label'
@@ -407,9 +434,10 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 					]
 				}
 			],
-			title='Risultati',
+			title=_('Risultati'),
 			style='indicazioni'
 		)
+
 		risultati_holder.add(self.risultati)
 		# Primi arrivi
 		gp = self.risultati.by_name('linee')
@@ -428,16 +456,16 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 				a.addClickListener(self.onLineaFactory(l['linea']))
 			gp.add(a, center=HasAlignment.ALIGN_RIGHT)
 			if getdefault(l, 'disabilitata', False):
-				msg = "Non disponibile"
+				msg = _("Non disponibile")
 			elif getdefault(l, 'non_monitorata', False):
-				msg = "Non monitorata"
+				msg = _("Non monitorata")
 			elif getdefault(l, 'nessun_autobus', False):
-				msg = "Nessun autobus"
+				msg = _("Nessun autobus")
 			else:
 				msg = l['annuncio']
 				partenza = getdefault(l, 'partenza', '')
 				if partenza != '':
-					msg += " (partenza %s)" % partenza
+					msg += _(" (partenza %s)") % partenza
 			gp.add(HTML(": " + msg), center=HasAlignment.ALIGN_LEFT)
 
 		# Tutti gli arrivi
@@ -463,20 +491,23 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 			msg = ': ' + l['annuncio']
 			partenza = getdefault(l, 'partenza', '')
 			if partenza != '':
-				msg += " (partenza %s)" % partenza
+				msg += _(" (partenza %s)") % partenza
 			hp1.add(HTML(msg))
 			vp.add(hp1)
 			hp2 = HorizontalPanel()
 			vp.add(hp2)
 			for dotaz in ['pedana', 'meb', 'aria', 'moby']:
 				self._converti_dotazioni_bordo(l, dotaz)
-				hp2.add(Image('/paline/s/img/%s.gif' % l[dotaz]))
+				hp2.add(Image(make_absolute('/paline/s/img/%s.gif' % l[dotaz])))
 
 			arrivi.add(vp)
 			arrivi.setCellWidth(vp, '100%')
 
 
 	def cercaLinea(self, query, set_input=False, set_tab=False, from_map=False):
+		self.owner.setDirty()
+		if set_tab:
+			self.owner.setTabLineaMappa()
 		if set_input:
 			self.base.by_name('query').setText(query)
 		self.base.by_name('button').start()
@@ -485,11 +516,10 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 			callback = self.onCercaDoneFromMap
 		else:
 			callback = self.onCercaDone
-		client.paline_smart_search(query, JsonHandler(callback))
+		client.paline_smart_search(query, get_lang(), JsonHandler(callback))
 			
 	def onCerca(self):
 		self.ripristinaWidgets()
-		self.owner.setDirty()
 		self.cercaLinea(self.base.by_name('query').getText())
 		
 	def cercaPercorso(self, id_percorso, set_tab=False, su_mappa=False, reset_palina=True):
@@ -498,11 +528,13 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 			self.id_palina = None
 			self.id_veicolo_selezionato = None
 		if su_mappa:
-			self.owner.setTabMappaLinea()
+			self.owner.hide(False)
 		else:
 			self.owner.setTabLineaMappa()
-		client.paline_percorso_fermate(id_percorso, self.id_veicolo_selezionato, JsonHandler(self.onCercaPercorsoDone))
-		self.map.loadNewLayer(id_percorso, 'percorso', id_percorso)
+		client.paline_percorso_fermate(id_percorso, self.id_veicolo_selezionato, get_lang(), JsonHandler(self.onCercaPercorsoDone))
+		def load_layer():
+			self.map.loadNewLayer(id_percorso, 'percorso', id_percorso)
+		self.owner.map_tab.do_or_defer(load_layer)
 		
 	def onCercaPercorsoDone(self, res):
 		wait_stop()
@@ -511,6 +543,12 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 		risultati_holder = self.base.by_name('risultati_holder')
 		if self.risultati is not None:
 			risultati_holder.remove(self.risultati)
+
+		p = res['percorso']
+		if p['descrizione'] is not None and p['descrizione'] != '':
+			desc = p['descrizione']
+		else:
+			desc = _('%(id_linea)s %(carteggio_dec)s direz. %(arrivo)s') % p
 		
 		self.risultati = DP(
 			None,
@@ -521,14 +559,26 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 					'name': 'dettaglio',
 					'sub': [
 						{
-							'class': Label,
-							'args': ['%(id_linea)s %(carteggio_dec)s direz. %(arrivo)s' % res['percorso']],
-							'style': 'indicazioni-h1',
-							'height': None,
+							'class': HP,
+							'sub': [
+								{
+									'class': Label,
+									'args': [desc],
+									'style': 'indicazioni-h1',
+									'height': None,
+								},
+								{
+									'class': Image,
+									'args': ['reload.png'],
+									'width': '20px',
+									'call_addClickListener': ([self.onReload], {}),
+									'vertical_alignment': HasAlignment.ALIGN_MIDDLE,
+								},
+							]
 						},
 						{
 							'class': Label,
-							'args': ['Partenze da capolinea'],
+							'args': [_('Partenze da capolinea')],
 							'style': 'indicazioni-h2',
 							'height': None,
 						},
@@ -539,14 +589,16 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 						},								
 						{
 							'class': Label,
-							'args': ['Fermate'],
+							'args': [_('Fermate')],
 							'style': 'indicazioni-h2',
 							'height': None,
 						},
 						{
 							'class': HTML,
-							'args': ["Seleziona una fermata, oppure un veicolo per conoscerne gli orari di arrivo."],
+							'args': [_("<b>Veicolo: </b>Seleziona un bus")],
+							'style': 'indicazioni',
 							'height': None,
+							'name': 'veicolo_selezionato',
 						},
 						{
 							'class': GP,
@@ -558,7 +610,7 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 						{
 							'class': Label,
 							'name': 'altri_label',
-							'args': ['Altri percorsi della linea'],
+							'args': [_('Altri percorsi della linea')],
 							'style': 'indicazioni-h2',
 							'height': None,
 						},
@@ -570,7 +622,7 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 						},
 						{
 							'class': Label,
-							'args': ['Gestore'],
+							'args': [_('Gestore')],
 							'style': 'indicazioni-h2',
 							'height': None,
 						},
@@ -583,10 +635,13 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 					]
 				}		
 			],
-			title='Risultati',
+			title=_('Risultati'),
 			style='indicazioni'
 		)
 		risultati_holder.add(self.risultati)
+
+		if self.id_veicolo_selezionato is not None:
+			self.selezionaVeicolo(self.id_veicolo_selezionato)
 
 		orari = self.risultati.by_name('orari')
 		for o in res['giorni']:
@@ -603,6 +658,7 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 				st = p['stato_traffico']
 				stp = SimplePanel()
 				stp.setHeight('100%')
+				stp.add(HTML('&nbsp;'))
 				paline.add(stp)
 				imgp = SimplePanel()
 				paline.add(imgp)
@@ -618,7 +674,7 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 				paline.add(a, center=HasAlignment.ALIGN_LEFT)
 
 
-		self.risultati.by_name('gestore').setHTML('La linea %s &egrave; gestita da %s.' % (
+		self.risultati.by_name('gestore').setHTML(_('La linea %s &egrave; gestita da %s.') % (
 			res['percorso']['id_linea'],
 			res['percorso']['gestore'],
 		))
@@ -633,7 +689,12 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 		self.onInfoRealtime(res)
 		self.startTimer()
 
+	def selezionaVeicolo(self, id_veicolo):
+		self.id_veicolo_selezionato = id_veicolo
+		self.risultati.by_name('veicolo_selezionato').setHTML('<b>Veicolo:</b> %s' % id_veicolo)
+
 	def onInfoRealtime(self, res):
+		wait_stop()
 		i = 0
 		n = len(res['fermate'])
 		for p in res['fermate']:
@@ -644,18 +705,18 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 				if 'veicolo' in p:
 					id_veicolo = p['veicolo']['id_veicolo']
 					if id_veicolo == self.id_veicolo_selezionato:
-						img = Image('/paline/s/img/bus_hl.png')
+						img = Image(make_absolute('/paline/s/img/bus_hl.png'))
 					else:
-						img = Image('/paline/s/img/bus.png')
+						img = Image(make_absolute('/paline/s/img/bus.png'))
 						img.addStyleName('clickable')
 						def onVeicolo(id_veicolo):
 							def f():
-								self.id_veicolo_selezionato = id_veicolo
-								client.paline_percorso_fermate(self.id_percorso, id_veicolo, JsonHandler(self.onInfoRealtime))
+								self.selezionaVeicolo(id_veicolo)
+								client.paline_percorso_fermate(self.id_percorso, id_veicolo, get_lang(), JsonHandler(self.onInfoRealtime))
 							return f
 						img.addClickListener(onVeicolo(id_veicolo))
 				else:
-					img = Image('/paline/s/img/%s_arrow.gif' % ('down' if i < n - 1 else 'stop'))
+					img = Image(make_absolute('/paline/s/img/%s_arrow.gif' % ('down' if i < n - 1 else 'stop')))
 				imgp.setWidget(img)
 				ta = ''
 				if 'orario_arrivo' in p:
@@ -692,12 +753,18 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 		self.modo_realtime = None
 		self.timer.cancel()
 
+	def onReload(self):
+		wait_start()
+		self.onTimer()
+
 	def onTimer(self):
 		if self.modo_realtime is not None:
 			if self.modo_realtime == 'percorso':
-				client.paline_percorso_fermate(self.id_percorso, self.id_veicolo_selezionato, JsonHandler(self.onInfoRealtime))
-			if self.modo_realtime == 'palina':
-				client.paline7_Previsioni(self.id_palina, 'it', JsonHandler(self.aggiornaArrivi))
+				client.paline_percorso_fermate(self.id_percorso, self.id_veicolo_selezionato, get_lang(), JsonHandler(self.onInfoRealtime))
+			elif self.modo_realtime == 'palina':
+				client.paline_previsioni(self.id_palina, get_lang(), JsonHandler(self.aggiornaArrivi))
+			else:
+				wait_stop()
 			self.timer.schedule(INTERVALLO_TIMER)
 
 	def startTimer(self):
@@ -740,7 +807,7 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 					]
 				}		
 			],
-			title='Risultati',
+			title=_('Risultati'),
 			style='indicazioni'
 		)
 		self.map.hideAllLayers()
@@ -751,7 +818,7 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 		self.paline_nascoste = []
 
 		if len(res['paline_extra']) > 0 or len(res['paline_semplice']) > 0:
-			h = HTML('Fermate trovate')
+			h = HTML(_('Fermate trovate'))
 			h.addStyleName('indicazioni-h1')
 			dettaglio.add(h)
 
@@ -772,21 +839,23 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 				self.paline_nascoste.append(palina)
 			else:
 				if 'lng' in p:
-					m = Marker(
-						self.cl_layer,
-						(p['lng'], p['lat']),
-						'/paline/s/img/partenza.png',
-						icon_size=(16, 16),
-						anchor=(8, 8),
-						name=('palina', (p['id_palina'], '')),
-						label=p['nome'],
-						infobox=p['nome'],
-					)
+					def add_marker():
+						m = Marker(
+							self.cl_layer,
+							(p['lng'], p['lat']),
+							make_absolute('/paline/s/img/partenza.png'),
+							icon_size=(16, 16),
+							anchor=(8, 8),
+							name=('palina', (p['id_palina'], '')),
+							label=p['nome'],
+							infobox=p['nome'],
+						)
+					self.owner.map_tab.do_or_defer(add_marker)
 
 		if len(res['percorsi']) > 0:
 			if from_map:
 				self.owner.setTabCercaLinea()
-			h = HTML('Linee trovate')
+			h = HTML(_('Linee trovate'))
 			h.addStyleName('indicazioni-h1')
 			dettaglio.add(h)
 		elif len(res['paline_semplice']) > 0 and from_map:
@@ -799,8 +868,8 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 		if len(self.paline_nascoste) > 0:
 			self.mostra_tutto = HTMLFlowPanel()
 			dettaglio.add(self.mostra_tutto)
-			self.mostra_tutto.addHtml("Alcune fermate sono state nascoste perch&eacute; non vi transitano altre linee bus.&nbsp")
-			self.mostra_tutto.addAnchor("Mostra tutte le fermate", self.onMostraTuttePaline)
+			self.mostra_tutto.addHtml(_("Alcune fermate sono state nascoste perch&eacute; non vi transitano altre linee bus.&nbsp"))
+			self.mostra_tutto.addAnchor(_("Mostra tutte le fermate"), self.onMostraTuttePaline)
 
 		if 'lng' in res:
 			def on_cpda():
@@ -815,31 +884,36 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 			def on_cr():
 				self.owner.cercaLuogo(res['ricerca'])
 
+			infobox=_("""
+				<b>%(ricerca)s</b><br /><br />
+				<a id="link-cpa" href="#">Cerca percorso fino a qui</a>
+				<a id="link-cpda" href="#">Cerca percorso da qui</a>
+				<a id="link-cl" href="#">Cerca fermate vicine</a>
+				<a id="link-cr" href="#">Cerca luoghi vicini</a>
+			""") % {'ricerca': res['ricerca']}
+
 			def on_infobox(marker):
-				marker.openBubble()
+				marker.openBubble(infobox)
 				DOM.getElementById('link-cpda').onclick = on_cpda
 				DOM.getElementById('link-cpa').onclick = on_cpa
 				DOM.getElementById('link-cl').onclick = on_cl
 				DOM.getElementById('link-cr').onclick = on_cr
 
-			m = Marker(
-				self.cl_layer,
-				(res['lng'], res['lat']),
-				'/paline/s/img/partenza_percorso.png',
-				icon_size=(32, 32),
-				anchor=(16, 32),
-				drop_callback=self.onRightClick,
-				infobox="""
-					<b>%(ricerca)s</b><br /><br />
-					<a id="link-cpa" href="#">Cerca percorso fino a qui</a>
-					<a id="link-cpda" href="#">Cerca percorso da qui</a>
-					<a id="link-cl" href="#">Cerca fermate vicine</a>
-					<a id="link-cr" href="#">Cerca luoghi vicini</a>
-				""" % {'ricerca': res['ricerca']},
-				infobox_listener=on_infobox
-			)
-			if from_map:
-				on_infobox(m)
+			def add_marker():
+				m = Marker(
+					self.cl_layer,
+					(res['lng'], res['lat']),
+					make_absolute('/paline/s/img/partenza_percorso.png'),
+					icon_size=(32, 32),
+					anchor=(16, 32),
+					drop_callback=self.onRightClick,
+					infobox=infobox,
+					infobox_listener=on_infobox
+				)
+				if from_map:
+					on_infobox(m)
+
+			self.owner.map_tab.do_or_defer(add_marker)
 
 
 		if len(res['paline_extra']) > 0 or 'lng' in res:

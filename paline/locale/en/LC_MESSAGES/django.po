@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: muoversiaroma\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2014-01-08 12:15+0100\n"
-"PO-Revision-Date: 2014-01-08 12:16+0100\n"
+"PO-Revision-Date: 2014-02-18 12:14+0100\n"
 "Last-Translator: \n"
 "Language-Team: muoversiaroma <LL@li.org>\n"
 "MIME-Version: 1.0\n"
@@ -581,7 +581,7 @@ msgstr "Other routes"
 #: .\templates\paline-percorsi.html.py:30
 #, python-format
 msgid "La linea %(l)s &egrave; gestita da %(g)s."
-msgstr "Line %(l)s is managed by %(g)s."
+msgstr "Line %(l)s is operated by %(g)s."
 
 #: .\templates\paline-fermate.html.py:179
 msgid "Legenda"

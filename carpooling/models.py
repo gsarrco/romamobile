@@ -361,7 +361,7 @@ SESSO_CHOICES = [
 
 class UtenteCarPooling(models.Model):
 	user = models.ForeignKey(User)
-	organizzazione = models.ForeignKey(OrganizzazioneCarPooling)
+	organizzazione = models.ForeignKey(OrganizzazioneCarPooling, blank=True, null=True)
 	feedback_richiedente_total = models.IntegerField(default=0)
 	feedback_richiedente_count = models.IntegerField(default=0)
 	feedback_offerente_total = models.IntegerField(default=0)
@@ -471,7 +471,7 @@ def verifica_abilitazione_utente(u, org=None):
 				os = DominioOrganizzazione.objects.filter(dominio=s[1])
 				if len(os) > 0:
 					org = os[0].organizzazione
-		if org is not None:
+		if True: # org is not None:
 			ucp = UtenteCarPooling(
 				user=u,
 				organizzazione=org,
@@ -479,18 +479,6 @@ def verifica_abilitazione_utente(u, org=None):
 			ucp.save()
 			g = Group.objects.get(name='carpooling') 
 			g.user_set.add(u)
-
-
-def get_vincoli(user):
-	ucp = UtenteCarPooling.from_user(user)
-	vincoli = {
-		'fumatore': ucp.fumatore,
-		'sesso': ucp.sesso,
-		'pk_utente': user.pk,
-		'solo_stesso_sesso': ucp.solo_stesso_sesso,
-		'solo_non_fumatori': ucp.solo_non_fumatori,
-	}
-	return vincoli
 
 def migra_organizzazioni():
 	nomi = OrganizzazioneCarPooling.objects.values('nome')
@@ -505,4 +493,23 @@ def migra_organizzazioni():
 				DominioOrganizzazione(dominio=o2.dominio, organizzazione=o1).save()
 				UtenteCarPooling.objects.filter(organizzazione=o2).update(organizzazione=o1)
 				o2.delete()
-				
+
+def get_vincoli(user):
+	if user.is_authenticated():
+		ucp = UtenteCarPooling.from_user(user)
+		vincoli = {
+			'fumatore': ucp.fumatore,
+			'sesso': ucp.sesso,
+			'pk_utente': user.pk,
+			'solo_stesso_sesso': ucp.solo_stesso_sesso,
+			'solo_non_fumatori': ucp.solo_non_fumatori,
+		}
+	else:
+		vincoli = {
+			'fumatore': False,
+			'sesso': '-',
+			'pk_utente': -1,
+			'solo_stesso_sesso': False,
+			'solo_non_fumatori': False,
+		}
+	return vincoli

@@ -183,14 +183,14 @@ def geocode_place_infotp(composite_address):
 	# print "Geocoding"
 	if composite_address.startswith('punto:'):
 		try:
-			lat, lng = composite_address[7:-1].split(',')
+			lat, lng = [float(x) for x in composite_address[7:-1].split(',')]
 			x, y = wgs84_to_gbfe(lng, lat)
 			out = {
 				'stato': 'OK',
-				'indirizzo': _('Punto su mappa <punto:(%s,%s)>') % (lat, lng),
+				'indirizzo': _('Punto su mappa <punto:(%0.4f,%0.4f)>') % (lat, lng),
 				'ricerca': composite_address,
 				'streetno': '',
-				'address': _('Punto su mappa <punto:(%s,%s)>') % (lat, lng),
+				'address': _('Punto su mappa <punto:(%0.4f,%0.4f)>') % (lat, lng),
 				'place': '',
 				'y': y,
 				'x': x,

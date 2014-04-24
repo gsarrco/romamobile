@@ -54,7 +54,7 @@
 		{% endif %}
 	<p>
 		<img class="dot" width="13" height="7" src="/news/s/img/right_bullet.gif" alt="*" />
-		<a href="/percorso/js/?query={{ cerca }}&amp;cl=1&amp;lf=0" target="_blank">{% trans "Mappa interattiva" %}</a>
+		<a href="/percorso/js/?hl={{ lingua.codice }}&amp;query={{ cerca }}&amp;cl=1&amp;lf=0" target="_blank">{% trans "Mappa interattiva" %}</a>
 	</p>		
 	{% endif %}
 	
@@ -63,8 +63,12 @@
 		<p>
 		{% for p in percorsi %}
 			<img class="dot" src="/xhtml/s/img/red_bullet.gif" height="5" width="13" alt="*" />
-			<a href='{% hist %}/paline/percorso/{{ p.id_percorso }}{% endhist %}'>{{ p.linea.id_linea }}
-			{% if p.decodeCarteggio %}{{ p.decodeCarteggio }} {% endif %}{% blocktrans with dest=p.arrivo.nome_ricapitalizzato %}Direz. {{ dest }}{% endblocktrans %}</a>
+			{% if p.descrizione %}
+				<a href='{% hist %}/paline/percorso/{{ p.id_percorso }}{% endhist %}'>{{ p.descrizione }}</a>
+			{% else %}
+				<a href='{% hist %}/paline/percorso/{{ p.id_percorso }}{% endhist %}'>{{ p.linea.id_linea }}
+				{% if p.decodeCarteggio %}{{ p.decodeCarteggio }} {% endif %}{% blocktrans with dest=p.arrivo.nome_ricapitalizzato %}Direz. {{ dest }}{% endblocktrans %}</a>
+			{% endif %}
 			{% if not p.linea.monitorata %}
 				<br /><img class="dot" src="/xhtml/s/img/blank_bullet.gif" height="5" width="13" alt="*" />
 				({% trans "non monitorata" %})

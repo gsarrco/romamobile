@@ -24,4 +24,5 @@ import views
 
 urlpatterns = patterns('',
 	views.percorso1.get_url_entry(),
+	views.percorso2.get_url_entry(),
 )

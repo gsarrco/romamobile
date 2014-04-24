@@ -27,7 +27,7 @@ def get_filepaths(directory):
 ESCLUSIONI = [
 	r'.*red.appcache$',
 	r'.*db$',
-	r'.*lib/.*',
+	#r'.*lib/.*',
 	r'.*opera.*',
 	r'.*oldmoz.*',
 	r'.*ie6.*',

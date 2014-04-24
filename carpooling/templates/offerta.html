@@ -30,7 +30,6 @@
 			<span class="b">A:</span> {{ r.a_indirizzo }} ({{ r.a_orario|date:"H:i" }})<br />
 			<span class="b">Contributo suggerito:</span> {{ r.costo|floatformat:2 }} &euro;<br />
 			<span class="b">Feedback richiedente:</span> {{ r.utente_car_pooling.feedback_complessivo_arrotondato }} / 5.0<br />
-			<span class="b">Organizzazione:</span> {{ r.utente_car_pooling.organizzazione }}
 		</p>
 		<p>
 			<a href="{% nohist %}/carpooling/accetta/{{ r.pk }}{% endnohist %}">Accetta</a> -
@@ -51,7 +50,6 @@
 			<span class="b">Feedback richiedente:</span> {{ r.utente_car_pooling.feedback_complessivo_arrotondato }} / 5.0<br />			
 			<span class="b">Richiedente:</span> {{ r.user.first_name }} {{ r.user.last_name }}<br />
 			<span class="b">Telefono:</span> {{ r.telefoni }}
-			<span class="b">Organizzazione:</span> {{ r.utente_car_pooling.organizzazione }}
 		</p>
 		<p>
 			{% if offerta.futura %}

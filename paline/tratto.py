@@ -20,7 +20,7 @@
 #
 
 from datetime import date, time, datetime, timedelta
-from servizi.utils import RPyCAllowRead, modifica_url_con_storia
+from servizi.utils import RPyCAllowRead, modifica_url_con_storia, getdef
 from django.utils.safestring import mark_safe
 from servizi.utils import ricapitalizza
 from geomath import gbfe_to_wgs84
@@ -647,6 +647,12 @@ def format_indicazioni_icona_root_post(tratto, ft, opz):
 
 @formattatore('indicazioni_icona', [TrattoInterscambio])
 def format_indicazioni_icona_tratto_interscambio(tratto, ft, opz):
+	versione = getdef(opz, 'versione', 2)
+	mezzo = 'I'
+	icona = 'interscambio.png'
+	if versione == 1:
+		mezzo = 'P'
+		icona = 'piedi.png'
 	ft.aggiungi_nodo(
 		t=tratto.tempo,
 		nome=tratto.nome_palina_s,
@@ -657,7 +663,7 @@ def format_indicazioni_icona_tratto_interscambio(tratto, ft, opz):
 		overwrite=True,
 	)
 	ft.aggiungi_tratto(
-		mezzo='I',
+		mezzo=mezzo,
 		linea='',
 		id_linea='',
 		dest='',
@@ -667,7 +673,7 @@ def format_indicazioni_icona_tratto_interscambio(tratto, ft, opz):
 		tempo_attesa='',
 		info_tratto='',
 		info_tratto_exp='',
-		icona='interscambio.png',
+		icona=icona,
 	)
 	ft.aggiungi_nodo(
 		t=tratto.tempo + timedelta(seconds=tratto.tempo_percorrenza),

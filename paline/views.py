@@ -30,6 +30,7 @@ from servizi.utils import datetime2mysql, populate_form, aggiungi_banda, messagg
 from servizi.utils import BrCheckboxSelectMultiple, group_excluded, mysql2date, date2mysql, mysql2datetime
 from servizi.utils import date2datetime, datetime2date, group_required, multisplit, is_int, unmarshal_datetime
 from servizi.utils import richiedi_conferma, datetime2compact
+from servizi.views import sostituisci_preferiti
 import traceback
 import logging
 from django import forms
@@ -63,7 +64,6 @@ from paline.geomath import gbfe_to_wgs84
 from xhtml.templatetags.format_extras import arrotonda_distanza
 from mercury.models import Mercury
 from pprint import pprint
-from backviews import mappa_layer
 
 logger = logging.getLogger('paline')
 
@@ -103,7 +103,7 @@ def PalinaVeicoliFiltra(request, token, id_palina, linea, lingua):
 @paline7.metodo("Percorsi")
 def LineaPercorsi(request, token, id_linea, lingua):
 	try:
-		linea = Linea.objects.by_date().get(id_linea=id_linea, tipo__in=TIPI_LINEA_INFOTP)
+		linea = Linea.objects.by_date().get(id_linea=id_linea)
 	except:
 		raise errors.XMLRPC['XRE_NO_LINEA']
 	return linea.getPercorsi()
@@ -145,11 +145,6 @@ def ProssimaPartenza(request, token, id_percorso, lingua):
 	except Exception as e:
 		raise errors.XMLRPC['XRE_NO_PERCORSO']
 	return datetime2mysql(pp)
-
-
-@paline7.metodo("Mappa")
-def ws_mappa(request, token, tipo, id):
-	return mappa_layer(request, (tipo, id))
 
 def proxy_infotp(request):
 	return HttpResponse(infotp.call_infotp_raw(request.GET['IdFermata']))
@@ -293,7 +288,7 @@ def trovalinea_veicoli_locale(request, id_palina, id_percorso="", capolinea=Fals
 		else:
 			fs = Fermata.objects.by_date().filter(palina=palina).distinct()
 		for f in fs:
-			if f.percorso.linea.id_linea not in coincidenze:
+			if f.percorso.linea.id_linea not in coincidenze and not f.percorso.soppresso:
 				coincidenze.append(f.percorso.linea.id_linea)
 			
 							
@@ -667,6 +662,7 @@ def _disambigua_to_struct(ctx):
 				'abilitata': p.abilitata_complessivo(),
 				'carteggio': p.carteggio,
 				'carteggio_dec': p.decodeCarteggio(),
+				'descrizione': p.descrizione,
 			})			
 	res['percorsi'] = pe
 	if 'lng' in ctx:
@@ -762,6 +758,7 @@ def linea(request, id_linea):
 		return _disambigua(request, linee=linee, ctx=ctx, per_palina=per_palina)
 	
 def _default(request, cerca, ctx, as_service):
+	cerca = sostituisci_preferiti(request, cerca)
 	cerca = cerca.strip()
 	if cerca == '':
 		ctx['errore'] = True

@@ -1,0 +1,815 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2014-04-16 09:41+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=CHARSET\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: .\main.py:72
+msgid ""
+"\n"
+"\t\t\t\t\t\t\t\t<b>Una ricerca, tanti servizi</b><br />\n"
+"\t\t\t\t\t\t\t\tPer i tempi di attesa bus, il cerca linea e il cerca "
+"percorso usa la casella qui sotto.\n"
+"\t\t\t\t\t\t\t\tInserisci il numero di fermata, la linea bus o l'indirizzo, "
+"oppure tocca la mappa.\n"
+"\t\t\t\t\t\t\t"
+msgstr ""
+
+#: .\main.py:86
+msgid "Chiudi suggerimento"
+msgstr ""
+
+#: .\main.py:92
+msgid "Non mostrare pi&ugrave;"
+msgstr ""
+
+#: .\main.py:271
+msgid "Linea"
+msgstr ""
+
+#: .\main.py:275
+msgid "Luogo"
+msgstr ""
+
+#: .\main.py:413 .\main.py:478 .\main.py:484 .\main.py:518
+#, python-format
+msgid "Posizione attuale <punto:(%f,%f)>"
+msgstr ""
+
+#: .\main.py:444
+msgid "Mappa"
+msgstr ""
+
+#: .\main.py:481 .\main.py:647 .\main.py:655 .\main.py:693 .\main.py:695
+msgid "Ora presenti sulla mappa"
+msgstr ""
+
+#: .\main.py:541 .\main.py:702 .\main.py:710 .\main.py:748 .\main.py:750
+msgid "Pannelli VMS"
+msgstr ""
+
+#: .\cerca_percorso.py:112 .\cerca_percorso.py:114
+msgid "Dove"
+msgstr ""
+
+#: .\cerca_percorso.py:123 .\cerca_percorso.py:125
+msgid "Da: "
+msgstr ""
+
+#: .\cerca_percorso.py:158 .\cerca_percorso.py:159
+msgid "A: "
+msgstr ""
+
+#: .\cerca_percorso.py:198 .\cerca_linea.py:211 .\cerca_luogo.py:108
+#: .\cerca_linea.py:214 .\main.py:128 .\main.py:121 .\cerca_linea.py:217
+msgid "Cerca"
+msgstr ""
+
+#: .\cerca_percorso.py:209
+msgid "Ritorno"
+msgstr ""
+
+#: .\cerca_percorso.py:217
+msgid "Come: Trasporto pubblico"
+msgstr ""
+
+#: .\cerca_percorso.py:231 .\cerca_percorso.py:552 .\cerca_percorso.py:566
+#: .\cerca_percorso.py:235 .\cerca_percorso.py:572
+msgid "Trasporto pubblico"
+msgstr ""
+
+#: .\cerca_percorso.py:238 .\cerca_percorso.py:239 .\cerca_percorso.py:243
+msgid "Bike and ride"
+msgstr ""
+
+#: .\cerca_percorso.py:245 .\cerca_percorso.py:1138 .\cerca_percorso.py:272
+#: .\cerca_percorso.py:1160 .\cerca_percorso.py:276 .\cerca_percorso.py:1166
+#: .\cerca_percorso.py:1167
+msgid "Car sharing"
+msgstr ""
+
+#: .\cerca_percorso.py:252 .\cerca_percorso.py:552 .\cerca_percorso.py:256
+#: .\cerca_percorso.py:566 .\cerca_percorso.py:260 .\cerca_percorso.py:572
+msgid "Trasporto privato"
+msgstr ""
+
+#: .\cerca_percorso.py:259 .\cerca_percorso.py:264 .\cerca_percorso.py:268
+msgid "Park and ride"
+msgstr ""
+
+#: .\cerca_percorso.py:268 .\cerca_percorso.py:282 .\cerca_percorso.py:288
+msgid "Opzioni avanzate"
+msgstr ""
+
+#: .\cerca_percorso.py:275 .\cerca_percorso.py:289 .\cerca_percorso.py:295
+msgid "Opzioni"
+msgstr ""
+
+#: .\cerca_percorso.py:281 .\cerca_percorso.py:295 .\cerca_percorso.py:301
+msgid "Cerca un luogo lungo il percorso"
+msgstr ""
+
+#: .\cerca_percorso.py:301 .\cerca_percorso.py:315 .\cerca_percorso.py:321
+msgid "Permessi di accesso ZTL"
+msgstr ""
+
+#: .\cerca_percorso.py:324 .\cerca_percorso.py:338 .\cerca_percorso.py:344
+msgid "Propensione spostamenti a piedi"
+msgstr ""
+
+#: .\cerca_percorso.py:329 .\cerca_percorso.py:343 .\cerca_percorso.py:349
+msgid "Bassa (camminatore lento)"
+msgstr ""
+
+#: .\cerca_percorso.py:334 .\cerca_percorso.py:348 .\cerca_percorso.py:354
+msgid "Media"
+msgstr ""
+
+#: .\cerca_percorso.py:340 .\cerca_percorso.py:354 .\cerca_percorso.py:360
+msgid "Alta (camminatore veloce)"
+msgstr ""
+
+#: .\cerca_percorso.py:345 .\cerca_percorso.py:359 .\cerca_percorso.py:365
+msgid "Mezzi pubblici da utilizzare"
+msgstr ""
+
+#: .\cerca_percorso.py:350 .\cerca_percorso.py:364 .\cerca_percorso.py:370
+msgid "Autobus e tram"
+msgstr ""
+
+#: .\cerca_percorso.py:356 .\cerca_percorso.py:370 .\cerca_percorso.py:376
+msgid "Metropolitana"
+msgstr ""
+
+#: .\cerca_percorso.py:362 .\cerca_percorso.py:376 .\cerca_percorso.py:382
+msgid "Ferrovie urbane"
+msgstr ""
+
+#: .\cerca_percorso.py:368 .\cerca_percorso.py:382 .\cerca_percorso.py:388
+msgid "Teletrasporto"
+msgstr ""
+
+#: .\cerca_percorso.py:383 .\cerca_percorso.py:397 .\cerca_percorso.py:403
+msgid "Max distanza in bici:&nbsp;"
+msgstr ""
+
+#: .\cerca_percorso.py:395 .\cerca_percorso.py:409 .\cerca_percorso.py:415
+msgid "&nbsp;km"
+msgstr ""
+
+#: .\cerca_percorso.py:407 .\cerca_percorso.py:421 .\cerca_percorso.py:427
+msgid "Parcheggi Park and Ride"
+msgstr ""
+
+#: .\cerca_percorso.py:412 .\cerca_percorso.py:426 .\cerca_percorso.py:432
+msgid "Parcheggi di scambio"
+msgstr ""
+
+#: .\cerca_percorso.py:418 .\cerca_percorso.py:432 .\cerca_percorso.py:438
+msgid "Autorimesse private"
+msgstr ""
+
+#: .\cerca_percorso.py:426 .\cerca_percorso.py:440 .\cerca_percorso.py:446
+msgid "Quando"
+msgstr ""
+
+#: .\cerca_percorso.py:432 .\cerca_percorso.py:446 .\cerca_percorso.py:452
+msgid "Adesso"
+msgstr ""
+
+#: .\cerca_percorso.py:439 .\cerca_percorso.py:453 .\cerca_percorso.py:459
+msgid "Fra 5 minuti"
+msgstr ""
+
+#: .\cerca_percorso.py:449 .\cerca_percorso.py:463 .\cerca_percorso.py:469
+msgid "Parti alle:&nbsp;"
+msgstr ""
+
+#: .\cerca_percorso.py:456 .\cerca_percorso.py:470 .\cerca_percorso.py:476
+msgid "Arriva alle:&nbsp;"
+msgstr ""
+
+#: .\cerca_percorso.py:476 .\cerca_percorso.py:490 .\cerca_percorso.py:496
+msgid "&nbsp;&nbsp;Ore:&nbsp;"
+msgstr ""
+
+#: .\cerca_percorso.py:491
+msgid ""
+"\n"
+"\t\t\t\t\t\t\t\t\t<p>\n"
+"\t\t\t\t\t\t\t\t\t\tQuesto servizio calcola il miglior percorso con i mezzi\n"
+"\t\t\t\t\t\t\t\t\t\tAtac, Roma TPL e le ferrovie regionali Trenitalia.\n"
+"\t\t\t\t\t\t\t\t\t\tUsa i dati in tempo reale per tener conto dello stato\n"
+"\t\t\t\t\t\t\t\t\t\tdel traffico e della posizione degli autobus.\n"
+"\t\t\t\t\t\t\t\t\t<p>\n"
+"\t\t\t\t\t\t\t\t\t</p>\n"
+"\t\t\t\t\t\t\t\t\t\tIl software, sviluppato dall'Agenzia per la "
+"Mobilit&agrave;\n"
+"\t\t\t\t\t\t\t\t\t\tdi Roma, &egrave; <a href=\"http://www-test."
+"agenziamobilita.roma.it/servizi/open-data/codice-sorgente.html\" target="
+"\"_blank\">rilasciato\n"
+"\t\t\t\t\t\t\t\t\t\tcon licenza open source.</a>\n"
+"\t\t\t\t\t\t\t\t\t</p>\n"
+"\t\t\t\t\t\t\t\t\t"
+msgstr ""
+
+#: .\cerca_percorso.py:522 .\cerca_percorso.py:536 .\cerca_percorso.py:542
+msgid "Seleziona tutte"
+msgstr ""
+
+#: .\cerca_percorso.py:552 .\cerca_percorso.py:566 .\cerca_percorso.py:572
+msgid "Park and Ride"
+msgstr ""
+
+#: .\cerca_percorso.py:552 .\cerca_percorso.py:566 .\cerca_percorso.py:572
+msgid "Bike and Ride"
+msgstr ""
+
+#: .\cerca_percorso.py:552 .\cerca_percorso.py:566 .\cerca_percorso.py:572
+msgid "Car Sharing"
+msgstr ""
+
+#: .\cerca_percorso.py:584 .\cerca_percorso.py:601 .\cerca_percorso.py:607
+#, python-format
+msgid "Come: %s"
+msgstr ""
+
+#: .\cerca_percorso.py:721 .\cerca_percorso.py:738 .\cerca_percorso.py:744
+#: .\cerca_percorso.py:745
+msgid "Cerca percorso da qui"
+msgstr ""
+
+#: .\cerca_percorso.py:722 .\cerca_percorso.py:739 .\cerca_percorso.py:745
+#: .\cerca_percorso.py:746
+msgid "Cerca percorso fino a qui"
+msgstr ""
+
+#: .\cerca_percorso.py:797 .\cerca_percorso.py:1085 .\cerca_percorso.py:814
+#: .\cerca_percorso.py:1101 .\cerca_percorso.py:820 .\cerca_percorso.py:1107
+#: .\cerca_percorso.py:821 .\cerca_percorso.py:1108
+msgid "Percorso trovato"
+msgstr ""
+
+#: .\cerca_percorso.py:1024 .\cerca_percorso.py:1040 .\cerca_percorso.py:1046
+#: .\cerca_percorso.py:1047
+msgid "Riepilogo"
+msgstr ""
+
+#: .\cerca_percorso.py:1054 .\cerca_percorso.py:1070 .\cerca_percorso.py:1076
+#: .\cerca_percorso.py:1077
+msgid "Esclusioni"
+msgstr ""
+
+#: .\cerca_percorso.py:1066 .\cerca_percorso.py:1082 .\cerca_percorso.py:1088
+#: .\cerca_percorso.py:1089
+msgid "Indicazioni"
+msgstr ""
+
+#: .\cerca_percorso.py:1078 .\cerca_percorso.py:1094 .\cerca_percorso.py:1100
+#: .\cerca_percorso.py:1101
+#, python-format
+msgid ""
+"&copy; %d\n"
+"\t\t\t\t\t\t\t\t<a class=\"inl\" href=\"http://www.agenziamobilita.roma.it"
+"\">Roma servizi per la mobilit&agrave; s.r.l.</a>"
+msgstr ""
+
+#: .\cerca_percorso.py:1095 .\cerca_percorso.py:1111 .\cerca_percorso.py:1117
+#: .\cerca_percorso.py:1118
+#, python-format
+msgid "<b>Durata spostamento:</b> %s"
+msgstr ""
+
+#: .\cerca_percorso.py:1096 .\cerca_percorso.py:1112 .\cerca_percorso.py:1118
+#: .\cerca_percorso.py:1119
+#, python-format
+msgid "<b>Distanza percorsa:</b> %s<br />"
+msgstr ""
+
+#: .\cerca_percorso.py:1097 .\cerca_percorso.py:1113 .\cerca_percorso.py:1119
+#: .\cerca_percorso.py:1120
+#, python-format
+msgid "<b>Di cui a piedi:</b> %s"
+msgstr ""
+
+#: .\cerca_percorso.py:1126 .\cerca_percorso.py:1145 .\cerca_percorso.py:1151
+#: .\cerca_percorso.py:1152
+msgid "Cambia linea"
+msgstr ""
+
+#: .\cerca_percorso.py:1130 .\cerca_percorso.py:1149 .\cerca_percorso.py:1155
+#: .\cerca_percorso.py:1156
+msgid "A piedi"
+msgstr ""
+
+#: .\cerca_percorso.py:1132 .\cerca_percorso.py:1151 .\cerca_percorso.py:1157
+#: .\cerca_percorso.py:1158
+msgid "In bici"
+msgstr ""
+
+#: .\cerca_percorso.py:1134 .\cerca_percorso.py:247 .\cerca_percorso.py:1153
+#: .\cerca_percorso.py:251 .\cerca_percorso.py:1159 .\cerca_percorso.py:1160
+msgid "Car pooling"
+msgstr ""
+
+#: .\cerca_percorso.py:1136 .\cerca_percorso.py:1158 .\cerca_percorso.py:1164
+#: .\cerca_percorso.py:1165
+msgid "In automobile"
+msgstr ""
+
+#: .\cerca_percorso.py:1141 .\cerca_percorso.py:1163 .\cerca_percorso.py:1169
+#: .\cerca_percorso.py:1170
+msgid "Apertura ZTL ore&nbsp;"
+msgstr ""
+
+#: .\cerca_percorso.py:1145 .\cerca_percorso.py:1167 .\cerca_percorso.py:1173
+#: .\cerca_percorso.py:1174
+msgid "Linea&nbsp;"
+msgstr ""
+
+#: .\cerca_percorso.py:1150 .\cerca_percorso.py:1172 .\cerca_percorso.py:1178
+#: .\cerca_percorso.py:1179
+msgid "&nbsp;direz. "
+msgstr ""
+
+#: .\cerca_percorso.py:1158 .\cerca_percorso.py:1180 .\cerca_percorso.py:1186
+#: .\cerca_percorso.py:1187
+msgid "Partenza ore&nbsp;"
+msgstr ""
+
+#: .\cerca_percorso.py:1160 .\cerca_percorso.py:1182 .\cerca_percorso.py:1188
+#: .\cerca_percorso.py:1189
+msgid "Attesa circa&nbsp;"
+msgstr ""
+
+#: .\cerca_percorso.py:1162 .\cerca_percorso.py:1184 .\cerca_percorso.py:1190
+#: .\cerca_percorso.py:1191
+msgid "In arrivo fra&nbsp;"
+msgstr ""
+
+#: .\cerca_percorso.py:1164 .\cerca_percorso.py:1186 .\cerca_percorso.py:1192
+#: .\cerca_percorso.py:1193
+msgid "In arrivo dopo&nbsp;"
+msgstr ""
+
+#: .\cerca_percorso.py:1212 .\cerca_percorso.py:1234 .\cerca_percorso.py:1240
+#: .\cerca_percorso.py:1241
+msgid "Fermata&nbsp;"
+msgstr ""
+
+#: .\cerca_percorso.py:1261 .\cerca_percorso.py:1292 .\cerca_percorso.py:1298
+#: .\cerca_percorso.py:1299
+msgid "Link al percorso completo:"
+msgstr ""
+
+#: .\cerca_percorso.py:1267 .\cerca_percorso.py:1298 .\cerca_percorso.py:1304
+#: .\cerca_percorso.py:1305
+#, python-format
+msgid ""
+"\n"
+"\t\t\t\t\t\tQuesto link mostrer&agrave; le indicazioni e la mappa del "
+"percorso\n"
+"\t\t\t\t\t\tda %s a %s.\n"
+"\t\t\t\t\t"
+msgstr ""
+
+#: .\cerca_percorso.py:1282 .\cerca_percorso.py:1313 .\cerca_percorso.py:1319
+#: .\cerca_percorso.py:1320
+#, python-format
+msgid "Link al cerca percorso fino a %s:"
+msgstr ""
+
+#: .\cerca_percorso.py:1288 .\cerca_percorso.py:1319 .\cerca_percorso.py:1325
+#: .\cerca_percorso.py:1326
+#, python-format
+msgid ""
+"\n"
+"\t\t\t\t\t\tQuesto link chieder&agrave; un punto di partenza, a partire dal "
+"quale\n"
+"\t\t\t\t\t\tcercher&agrave; il percorso fino a %s.\n"
+"\t\t\t\t\t"
+msgstr ""
+
+#: .\cerca_percorso.py:1338 .\cerca_percorso.py:1369 .\cerca_percorso.py:1375
+#: .\cerca_percorso.py:1376
+msgid "Indirizzo email del destinatario:"
+msgstr ""
+
+#: .\cerca_percorso.py:1352 .\cerca_percorso.py:1383 .\cerca_percorso.py:1389
+#: .\cerca_percorso.py:1390
+msgid "Invia"
+msgstr ""
+
+#: .\cerca_percorso.py:1357 .\cerca_percorso.py:1388 .\util.py:1341
+#: .\cerca_percorso.py:1394 .\cerca_percorso.py:1395 .\util.py:1360
+#: .\util.py:1381 .\util.py:1393
+msgid "Annulla"
+msgstr ""
+
+#: .\main.py:266
+msgid "Percorso"
+msgstr ""
+
+#: .\cerca_linea.py:85 .\cerca_linea.py:89
+#, python-format
+msgid "&nbsp;Direz. %s"
+msgstr ""
+
+#: .\cerca_linea.py:91 .\cerca_linea.py:95
+msgid "Altre linee:&nbsp;"
+msgstr ""
+
+#: .\cerca_linea.py:115 .\cerca_linea.py:119 .\cerca_linea.py:122
+#, python-format
+msgid "%s %s Direz. %s"
+msgstr ""
+
+#: .\cerca_linea.py:142 .\cerca_linea.py:146 .\cerca_linea.py:149
+#, python-format
+msgid "<b>%s:</b> %s"
+msgstr ""
+
+#: .\cerca_linea.py:149 .\cerca_linea.py:153 .\cerca_linea.py:156
+msgid ""
+"Siamo spiacenti, non sono disponibili gli orari di partenza dal capolinea "
+"per il percorso selezionato."
+msgstr ""
+
+#: .\cerca_linea.py:151 .\cerca_linea.py:155 .\cerca_linea.py:158
+msgid "Nella giornata selezionata il percorso non &egrave; attivo."
+msgstr ""
+
+#: .\cerca_linea.py:171 .\cerca_linea.py:175 .\cerca_linea.py:178
+msgid "Fermata, linea o indirizzo"
+msgstr ""
+
+#: .\cerca_linea.py:274 .\cerca_linea.py:275 .\cerca_linea.py:278
+msgid "Fermate vicine"
+msgstr ""
+
+#: .\cerca_linea.py:320 .\cerca_linea.py:739 .\cerca_linea.py:750
+#: .\cerca_linea.py:323 .\cerca_linea.py:784 .\cerca_linea.py:326
+#: .\cerca_linea.py:802
+msgid "Fermate trovate"
+msgstr ""
+
+#: .\cerca_linea.py:366 .\cerca_linea.py:377 .\cerca_linea.py:390
+#: .\cerca_linea.py:393
+msgid "Linee della fermata"
+msgstr ""
+
+#: .\cerca_linea.py:378 .\cerca_linea.py:389 .\cerca_linea.py:402
+#: .\cerca_linea.py:405
+msgid "Tutti gli arrivi"
+msgstr ""
+
+#: .\cerca_linea.py:413 .\cerca_linea.py:424 .\cerca_linea.py:437
+#: .\cerca_linea.py:440
+msgid "Non disponibile"
+msgstr ""
+
+#: .\cerca_linea.py:415 .\cerca_linea.py:426 .\cerca_linea.py:439
+#: .\cerca_linea.py:442
+msgid "Non monitorata"
+msgstr ""
+
+#: .\cerca_linea.py:417 .\cerca_linea.py:428 .\cerca_linea.py:441
+#: .\cerca_linea.py:444
+msgid "Nessun autobus"
+msgstr ""
+
+#: .\cerca_linea.py:422 .\cerca_linea.py:448 .\cerca_linea.py:433
+#: .\cerca_linea.py:459 .\cerca_linea.py:446 .\cerca_linea.py:472
+#: .\cerca_linea.py:449 .\cerca_linea.py:475
+#, python-format
+msgid " (partenza %s)"
+msgstr ""
+
+#: .\cerca_linea.py:509 .\cerca_linea.py:520 .\cerca_linea.py:538
+#: .\cerca_linea.py:532
+#, python-format
+msgid "%(id_linea)s %(carteggio_dec)s direz. %(arrivo)s"
+msgstr ""
+
+#: .\cerca_linea.py:515 .\cerca_linea.py:526 .\cerca_linea.py:553
+#: .\cerca_linea.py:562
+msgid "Partenze da capolinea"
+msgstr ""
+
+#: .\cerca_linea.py:526 .\cerca_linea.py:537 .\cerca_linea.py:564
+#: .\cerca_linea.py:573
+msgid "Fermate"
+msgstr ""
+
+#: .\cerca_linea.py:532 .\cerca_linea.py:543 .\cerca_linea.py:570
+msgid ""
+"Seleziona una fermata, oppure un veicolo per conoscerne gli orari di arrivo."
+msgstr ""
+
+#: .\cerca_linea.py:545 .\cerca_linea.py:556 .\cerca_linea.py:583
+#: .\cerca_linea.py:594
+msgid "Altri percorsi della linea"
+msgstr ""
+
+#: .\cerca_linea.py:557 .\cerca_linea.py:568 .\cerca_linea.py:595
+#: .\cerca_linea.py:606
+msgid "Gestore"
+msgstr ""
+
+#: .\cerca_linea.py:606 .\cerca_linea.py:617 .\cerca_linea.py:644
+#: .\cerca_linea.py:658
+#, python-format
+msgid "La linea %s &egrave; gestita da %s."
+msgstr ""
+
+#: .\cerca_linea.py:774 .\cerca_linea.py:785 .\cerca_linea.py:821
+#: .\cerca_linea.py:839
+msgid "Linee trovate"
+msgstr ""
+
+#: .\cerca_linea.py:787 .\cerca_linea.py:798 .\cerca_linea.py:834
+#: .\cerca_linea.py:852
+msgid ""
+"Alcune fermate sono state nascoste perch&eacute; non vi transitano altre "
+"linee bus.&nbsp"
+msgstr ""
+
+#: .\cerca_linea.py:788 .\cerca_linea.py:799 .\cerca_linea.py:835
+#: .\cerca_linea.py:853
+msgid "Mostra tutte le fermate"
+msgstr ""
+
+#: .\cerca_linea.py:817 .\cerca_linea.py:828
+#, python-format
+msgid ""
+"\n"
+"\t\t\t\t\t<b>%(ricerca)s</b><br /><br />\n"
+"\t\t\t\t\t<a id=\"link-cpa\" href=\"#\">Cerca percorso fino a qui</a>\n"
+"\t\t\t\t\t<a id=\"link-cpda\" href=\"#\">Cerca percorso da qui</a>\n"
+"\t\t\t\t\t<a id=\"link-cl\" href=\"#\">Cerca fermate vicine</a>\n"
+"\t\t\t\t\t<a id=\"link-cr\" href=\"#\">Cerca luoghi vicini</a>\n"
+"\t\t\t\t"
+msgstr ""
+
+#: .\cerca_linea.py:391 .\cerca_luogo.py:224 .\cerca_linea.py:402
+#: .\cerca_linea.py:415 .\cerca_linea.py:608 .\cerca_linea.py:773
+#: .\cerca_linea.py:418 .\cerca_linea.py:619 .\cerca_linea.py:791
+msgid "Risultati"
+msgstr ""
+
+#: .\cerca_luogo.py:68 .\cerca_luogo.py:69
+msgid "Indirizzo"
+msgstr ""
+
+#: .\cerca_luogo.py:142
+msgid "Cerca luogo lungo un percorso"
+msgstr ""
+
+#: .\cerca_luogo.py:189
+msgid "Luoghi vicini"
+msgstr ""
+
+#: .\cerca_luogo.py:243
+msgid "Luoghi trovati"
+msgstr ""
+
+#: .\cerca_percorso.py:491 .\cerca_percorso.py:505 .\cerca_percorso.py:511
+msgid ""
+"\n"
+"\t\t\t\t\t\t\t\t\t<p>\n"
+"\t\t\t\t\t\t\t\t\t\tQuesto servizio calcola il miglior percorso con i mezzi\n"
+"\t\t\t\t\t\t\t\t\t\tAtac, Roma TPL e le ferrovie regionali Trenitalia.\n"
+"\t\t\t\t\t\t\t\t\t\tUsa i dati in tempo reale per tener conto dello stato\n"
+"\t\t\t\t\t\t\t\t\t\tdel traffico e della posizione degli autobus.\n"
+"\t\t\t\t\t\t\t\t\t<p>\n"
+"\t\t\t\t\t\t\t\t\t</p>\n"
+"\t\t\t\t\t\t\t\t\t\tIl software, sviluppato dall'Agenzia per la "
+"Mobilit&agrave;\n"
+"\t\t\t\t\t\t\t\t\t\tdi Roma, &egrave; <a href=\"http://www.agenziamobilita."
+"roma.it/servizi/open-data/codice-sorgente.html\" target=\"_blank"
+"\">rilasciato\n"
+"\t\t\t\t\t\t\t\t\t\tcon licenza open source.</a>\n"
+"\t\t\t\t\t\t\t\t\t</p>\n"
+"\t\t\t\t\t\t\t\t\t"
+msgstr ""
+
+#: .\map.py:320 .\map.py:323 .\map.py:326
+msgid "Cerca un percorso, una linea o una fermata per mostrarla sulla mappa."
+msgstr ""
+
+#: .\cerca_percorso.py:1302
+msgid "\\Chiudi"
+msgstr ""
+
+#: .\cerca_percorso.py:1302 .\cerca_percorso.py:1333 .\cerca_percorso.py:1517
+#: .\cerca_percorso.py:1566 .\cerca_percorso.py:1339 .\cerca_percorso.py:1523
+#: .\cerca_percorso.py:1572 .\cerca_percorso.py:1340 .\cerca_percorso.py:1524
+#: .\cerca_percorso.py:1573
+msgid "Chiudi"
+msgstr ""
+
+#: .\cerca_percorso.py:566 .\cerca_percorso.py:572
+msgid "Car Pooling"
+msgstr ""
+
+#: .\cerca_percorso.py:1430 .\cerca_percorso.py:1436 .\cerca_percorso.py:1437
+msgid "Trovato un passaggio in car pooling"
+msgstr ""
+
+#: .\cerca_percorso.py:1436 .\cerca_percorso.py:1442 .\cerca_percorso.py:1443
+msgid ""
+"Trovata un'offerta di passaggio in car pooling compatibile con il tuo "
+"spostamento."
+msgstr ""
+
+#: .\cerca_percorso.py:1445 .\cerca_percorso.py:1451 .\cerca_percorso.py:1452
+msgid "Chiedi un passaggio"
+msgstr ""
+
+#: .\cerca_percorso.py:1450 .\cerca_percorso.py:1456 .\cerca_percorso.py:1457
+msgid "Cerca un altro passaggio"
+msgstr ""
+
+#: .\cerca_percorso.py:1499 .\cerca_percorso.py:1505 .\cerca_percorso.py:1506
+msgid "Richiesta effettuata"
+msgstr ""
+
+#: .\cerca_percorso.py:1505 .\cerca_percorso.py:1511 .\cerca_percorso.py:1512
+msgid ""
+"\n"
+"\t\t\t\t\t\tLa tua richiesta di passaggio &egrave; stata inviata. Riceverai "
+"una notifica con ulteriori dettagli\n"
+"\t\t\t\t\t\tquando l'offerente avr&agrave; accettato o rifiutato la "
+"richiesta.\n"
+"\t\t\t\t\t"
+msgstr ""
+
+#: .\cerca_percorso.py:1542 .\cerca_percorso.py:1548 .\cerca_percorso.py:1549
+msgid "Nessun passaggio trovato"
+msgstr ""
+
+#: .\cerca_percorso.py:1548 .\cerca_percorso.py:1554 .\cerca_percorso.py:1555
+msgid ""
+"\n"
+"\t\t\t\t\t\tNessun'offerta di passaggio soddisfa la tua richiesta. Ti "
+"proponiamo un percorso con i soli mezzi\n"
+"\t\t\t\t\t\tpubblici. In alternativa prova a modificare l'orario della "
+"ricerca, oppure\n"
+"\t\t\t\t\t\toffri tu stesso un passaggio in car pooling!\n"
+"\t\t\t\t\t"
+msgstr ""
+
+#: .\cerca_percorso.py:1561 .\cerca_percorso.py:1615 .\cerca_percorso.py:1567
+#: .\cerca_percorso.py:1621 .\cerca_percorso.py:1568 .\cerca_percorso.py:1622
+msgid "Offri un passaggio"
+msgstr ""
+
+#: .\cerca_percorso.py:1595 .\cerca_percorso.py:1601 .\cerca_percorso.py:1602
+msgid "Condividi il tuo viaggio"
+msgstr ""
+
+#: .\cerca_percorso.py:1601 .\cerca_percorso.py:1607 .\cerca_percorso.py:1608
+msgid ""
+"\n"
+"\t\t\t\t\t\tFai car pooling, offri un passaggio! Se vuoi condividere il tuo "
+"viaggio, Muoversi a Roma lo proporr&agrave;\n"
+"\t\t\t\t\t\tad altri utenti che cercano un percorso, proprio come se la tua "
+"auto diventasse un autobus.\n"
+"\t\t\t\t\t\tPotrai anche accordarti con le persone a cui offri un passaggio "
+"per ricevere un contributo\n"
+"\t\t\t\t\t\talle spese di viaggio, suggerito da Muoversi a Roma.\n"
+"\t\t\t\t\t"
+msgstr ""
+
+#: .\cerca_percorso.py:1620 .\cerca_percorso.py:1626 .\cerca_percorso.py:1627
+msgid "No, grazie"
+msgstr ""
+
+#: .\main.py:150 .\main.py:142
+msgid "Linea, fermata o indirizzo"
+msgstr ""
+
+#: .\main.py:151
+msgid "Preferiti"
+msgstr ""
+
+#: .\main.py:152 .\main.py:143
+msgid "Imposta posizione corrente"
+msgstr ""
+
+#: .\main.py:291 .\main.py:297 .\main.py:326
+msgid "Caricamento account utente"
+msgstr ""
+
+#: .\main.py:296 .\main.py:302 .\main.py:336
+msgid "Versione precedente"
+msgstr ""
+
+#: .\main.py:301 .\main.py:307 .\main.py:341
+msgid "Language"
+msgstr ""
+
+#: .\main.py:306 .\main.py:312 .\main.py:346
+msgid "Esci"
+msgstr ""
+
+#: .\main.py:363 .\main.py:369 .\main.py:407
+#, python-format
+msgid "Ciao, %s (Gestisci account)"
+msgstr ""
+
+#: .\main.py:368 .\main.py:374 .\main.py:412
+msgid "Accedi"
+msgstr ""
+
+#: .\main.py:570 .\main.py:578 .\main.py:616 .\main.py:618
+msgid "Italiano"
+msgstr ""
+
+#: .\main.py:575 .\main.py:583 .\main.py:621 .\main.py:623
+msgid "English"
+msgstr ""
+
+#: .\util.py:1337 .\util.py:1356 .\util.py:1377 .\util.py:1389
+msgid "Accesso richiesto"
+msgstr ""
+
+#: .\util.py:1338 .\util.py:1357 .\util.py:1378 .\util.py:1390
+msgid "Per continuare devi effettuare l'accesso."
+msgstr ""
+
+#: .\util.py:1340 .\util.py:1359 .\util.py:1380 .\util.py:1392
+msgid "Accedi o registrati"
+msgstr ""
+
+#: .\main.py:275 .\main.py:281 .\main.py:306
+msgid "toolbar/percorso.png"
+msgstr ""
+
+#: .\main.py:280 .\main.py:286 .\main.py:311
+msgid "toolbar/linea.png"
+msgstr ""
+
+#: .\main.py:284 .\main.py:290 .\main.py:315
+msgid "toolbar/luogo.png"
+msgstr ""
+
+#: .\main.py:505 .\main.py:511 .\main.py:545
+msgid "toolbar/mappa.png"
+msgstr ""
+
+#: .\cerca_linea.py:850 .\cerca_linea.py:868
+#, python-format
+msgid ""
+"\n"
+"\t\t\t\t<b>%(ricerca)s</b><br /><br />\n"
+"\t\t\t\t<a id=\"link-cpa\" href=\"#\">Cerca percorso fino a qui</a>\n"
+"\t\t\t\t<a id=\"link-cpda\" href=\"#\">Cerca percorso da qui</a>\n"
+"\t\t\t\t<a id=\"link-cl\" href=\"#\">Cerca fermate vicine</a>\n"
+"\t\t\t\t<a id=\"link-cr\" href=\"#\">Cerca luoghi vicini</a>\n"
+"\t\t\t"
+msgstr ""
+
+#: .\map.py:432
+msgid "<br/>Caricamento..."
+msgstr ""
+
+#: .\main.py:278
+msgid "Conferma"
+msgstr ""
+
+#: .\main.py:278
+msgid "Vuoi cancellare il preferito?"
+msgstr ""
+
+#: .\main.py:278
+msgid "No"
+msgstr ""
+
+#: .\main.py:319
+msgid "toolbar/preferiti.png"
+msgstr ""
+
+#: .\main.py:331 .\news.py:84 .\news.py:89
+msgid "News"
+msgstr ""
+
+#: .\main.py:278
+msgid "S&igrave;"
+msgstr ""
+
+#: .\cerca_linea.py:579
+msgid "<b>Veicolo: </b>Seleziona un bus"
+msgstr ""
