@@ -63,6 +63,7 @@ import xmlrpclib
 from paline.geomath import gbfe_to_wgs84
 from xhtml.templatetags.format_extras import arrotonda_distanza
 from mercury.models import Mercury
+import hashlib
 from pprint import pprint
 
 logger = logging.getLogger('paline')
@@ -155,6 +156,18 @@ class MultiForm(AtacMobileForm):
 
 class PercorsoForm(forms.Form):
 	stop_address = forms.CharField()
+
+def _dettaglio_paline_app(request, palina):
+	p = palina
+	prev = _dettaglio_paline(request, p.nome, [p], aggiungi=p.id_palina, as_service=True)
+	prev['collocazione'] = p.descrizione
+	if request.user.is_authenticated():
+		preferito = PalinaPreferita.objects.filter(gruppo__user=request.user, id_palina=p.id_palina).count() > 0
+	else:
+		preferito = False
+	prev['esiste_preferito'] = preferito
+	return prev
+
 
 def _dettaglio_paline(request, nome, paline, linee_escluse=[], aggiungi=None, ctx=None, as_service=False):
 	if ctx is None:
@@ -305,6 +318,7 @@ def trovalinea_veicoli_locale(request, id_palina, id_percorso="", capolinea=Fals
 
 def _orari(id_percorso, data=None, day_only=True):
 	ctx = {}
+	percorso = Percorso.objects.by_date().get(id_percorso=id_percorso)
 	if data:
 		try:
 			if type(data) != date and type(data) != datetime:
@@ -350,6 +364,8 @@ def _orari(id_percorso, data=None, day_only=True):
 		ctx['orari_partenza'] = ore_ieri + ore + ore_domani
 	else:
 		ctx['orari_partenza'] = ore
+	ctx['no_orari'] = percorso.no_orari
+	ctx['note_no_orari'] = percorso.note_no_orari
 	return ctx
 
 def trovalinea_orari(request, token, id_percorso, data=None):
@@ -399,9 +415,11 @@ def _percorso(request, id_percorso, ctx=None, id_veicolo=None, giorno_partenze=N
 		else:
 			ctx['orari_partenza_vicini'] = PartenzeCapilinea.objects.filter(id_percorso=id_percorso, orario_partenza__gte=oggi - timedelta(minutes=5), orario_partenza__lte=oggi + timedelta(minutes=60))[:5]
 		if as_service:
+			ctx['no_orari'] = p.no_orari
+			ctx['note_no_orari'] = p.note_no_orari
 			ctx['percorso'] = ctx['percorso'].getPercorso()
 			ctx['percorsi'] = [p.getPercorso() for p in ctx['percorsi']]
-			if 'orari_partenza_vicini' in ctx: 
+			if 'orari_partenza_vicini' in ctx:
 				ctx['orari_partenza_vicini'] = [o.orario_partenza for o in ctx['orari_partenza_vicini']]
 			return ctx
 		return TemplateResponse(request, 'paline-fermate.html', ctx)
@@ -430,6 +448,29 @@ def percorso(request, id_percorso, ctx=None):
 	else:
 		giorno = None
 	return _percorso(request, id_percorso, ctx, id_veicolo, giorno)
+
+def percorso_per_json(request, id_percorso, id_veicolo=None):
+	giorni = []
+	t = date.today()
+	for i in range(7):
+		giorni.append({
+			'giorno': t.strftime('%Y-%m-%d'),
+			'nome': datefilter(t, "l j F").capitalize(),
+		})
+		t += timedelta(days=1)
+
+	percorso = _percorso(request, id_percorso, id_veicolo=id_veicolo, as_service=True)
+
+	return {
+		'fermate': percorso['fermate'],
+		'giorni': giorni,
+		'id_percorso': id_percorso,
+		'percorso': percorso['percorso'],
+		'percorsi':  percorso['percorsi'],
+		'orari_partenza_vicini': percorso['orari_partenza_vicini'],
+		'no_orari': percorso['no_orari'],
+		'note_no_orari': percorso['note_no_orari'],
+	}
 
 
 def visualizza_mappa(request, id_percorso):
@@ -628,13 +669,19 @@ def _disambigua_to_struct(ctx):
 				d = -1
 			li = []
 			le = []
+			direzioni = []
 			for l in p.linee_extra:
-				le.append(l.linea.id_linea)	
+				le.append(l.linea.id_linea)
 			for l in p.linee_info:
+				arrivo = l.arrivo.nome_ricapitalizzato()
+				if not arrivo in direzioni:
+					direzioni.append(arrivo)
 				li.append({
 					'id_linea': l.linea.id_linea,
-					'direzione': l.arrivo.nome_ricapitalizzato(), 					
+					'direzione': arrivo,
 				})
+			if len(le) > 0:
+				direzioni.append('...')
 			palina = {
 				'nome': p.nome_ricapitalizzato(),
 				'id_palina': p.id_palina,
@@ -643,6 +690,9 @@ def _disambigua_to_struct(ctx):
 				'distanza_arrotondata': arrotonda_distanza(d) if d > 0 else '',
 				'linee_extra': le,
 				'linee_info': li,
+				'primi_arrivi': p.primi_arrivi,
+				'preferita': p.preferita,
+				'direzioni': ", ".join(direzioni),
 			}
 			try:
 				palina['lat'] = p.lat
@@ -663,8 +713,10 @@ def _disambigua_to_struct(ctx):
 				'carteggio': p.carteggio,
 				'carteggio_dec': p.decodeCarteggio(),
 				'descrizione': p.descrizione,
-			})			
+			})
 	res['percorsi'] = pe
+	if 'percorso' in ctx:
+		res['percorso'] = ctx['percorso']
 	if 'lng' in ctx:
 		res['lng'] = ctx['lng']
 		res['lat'] = ctx['lat']
@@ -673,14 +725,25 @@ def _disambigua_to_struct(ctx):
 def _cmp_percorsi(p1, p2):
 	if p1.linea.id_linea != p2.linea.id_linea:
 		return cmp(p1.linea.id_linea, p2.linea.id_linea)
-	if len(p1.carteggio) < len(p2.carteggio):
+	c1 = p1.carteggio.replace('T', '')
+	c2 = p2.carteggio.replace('T', '')
+	if len(c1) < len(c2):
 		return -1
-	elif len(p1.carteggio) > len(p2.carteggio):
+	elif len(c1) > len(c2):
 		return 1
 	else:
-		return cmp(p1.carteggio, p2.carteggio)
+		return cmp(c1, c2)
 
-def _disambigua(request, paline_semplice=None, linee=None, paline_extra=None, nascondi_duplicati=False, ctx=None, as_service=False, per_palina=None):
+def _disambigua(request,
+	paline_semplice=None,
+	linee=None,
+	paline_extra=None,
+	nascondi_duplicati=False,
+	ctx=None,
+	as_service=False,
+	per_palina=None,
+	dett_paline=False,
+):
 	if ctx is None:
 		ctx_orig = {}
 	else:
@@ -697,15 +760,28 @@ def _disambigua(request, paline_semplice=None, linee=None, paline_extra=None, na
 		else:
 			fermate = Fermata.objects.by_date().filter(palina__id_palina=per_palina)
 			percorsi = Percorso.objects.by_date().select_related('linea').filter(linea__in=linee, fermata__in=fermate, soppresso=False)
-			if len(percorsi) == 1:
-				return percorso(request, percorsi[0].id_percorso)
+			if len(percorsi) == 1 and not as_service:
+				return _percorso(request, percorsi[0].id_percorso)
+			elif len(percorsi) == 1:
+				ctx['percorso'] = percorso_per_json(request, percorsi[0].id_percorso)
 			ctx['percorsi'] = percorsi
+
 	if paline_extra is not None:
+		if request is not None and request.user.is_authenticated():
+			preferite = set([p.id_palina for p in PalinaPreferita.objects.filter(gruppo__user=request.user)])
+		else:
+			preferite = set()
 		lac = LineeAssociateComparer(max_linee_per_palina)
-		out = []
 		percorsi_usati = set([])
 		nascoste = False
+		p1 = []
+		p2 = []
 		for palina in paline_extra:
+			palina.preferita = palina.id_palina in preferite
+			if palina.preferita:
+				p1.append(palina)
+			else:
+				p2.append(palina)
 			nuovi_percorsi = not nascondi_duplicati
 			if palina.ha_linee_infotp():
 				ps = [p for p in Percorso.objects.by_date().select_related('linea').filter(fermata__palina=palina, soppresso=False)]
@@ -723,11 +799,18 @@ def _disambigua(request, paline_semplice=None, linee=None, paline_extra=None, na
 				lac.add_trovate(linee)
 				palina.linee_info = linee[:max_linee_per_palina]
 				palina.linee_extra = linee[max_linee_per_palina:]
-				palina.nascosta = not nuovi_percorsi
-				out.append(palina)
-				if not nuovi_percorsi:
+				palina.nascosta = not (nuovi_percorsi or palina.preferita)
+				palina.primi_arrivi = []
+				if palina.nascosta:
 					nascoste = True
-		ctx['paline_extra'] = out
+		paline_extra = p1 + p2
+		if dett_paline:
+			paline_visibili = [p for p in paline_extra if not p.nascosta]
+			primi = get_primi_arrivi(paline_visibili)
+			for p in paline_visibili:
+				p.primi_arrivi = primi[p.id_palina]['veicoli']
+
+		ctx['paline_extra'] = paline_extra
 		ctx['paline_nascoste'] = nascoste
 	if as_service:
 		ctx_orig.update(_disambigua_to_struct(ctx))
@@ -757,7 +840,7 @@ def linea(request, id_linea):
 	if len(linee) > 0:
 		return _disambigua(request, linee=linee, ctx=ctx, per_palina=per_palina)
 	
-def _default(request, cerca, ctx, as_service):
+def _default(request, cerca, ctx, as_service, dett_paline=False):
 	cerca = sostituisci_preferiti(request, cerca)
 	cerca = cerca.strip()
 	if cerca == '':
@@ -776,18 +859,32 @@ def _default(request, cerca, ctx, as_service):
 	if res is not None and res[0] is not None:
 		cerca = res[0]
 
-	paline = Palina.objects.by_date().filter(id_palina=cerca, soppressa=False)
-	linee_raw = Linea.objects.by_date().filter(id_linea__istartswith=cerca)
-	linee = []
-	for l in linee_raw:
-		id_linea = l.id_linea
-		uc = id_linea[-1].upper()
-		if len(id_linea) == len(cerca):
-			linee.append(l)
-		else:
-			lun = len(cerca)
-			if len(id_linea) > lun and id_linea[lun] >= 'A' and id_linea[lun] <= 'Z':
+	per_palina = None
+
+	if cerca.startswith('percorsi:'):
+		paline = Palina.objects.none()
+		try:
+			dummy, id_linea, per_palina = cerca.split(':')
+			linea = Linea.objects.by_date().get(id_linea=id_linea)
+		except:
+			ctx['errore'] = True
+			return ctx
+		linee = [linea]
+
+	else:
+		paline = Palina.objects.by_date().filter(id_palina=cerca, soppressa=False)
+		linee_raw = Linea.objects.by_date().filter(id_linea__istartswith=cerca)
+		linee = []
+		for l in linee_raw:
+			id_linea = l.id_linea
+			# uc = id_linea[-1].upper()
+			if len(id_linea) == len(cerca):
 				linee.append(l)
+			else:
+				lun = len(cerca)
+				if len(id_linea) > lun and 'A' <= id_linea[lun] <= 'Z':
+					linee.append(l)
+
 	if len(paline) == 1 and len(linee) == 0:
 		p = paline[0]
 		nome = "%s (%s)" % (p.nome_ricapitalizzato(), p.id_palina)
@@ -799,10 +896,14 @@ def _default(request, cerca, ctx, as_service):
 		else:
 			ctx['tipo'] = 'Palina'
 			ctx['id_palina'] = p.id_palina
+			if dett_paline:
+				ctx['dettaglio'] = _dettaglio_paline_app(request, p)
 			return ctx
+
 	if len(linee) > 0:
 		RicercaRecente.update(request, cerca, cerca)
-		return _disambigua(request, paline, linee, ctx=ctx, as_service=as_service)
+		return _disambigua(request, paline, linee, ctx=ctx, as_service=as_service, per_palina=per_palina)
+
 	# Nessuna linea o palina con l'id cercato
 	# Provo a cercare la palina in base al nome
 	parti = multisplit(cerca, [' ', '/'])
@@ -817,9 +918,11 @@ def _default(request, cerca, ctx, as_service):
 				res = res.intersection(pks)
 			if len(res) == 0:
 				break
+
 	if res is not None and len(res) > 0:
 		paline = Palina.objects.by_date().filter(pk__in=res, soppressa=False)
 		return _disambigua(request, paline_extra=paline, ctx=ctx, as_service=as_service)
+
 	# Infine, provo a considerare il testo immesso come indirizzo e cercare linee e paline vicine
 	if not is_int(cerca):
 		try:
@@ -835,8 +938,12 @@ def _default(request, cerca, ctx, as_service):
 					ctx['form'] = populate_form(request, CorreggiMultiForm, cerca='')	
 			elif res['stato'] == 'OK':
 				RicercaRecente.update(request, res['ricerca'], res['indirizzo'])
-				c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB)
-				trs = c.root.oggetti_vicini(res)
+				id_richiesta = hashlib.md5(pickle.dumps(('oggetti_vicini', res))).hexdigest()
+				trs = cache.get(id_richiesta)
+				if trs is None:
+					c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB)
+					trs = c.root.oggetti_vicini(res)
+					cache.set(id_richiesta, trs)
 				ps, ls = pickle.loads(trs)
 				paline = []
 				linee = []
@@ -851,10 +958,11 @@ def _default(request, cerca, ctx, as_service):
 					linea.distanza = l[2]
 				ctx['lng'], ctx['lat'] = gbfe_to_wgs84(res['x'], res['y'])
 				
-				return _disambigua(request, paline_extra=paline, nascondi_duplicati=True, ctx=ctx, as_service=as_service)
+				return _disambigua(request, paline_extra=paline, nascondi_duplicati=True, ctx=ctx, as_service=as_service, dett_paline=dett_paline)
 			else:
 				ctx['errore'] = True
 		except Exception, e:
+			traceback.print_exc()
 			# Se uno dei servizi sta giù (Infopoint, paline vicine) omettiamo la ricerca per indirizzo
 			ctx['errore'] = True
 	else:
@@ -998,7 +1106,10 @@ def _disservizio(request, paline, redirect_to, ctx=None):
 
 def elenco_linee(request):
 	ctx = {}
-	ps = Percorso.objects.by_date().select_related('linea', 'arrivo').filter(soppresso=False).order_by('linea__id_linea')
+	ps = Percorso.objects.by_date().select_related('linea', 'arrivo').filter(soppresso=False)
+	if 'scolastico' in request.REQUEST:
+		ps = ps.filter(carteggio__contains='S')
+	ps = ps.order_by('linea__id_linea')
 	ls = defaultdict(list)
 	for p in ps:
 		ls[p.linea.id_linea].append(p)
@@ -1286,3 +1397,18 @@ def get_stat_passaggi(request, token):
 		'tempi_attesa_percorsi': xmlrpclib.Binary(serializers.serialize("json", tempi_attesa_percorsi)),
 	}
 	
+@paline7.metodo("gtfs2mtram")
+def gtfs2mtram(request, token):
+	ps = Percorso.objects.by_date().all()
+	out = []
+	for p in ps:
+		linea_carteggio = "%s%s" % (p.linea.id_linea, p.carteggio_quoz)
+		direzione = 0
+		if p.verso == 'R':
+			direzione = 1
+		out.append({
+			'route_id': linea_carteggio,
+			'direction': direzione,
+			'mtram': p.id_percorso})
+
+	return out

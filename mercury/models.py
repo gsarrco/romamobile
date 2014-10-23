@@ -143,7 +143,8 @@ class Peer(models.Model):
 
 		if by_queue:
 			l = ss[0].queue_length
-			if l > ss[0].type.max_queue_length:
+			max_l = ss[0].type.max_queue_length
+			if max_l != -1 and l > max_l:
 				raise Exception("Servizio momentaneamente non disponibile")
 			n = len(ss)
 			i = 1
@@ -168,7 +169,8 @@ class Peer(models.Model):
 
 		if by_queue:
 			l = ss[0].queue_length
-			if l > ss[0].type.max_queue_length:
+			max_l = ss[0].type.max_queue_length
+			if max_l != -1 and l > max_l:
 				raise Exception("Servizio momentaneamente non disponibile")
 			n = len(ss)
 			i = 1
@@ -321,7 +323,7 @@ class Mercury(Thread):
 		return pickle.loads(getattr(c.root, method)(pickle.dumps(param, 2)))
 	
 	@classmethod
-	def sync_any_static(cls, name, method, param, by_queue):
+	def sync_any_static(cls, name, method, param, by_queue=False):
 		c = Peer.connect_any_static(name, by_queue)
 		return pickle.loads(getattr(c.root, method)(pickle.dumps(param, 2)))
 	

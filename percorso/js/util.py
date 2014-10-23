@@ -202,6 +202,90 @@ class DataButton(Button):
 	def onButton(self):
 		self.callback(self, self.data)
 
+
+class MessageDialog(DialogBox):
+	def __init__(self, message, title):
+		DialogBox.__init__(self, glass=True)
+
+		self.base = VP(
+			self,
+			[
+				{
+					'class': HTML,
+					'args': [title],
+					'height': None,
+					'style': 'indicazioni-h1',
+				},
+				{
+					'class': HTML,
+					'args': [message],
+					'height': None,
+					'style': 'indicazioni',
+				},
+				{
+					'class': Button,
+					'args': [_('OK'), self.onOk],
+					'height': None,
+				},
+			],
+			add_to_owner=True,
+		)
+		self.addStyleName('indicazioni')
+		self.show()
+		left = (Window.getClientWidth() - self.getClientWidth()) / 2
+		top = (Window.getClientHeight() - self.getClientHeight()) / 2
+		self.setPopupPosition(left, top)
+
+	def onOk(self):
+		self.hide()
+
+class DisturbingMessageDialog(DialogBox):
+	def __init__(self, message, title, id):
+		DialogBox.__init__(self, glass=True)
+		self.id = id
+
+		if not storage_get('disturbing_%s' % id, False):
+			self.base = VP(
+				self,
+				[
+					{
+						'class': HTML,
+						'args': [title],
+						'height': None,
+						'style': 'indicazioni-h1',
+					},
+					{
+						'class': HTML,
+						'args': [message],
+						'height': None,
+						'style': 'indicazioni',
+					},
+					{
+						'class': ButtonsPanel,
+						'args': [[
+							(_('OK'), self.onOk),
+							(_('Non mostrare pi&ugrave;'), self.onNeverMore),
+						]]
+					},
+				],
+				add_to_owner=True,
+			)
+			self.addStyleName('indicazioni')
+			self.show()
+			left = (Window.getClientWidth() - self.getClientWidth()) / 2
+			top = (Window.getClientHeight() - self.getClientHeight()) / 2
+			self.setPopupPosition(left, top)
+
+	def onOk(self):
+		self.hide()
+
+	def onNeverMore(self):
+		storage_set('disturbing_%s' % self.id, True)
+		self.hide()
+
+
+
+
 class QuestionDialogBox(DialogBox):
 	def __init__(self, title, question, answers):
 		"""
@@ -221,12 +305,16 @@ class QuestionDialogBox(DialogBox):
 		contents.setCellWidth(buttons, '100%')
 		contents.setCellHorizontalAlignment(buttons, HasAlignment.ALIGN_RIGHT)
 		buttons.setWidth('100%')
-		perc = "%d%" % int(100 / len(answers))
-		for a in answers:
+		perc = "%d%%" % (int(100 / len(answers)) - 1)
+		n = len(answers)
+		for i in range(n):
+			a = answers[i]
 			db = DataButton(a[0], self.onButton, (a[1], a[2]))
 			db.setWidth('100%')
 			buttons.add(db)
 			buttons.setCellWidth(db, perc)
+			if i < n - 1:
+				buttons.add(HTML('&nbsp;'))
 		self.setHTML('<b>%s</b>' % title)
 		self.setWidget(contents)
 		left = (Window.getClientWidth() - 200) / 2 + Window.getScrollLeft()
@@ -267,6 +355,7 @@ class MyAnchor(Anchor):
 		Anchor.__init__(self, *args, **kwargs)
 		self.my_parita = 0
 		self.max_parita = max_parita
+		self.widget = None
 		
 	def set_numero_eventi(self, n):
 		self.max_parita = n
@@ -280,6 +369,12 @@ class MyAnchor(Anchor):
 		if self.my_parita >= self.max_parita:
 			self.my_parita = 0
 			self.my_original_listener(source)
+
+	def setWidget(self, widget):
+		if self.widget is not None:
+			self.removeWidget()
+		self.widget = widget
+		Anchor.setWidget(self, widget)
 		
 				
 class HelpButton(HorizontalPanel):
@@ -328,7 +423,7 @@ class StyledFlexTable(FlexTable):
 	def getRow(self):
 		return self.row
 		
-	def addStyledWidget(self, w, style=None, center=False, expand=False):
+	def addStyledWidget(self, w, style=None, center=False, expand=False, width=None):
 		self.setWidget(self.row, self.column, w)
 		if style is not None:
 			self.formatter.addStyleName(self.row, self.column, style)
@@ -340,6 +435,9 @@ class StyledFlexTable(FlexTable):
 		if expand:
 			self.formatter.setWidth(self.row, self.column, '100%')
 			w.setWidth('100%')
+		elif width is not None:
+			self.formatter.setWidth(self.row, self.column, width)
+			w.setWidth('100%')
 		self.column += 1
 		
 class StyledFixedColumnFlexTable(StyledFlexTable):
@@ -348,15 +446,223 @@ class StyledFixedColumnFlexTable(StyledFlexTable):
 		del kwargs['column_count']
 		StyledFlexTable.__init__(self, *args, **kwargs)
 		
-	def addStyledWidget(self, w, style=None, center=False, expand=False):
-		StyledFlexTable.addStyledWidget(self, w, style, center, expand)
+	def addStyledWidget(self, w, style=None, center=False, expand=False, width=None):
+		StyledFlexTable.addStyledWidget(self, w, style, center, expand, width=width)
 		if self.column == self.column_count:
 			self.newRow()
 			
 	def add(self, w, center=True, expand=False):
 		self.addStyledWidget(w, center=center, expand=expand)
 
-		
+class MatrixChoiceElem(FocusPanel):
+	def __init__(self, owner, text):
+		FocusPanel.__init__(self)
+		self.text = text
+		self.owner = owner
+		self.add(HTML(text))
+		self.addStyleName('matrix-choice-unselected')
+		self.addClickListener(self.onClick)
+
+	def onClick(self):
+		self.owner.onSelected(self)
+
+	def setSelected(self, selected=True):
+		on = 'matrix-choice-selected'
+		off = 'matrix-choice-unselected'
+		if not selected:
+			on, off = off, on
+		self.removeStyleName(off)
+		self.addStyleName(on)
+
+	def getText(self):
+		return self.text
+
+
+class MatrixChoice(StyledFixedColumnFlexTable):
+	def __init__(self, choices, onChange=None):
+		"""
+		choices is a list of lists, representing available choices
+		"""
+		StyledFixedColumnFlexTable.__init__(self, column_count=len(choices[0]))
+		self.selected = None
+		self.choices = choices
+		self.onChange = onChange
+		self.el_dict = {}
+		for row in choices:
+			for el in row:
+				mce = MatrixChoiceElem(self, el)
+				self.add(mce)
+				self.el_dict[el] = mce
+
+	def onSelected(self, mce, notify=True):
+		if self.selected is not None:
+			self.selected.setSelected(False)
+		self.selected = mce
+		mce.setSelected(True)
+		if self.onChange is not None and notify:
+			self.onChange(self.selected.getText())
+
+	def getValue(self):
+		if self.selected is None:
+			return None
+		return self.selected.getText()
+
+	def setValue(self, value):
+		if value in self.el_dict:
+			self.onSelected(self.el_dict[value], False)
+
+
+
+hour_choices = [
+	['00', '12'],
+	['01', '13'],
+	['02', '14'],
+	['03', '15'],
+	['04', '16'],
+	['05', '17'],
+	['06', '18'],
+	['07', '19'],
+	['08', '20'],
+	['09', '21'],
+	['10', '22'],
+	['11', '23'],
+]
+min_choices = [
+	['00'],
+	['05'],
+	['10'],
+	['15'],
+	['20'],
+	['25'],
+	['30'],
+	['35'],
+	['40'],
+	['45'],
+	['50'],
+	['55'],
+]
+
+
+class TimePicker(DialogBox):
+	def __init__(self, onSelected, hour=0, minute=0):
+		DialogBox.__init__(self, glass=True)
+
+		self.vp = VerticalPanel()
+
+		self.hour_value = hour
+		self.minute_value = minute
+		self.onSelected = onSelected
+
+		self.time = HTML('')
+		self.time.addStyleName('timepicker-time')
+		self.vp.add(self.time)
+
+		self.holder = HorizontalPanel()
+
+		self.hour = VerticalPanel()
+		ore_label = HTML(_("Ore"))
+		ore_label.addStyleName('timepicker-label')
+		self.hour.add(ore_label)
+		self.hour_matrix = MatrixChoice(hour_choices, self.onHour)
+		self.hour.add(self.hour_matrix)
+		self.holder.add(self.hour)
+
+		spacer = SimplePanel()
+		self.holder.add(spacer)
+		self.holder.setCellWidth(spacer, '100%')
+
+		self.min = VerticalPanel()
+		min_label = HTML(_("Min"))
+		min_label.addStyleName('timepicker-label')
+		self.min.add(min_label)
+		self.min_matrix = MatrixChoice(min_choices, self.onMin)
+		self.min.add(self.min_matrix)
+		self.holder.add(self.min)
+
+		self.vp.add(self.holder)
+
+		self.commandBar = HorizontalPanel()
+		self.ok = Button(_("OK"), self.onOk)
+		self.ok.setWidth('95%')
+		self.cancel = Button(_("Annulla"), self.onCancel)
+		self.cancel.setWidth('100%')
+		self.commandBar.add(self.ok)
+		self.commandBar.add(self.cancel)
+		self.commandBar.setCellWidth(self.ok, '50%')
+		self.commandBar.setCellWidth(self.cancel, '50%')
+		self.vp.add(self.commandBar)
+		self.commandBar.setWidth('100%')
+
+		self.update()
+		self.hour_matrix.setValue("%02d" % self.hour_value)
+		self.min_matrix.setValue("%02d" % self.minute_value)
+
+		self.add(self.vp)
+		self.show()
+		left = (Window.getClientWidth() - self.getClientWidth()) / 2
+		top = (Window.getClientHeight() - self.getClientHeight()) / 2
+		self.setPopupPosition(left, top)
+
+	def onOk(self):
+		self.onSelected("%02d:%02d" % (self.hour_value, self.minute_value))
+		self.hide()
+
+	def onCancel(self):
+		self.hide()
+
+	def onHour(self):
+		self.hour_value = int(self.hour_matrix.getValue())
+		self.update()
+
+	def onMin(self):
+		self.minute_value = int(self.min_matrix.getValue())
+		self.update()
+
+	def update(self):
+		self.time.setHTML("%02d:%02d" % (self.hour_value, self.minute_value))
+
+
+class TimeBox(HorizontalPanel):
+	def __init__(self, time="00:00"):
+		HorizontalPanel.__init__(self)
+		self.setVerticalAlignment(HasAlignment.ALIGN_MIDDLE)
+		self.tb = TextBox()
+		self.tb.setVisibleLength(5)
+		self.tb.setText(time)
+		self.add(self.tb)
+
+		self.image = Image('icon_clock.gif')
+		self.image.addClickListener(self.onImageClick)
+		self.add(self.image)
+		self.enabled = True
+
+	def getTextBox(self):
+		return self.tb
+
+	def onImageClick(self):
+		if self.enabled:
+			hour = 0
+			min = 0
+			try:
+				time = self.tb.getText()
+				hour = time[:2]
+				min = time[3:5]
+			except:
+				pass
+			TimePicker(self.onTimePicker, hour, min)
+
+	def onTimePicker(self, time):
+		self.tb.setText(time)
+
+	def setText(self, time):
+		self.tb.setText(time)
+
+	def getText(self):
+		return self.tb.getText()
+
+	def setEnabled(self, enabled):
+		self.enabled = enabled
+		self.tb.setEnabled(enabled)
 		
 class AutofitHorizontalPanel(HorizontalPanel):
 	def __init__(self, owner):
@@ -625,12 +931,19 @@ class GP(StyledFixedColumnFlexTable, AutoLayout):
 		
 	def onCreate(self, el, kwargs):
 		expand = True
+		width = None
+		center = False
 		if 'expand' in kwargs:
 			expand = kwargs['expand']
-		self.addStyledWidget(el, expand=expand)
+		if 'width' in kwargs:
+			expand = False
+			width = kwargs['width']
+		if 'center' in kwargs:
+			center = kwargs['center']
+		self.addStyledWidget(el, expand=expand, width=width, center=center)
 		
 	def getReservedArgs(self):
-		return ['expand']
+		return ['expand', 'width', 'center']
 	
 def get_checked_radio(base, name, values):
 	for v in values:
@@ -667,13 +980,13 @@ class LoadingButton(Button):
 			self.backup_html = None
 			self.setEnabled(True)
 			wait_stop()
-		
+
 class MenuCmd:
 	def __init__(self, handler):
 	  self.handler = handler
 	def execute(self):
 	  self.handler()
-	  
+
 # ToggleImage
 class ToggleImage(Image):
 	def __init__(self, filename, style_inactive, style_active, callback=None, data=None, can_turn_off=True):
@@ -1074,7 +1387,6 @@ class DeferrableTabPanel(TabPanel):
 			index = int(token[4:])
 			super(DeferrableTabPanel, self).selectTab(index)
 
-
 	def onTabSelected(self, sender, tabIndex):
 		res = super(DeferrableTabPanel, self).onTabSelected(sender, tabIndex)
 		self.selected = self.getWidget(tabIndex)
@@ -1169,8 +1481,14 @@ class Waiting(VerticalPanel):
 	def __init__(self, owner):
 		super(Waiting, self).__init__(Width='48px', Height='48px')
 		self.wait = Image('wait.gif', Width='31px', Height='31px')
+		self.wait.addStyleName('waiting-image')
 		self.menu = Image('toolbar/menu.png', Width='48px', Height='48px')
+		self.focus = TextBox()
+		self.focus.addStyleName('focus-sink')
+		self.add(self.wait)
 		self.add(self.menu)
+		self.add(self.focus)
+		self.wait.setVisible(False)
 		self.owner = owner
 		self.owner.add(self)
 		self.addStyleName('waiting')
@@ -1178,12 +1496,20 @@ class Waiting(VerticalPanel):
 		self.setHorizontalAlignment(HasAlignment.ALIGN_CENTER)
 
 	def start(self):
-		self.remove(self.menu)
-		self.add(self.wait)
+		self.focus.setFocus(True)
+		# self.remove(self.focus)
+		# self.remove(self.menu)
+		# self.add(self.wait)
+		self.menu.setVisible(False)
+		self.wait.setVisible(True)
+
 
 	def stop(self):
-		self.remove(self.wait)
-		self.add(self.menu)
+		# self.remove(self.wait)
+		# self.add(self.focus)
+		# self.add(self.menu)
+		self.wait.setVisible(False)
+		self.menu.setVisible(True)
 
 	def setGeneralMenuPanel(self, menu_panel):
 		self.menu.addClickListener(menu_panel.display_menu)
@@ -1229,16 +1555,19 @@ class MenuPanelItem(HorizontalPanel):
 		self.fp.add(self.hp)
 		self.hp.setHeight('100%')
 		self.hp.setVerticalAlignment(HasAlignment.ALIGN_MIDDLE)
+		self.icon = HorizontalPanel()
 		if icon is not None:
-			self.icon = Image(icon)
+			self.icon_image = Image(icon)
 			if width is None:
 				width = '72px'
-			self.icon.setWidth(width)
+			self.icon_image.setWidth(width)
 			if height is None:
 				height = '48px'
-			self.icon.setHeight(height)
-		else:
-			self.icon = SimplePanel()
+			self.icon_image.setHeight(height)
+			self.icon.add(self.icon_image)
+			self.icon.setCellVerticalAlignment(self.icon_image, HasAlignment.ALIGN_MIDDLE)
+			self.icon.setCellHorizontalAlignment(self.icon_image, HasAlignment.ALIGN_CENTER)
+
 		self.icon.addStyleName('menu-item-icon')
 		self.hp.add(self.icon)
 		self.html = HTML(text)
@@ -1253,7 +1582,7 @@ class MenuPanelItem(HorizontalPanel):
 		self.fp.addClickListener(self.onClick)
 
 	def onClick(self):
-		self.owner.hide()
+		self.owner.onClick()
 		if self.listener is not None:
 			self.listener(self)
 
@@ -1280,7 +1609,7 @@ class MenuPanel(FocusPanel):
 	 * action_icon: url of the action icon for the item, or None (optional)
 	 * action_listener: action listener for the item (optional)
 	"""
-	def __init__(self, general_menu_panel, definition, title='Menu', icon=None):
+	def __init__(self, general_menu_panel, definition, title='Menu', icon=None, on_click=None):
 		FocusPanel.__init__(self)
 		self.vp = VerticalPanel(self)
 		self.add(self.vp)
@@ -1291,6 +1620,7 @@ class MenuPanel(FocusPanel):
 		self.vp.setWidth('100%')
 		self.items = []
 		self.itemdict = {}
+		self.on_click = on_click
 		if title is not None:
 			self.header = MenuPanelItem(
 				self,
@@ -1308,6 +1638,8 @@ class MenuPanel(FocusPanel):
 				text=d['text'],
 				listener=d['listener'],
 				icon=getdefault(d, 'icon', None),
+				width=getdefault(d, 'width', None),
+				height=getdefault(d, 'height', None),
 				action_icon=getdefault(d, 'action_icon', None),
 				action_listener=getdefault(d, 'action_listener', None),
 			)
@@ -1344,6 +1676,29 @@ class MenuPanel(FocusPanel):
 
 	def onClick(self):
 		self.hide()
+		if self.on_click is not None:
+			self.on_click()
+
+
+class MenuPopupPanel(PopupPanel):
+	def __init__(self, definition, x, y, anchor='tl'):
+		"""
+		Create and display a popup with a MenuPanel
+
+		definition: menu panel definition, as in MenuPanel init
+		x, y: anchor point
+		anchor: anchor corner, in ['tl', 'tr', 'bl', 'br']
+		"""
+		PopupPanel.__init__(self, True, modal=False)
+		self.menu = MenuPanel(None, definition, None, on_click=self.hide)
+		self.addStyleName('menu-popup-panel')
+		self.add(self.menu)
+		self.show()
+		if 'r' in anchor:
+			x = x - int(self.getClientWidth())
+		if 'b' in anchor:
+			y = y - int(self.getClientHeight())
+		self.setPopupPosition(x, y)
 
 
 class GeneralMenuPanel(SimplePanel):
@@ -1377,7 +1732,7 @@ class PreferitiImage(Image):
 	def __init__(self, tipo, nome, descrizione, esiste, client):
 		self.esiste = esiste
 		self.prepareUrl()
-		Image.__init__(self, self.url)
+		Image.__init__(self, self.url, Width='18px', Height='18px')
 		self.tipo = tipo
 		self.nome = nome
 		self.descrizione = descrizione
@@ -1396,9 +1751,9 @@ class PreferitiImage(Image):
 
 	def prepareUrl(self):
 		if self.esiste:
-			self.url = 'preferiti.png'
+			self.url = 'palina_preferita_on.png'
 		else:
-			self.url = 'preferiti-off.png'
+			self.url = 'palina_preferita_off.png'
 
 	def onClientDone(self, res):
 		get_control().setPreferiti(res['fav'])
@@ -1408,7 +1763,7 @@ def ask_login():
 		_('Accesso richiesto'),
 		_("Per continuare devi effettuare l'accesso."),
 		[
-			(_('Accedi o registrati'), get_control().onLogin, None),
+			(_('Accedi'), get_control().onLogin, None),
 			(_('Annulla'), None, None),
 		]
 	).show()
@@ -1435,47 +1790,499 @@ def enforce_login(f):
 			return f(*args, **kwargs)
 	return g
 
-# class PausableTimer(Timer):
-# 	timers = []
-#
-# 	def __init__(self, delayMillis=0, notify=None):
-# 		self.delayMillis = delayMillis
-# 		self.notify = notify
-# 		Timer.__init__(self, delayMillis, notify)
-# 		PausableTimer.timers.append(self)
-# 		if delayMillis == 0:
-# 			self.modo = 0
-# 		else:
-# 			self.modo = 1
-# 		self.paused = None
-#
-# 	def call(self):
-# 		if self.notify is not None:
-# 			self.notify()
-# 		else:
-# 			self.run()
-#
-# 	def schedule(self, delayMillis):
-# 		self.modo = 1
-# 		self.delayMillis = delayMillis
-# 		Timer.schedule(self, delayMillis)
-#
-# 	def cancel(self):
-# 		self.modo = 0
-# 		Timer.cancel(self)
-#
-# 	def scheduleRepeating(self, periodMillis):
-# 		self.modo = 2
-# 		self.delayMillis = periodMillis
-# 		Timer.scheduleRepeating(self, periodMillis)
-#
-# 	def pause(self):
-# 		if self.paused is None:
-# 			self.paused = datetime.now()
-# 			Timer.cancel(self)
-#
-# 	def resume(self):
-# 		if self.paused is not None:
-# 			elapsed = (datetime.now() - self.paused).total_seconds() * 1000
-# 			self.paused = None
-# 			if elapsed <
+class PausableTimer(Timer):
+	timers = []
+
+	def __init__(self, delayMillis=0, notify=None):
+		self.delayMillis = delayMillis
+		self.notify = notify
+		Timer.__init__(self, delayMillis, self.call)
+		PausableTimer.timers.append(self)
+		if delayMillis == 0:
+			self.modo = 0
+		else:
+			self.modo = 1
+		self.paused = None
+
+	def call(self):
+		# prnt("Timer calling")
+		# prnt(self.paused)
+		# prnt(self.modo)
+		if self.paused is None and self.modo > 0:
+			if self.notify is not None:
+				self.notify()
+			else:
+				self.run()
+
+	def schedule(self, delayMillis):
+		# prnt("Timer scheduling")
+		# prnt(self.paused)
+		# prnt(self.modo)
+
+		Timer.schedule(self, delayMillis, self.call)
+		self.modo = 1
+		self.delayMillis = delayMillis
+
+	def cancel(self):
+		# prnt("Timer cancel")
+		# prnt(self.paused)
+		# prnt(self.modo)
+
+		self.modo = 0
+		Timer.cancel(self)
+
+	def scheduleRepeating(self, periodMillis):
+		# prnt("Timer scheduling repeating")
+		# prnt(self.paused)
+		# prnt(self.modo)
+
+		self.modo = 2
+		self.delayMillis = periodMillis
+		Timer.scheduleRepeating(self, periodMillis, self.call)
+
+	def pause(self):
+		# prnt("Timer pausinig")
+		# prnt(self.paused)
+		# prnt(self.modo)
+		if self.paused is None and self.modo > 0:
+			self.paused = datetime.now()
+			Timer.cancel(self)
+
+	def resume(self):
+		# prnt("Timer resuming")
+		# prnt(self.paused)
+		# prnt(self.modo)
+		if self.paused is not None and self.modo > 0:
+			# elapsed = (datetime.now() - self.paused).total_seconds() * 1000
+			self.paused = None
+			if True: # elapsed > self.delayMillis:
+				self.call()
+			if self.modo == 1:
+				Timer.schedule(self, self.delayMillis, self.call)
+				self.modo = 1
+			elif self.modo == 2:
+				Timer.scheduleRepeating(self, self.delayMillis, self.call)
+				self.modo = 2
+
+	def __del__(self):
+		PausableTimer.timers.remove(self)
+
+def pause_all_timers():
+	# prnt("Pausing all timers")
+	# prnt(PausableTimer.timers)
+	for t in PausableTimer.timers:
+		t.pause()
+
+def resume_all_timers():
+	# prnt("Resuming all timers")
+	# prnt(PausableTimer.timers)
+	for t in PausableTimer.timers:
+		t.resume()
+
+
+class PaginatedPanelPage(object):
+	"""
+	Mixin for widgets to be added to a PaginatedPanel
+	"""
+	def notifyShow(self):
+		pass
+
+	def initPaginatedPanelPage(self, pp, index):
+		self.paginated_panel = pp
+		self.paginated_panel_index = index
+
+	def isShown(self):
+		return self.paginated_panel.isShown(self)
+
+	def insertMenuItem(self, position, description):
+		"""
+		Add a menu item at position position
+
+		Description is in the format of MenuPanel description
+		"""
+		self.paginated_panel.menus[self.paginated_panel_index].insert(position, description)
+		self.paginated_panel.update()
+
+
+class PaginatedPanel(VerticalPanel):
+	def __init__(self, height=None, close_callback=None):
+		VerticalPanel.__init__(self)
+		self.setWidth('100%')
+		if height is not None:
+			self.setHeight(height)
+
+		self.title_hp = HorizontalPanel()
+		self.title_hp.setWidth('100%')
+		self.title_hp.addStyleName('paginated-title')
+		self.title = HTML()
+		self.title_hp.add(self.title)
+		self.title_hp.setCellVerticalAlignment(self.title, HasAlignment.ALIGN_MIDDLE)
+		self.title_hp.setCellWidth(self.title, '100%')
+		self.detail = Image('paginated-details.png', Width='18px', Height='18px')
+		self.detail.setStyleAttribute('margin-right', '6px')
+		self.detail.addClickListener(self.onDetails)
+		self.detail.setVisible(False)
+		self.title_hp.add(self.detail)
+		self.title_hp.setCellVerticalAlignment(self.detail, HasAlignment.ALIGN_MIDDLE)
+		self.menu = Image('paginated-menu.png', Width='18px', Height='18px')
+		self.menu.addClickListener(self.onMenu)
+		self.title_hp.add(self.menu)
+		self.title_hp.setCellVerticalAlignment(self.menu, HasAlignment.ALIGN_MIDDLE)
+		self.close = Image('paginated-close.png', Width='18px', Height='18px')
+		self.close.addClickListener(self.onClose)
+		self.title_hp.add(self.close)
+		self.title_hp.setCellVerticalAlignment(self.close, HasAlignment.ALIGN_MIDDLE)
+
+		VerticalPanel.add(self, self.title_hp)
+		self.setCellWidth(self.title_hp, '100%')
+
+		self.hp = HorizontalPanel()
+		self.hp.addStyleName('paginated-panel')
+		self.hp.setWidth('100%')
+	
+		self.left = Button('<img src="paginated_left.png" width="35px" height="45px"/>', self.onLeft)
+		self.left.addStyleName('paginated-arrow')
+		self.left.addStyleName('paginated-inactive')
+		self.left.setHeight('100%')
+		self.hp.add(self.left)
+		self.hp.setCellVerticalAlignment(self.left, HasAlignment.ALIGN_MIDDLE)
+
+		self.sp = SimplePanel()
+		self.hp.add(self.sp)
+		self.hp.setCellWidth(self.sp, '100%')
+		self.hp.setCellHeight(self.sp, '100%')
+		
+		self.right = Button('<img src="paginated_right.png" width="35px" height="45px"/>', self.onRight)
+		self.right.addStyleName('paginated-arrow')
+		self.right.addStyleName('paginated-inactive')
+		self.right.setHeight('100%')
+		self.hp.add(self.right)
+		self.hp.setCellVerticalAlignment(self.right, HasAlignment.ALIGN_MIDDLE)
+
+		VerticalPanel.add(self, self.hp)
+		self.setCellWidth(self.hp, '100%')
+		
+		self.widgets = []
+		self.index = 0
+		self.callbacks = []
+		self.titles = []
+		self.details = []
+		self.menus = []
+		self.close_callback = close_callback
+
+	def add(self, widget, callback=None, title='', details=None, menu_description=None):
+		"""
+		Add a page to the panel
+
+		widget: page widget
+		callback:
+		title: page title
+		details: callback, called when user clicks on title or on details icon
+		menu_description: description of a context menu, in the format of MenuPanel description (see MenuPanel init doc)
+		"""
+		index = len(self.widgets)
+		self.widgets.append(widget)
+		self.callbacks.append(callback)
+		self.titles.append(title)
+		self.details.append(details)
+		if menu_description is not None:
+			menu_description.append({
+				'id': 'close',
+				'text': _('Chiudi'),
+				'listener': self.onClose,
+			})
+		self.menus.append(menu_description)
+		if index == 0:
+			self.update(False)
+		if index == 1:
+			self.right.removeStyleName('paginated-inactive')
+		widget.initPaginatedPanelPage(self, index)
+		return index
+
+
+	def onLeft(self):
+		if self.index > 0:
+			self.index -= 1
+			self.update()
+
+	def onRight(self):
+		if self.index < len(self.widgets) - 1:
+			self.index += 1
+			self.update()
+
+	def update(self, call_callback=True):
+		i = self.index
+		widget = self.widgets[i]
+		widget.notifyShow()
+		self.sp.setWidget(widget)
+		self.title.setHTML(self.titles[i])
+		self.detail.setVisible(self.details[i] is not None)
+		self.close.setVisible(self.menus[i] is None)
+		self.menu.setVisible(self.menus[i] is not None)
+		if i == 0:
+			self.left.addStyleName('paginated-inactive')
+		else:
+			self.left.removeStyleName('paginated-inactive')
+		if i == len(self.widgets) - 1:
+			self.right.addStyleName('paginated-inactive')
+		else:
+			self.right.removeStyleName('paginated-inactive')
+		c = self.callbacks[i]
+		if call_callback and c is not None:
+			c()
+
+	def selectIndex(self, i):
+		if i >= 0 and i < len(self.widgets):
+			self.index = i
+			self.update()
+
+	def onDetails(self):
+		details = self.details[self.index]
+		if details is not None:
+			details()
+
+	def onMenu(self):
+		l = int(self.menu.getAbsoluteLeft())
+		t = int(self.menu.getAbsoluteTop())
+		MenuPopupPanel(self.menus[self.index], l, t, 'br')
+
+
+	def onClose(self):
+		self.setVisible(False)
+		if self.close_callback is not None:
+			self.close_callback()
+
+	def isShown(self, widget):
+		return widget.paginated_panel_index == self.index
+
+	@classmethod
+	def generaPuntiPassi(cls, passo, totali):
+		"""
+		Genera tanti pallini quanti sono i passi, e colora il passo corrente
+
+		totali: numero totale di passi
+		passo: passo corrente, partendo da 0; oppure -1 (nessun passo corrente)
+		"""
+		out = ['<img src="paginated-dot-%s.png" width="14px" height="14px" style="vertical-align:middle;"/>' % ('full' if i == passo else 'blank') for i in range(totali)]
+		return "&nbsp;".join(out)
+
+
+class ImageTextButton(Button):
+	def __init__(self, img, img_width, img_height, text, listener):
+		html = """
+			<table class="text-image-button-table">
+				<tr>
+					<td><img src="%(img)s" height="%(height)s"/></td>
+					<td class="text-image-button-text">%(text)s</td>
+				</tr>
+			</table>
+		""" % {'img': img, 'width': img_width, 'height': img_height, 'text': text}
+		Button.__init__(self, html, listener)
+		self.addStyleName('text-image-button')
+
+
+class LuogoPanel(VerticalPanel, PaginatedPanelPage):
+	active_marker = None
+
+	def __init__(self, owner, on_percorso_da, on_percorso_a, on_cerca_linea, on_cerca_luogo):
+		VerticalPanel.__init__(self)
+		self.owner = owner
+		self.setSize('100%', '100%')
+		self.base = VP(
+			self,
+			sub=[
+				{
+					'class': GP,
+					'column_count': 2,
+					'name': 'bottoni',
+					'sub': [
+						{
+							'class': ImageTextButton,
+							'call_setHeight': (['48px'], {}),
+							'width': '50%',
+							'args': [
+								'azioni_luogo/percorso_da.png',
+								'36px',
+								'36px',
+								_('Percorso<br />da qui'),
+								on_percorso_da,
+							],
+						},
+						{
+							'class': ImageTextButton,
+							'call_setHeight': (['48px'], {}),
+							'width': '50%',
+							'args': [
+								'azioni_luogo/linea.png',
+								'36px',
+								'36px',
+								_('Fermate<br />vicine'),
+								on_cerca_linea,
+							],
+						},
+						{
+							'class': ImageTextButton,
+							'call_setHeight': (['48px'], {}),
+							'width': '50%',
+							'args': [
+								'azioni_luogo/percorso_a.png',
+								'36px',
+								'36px',
+								_('Percorso<br />fino a qui'),
+								on_percorso_a,
+							],
+						},
+						{
+							'class': ImageTextButton,
+							'call_setHeight': (['48px'], {}),
+							'width': '50%',
+							'args': [
+								'azioni_luogo/luogo.png',
+								'36px',
+								'36px',
+								_('Luoghi<br />vicini'),
+								on_cerca_luogo,
+							],
+						},
+					],
+				},
+			],
+			add_to_owner=True,
+		)
+
+class CheckList(VerticalPanel):
+	def __init__(self, items):
+		"""
+		items: list of triples (id, text, checked)
+		"""
+		VerticalPanel.__init__(self)
+		self.items = items
+		self.cbs = []
+		self.index = {}
+		i = 0
+		for iid, text, checked in self.items:
+			cb = CheckBox(text)
+			cb.setChecked(checked)
+			self.add(cb)
+			self.index[iid] = i
+			self.cbs.append(cb)
+			i += 1
+
+	def getCheckboxById(self, iid):
+		return self.cbs[self.index[iid]]
+
+	def getSelectedItems(self):
+		"""
+		Return list of id's of selected items
+		"""
+		ret = []
+
+		n = len(self.items)
+		for i in range(n):
+			if self.cbs[i].isChecked():
+				ret.append(self.items[i][0])
+
+		return ret
+
+class LocalNotification(object):
+	counter = 0
+
+	def __init__(self, onNotification=None):
+		"""
+		Each Notification instance handles 1 local notification
+		"""
+		object.__init__(self)
+		self.counter += 1
+		self.id = self.counter
+		self.onNotificationDone = onNotification
+
+
+	def schedule(self, delay, message, title=_("Notifica")):
+		"""
+		Schedule (or reschedule) notification.
+
+		delay in millisec
+		"""
+		JS("""
+			var now = new Date().getTime();
+			var t = new Date(now + delay);
+			$wnd.plugin.notification.local.add({
+				id:	self.id,
+				date: t,
+				message: message,
+				title: title,
+			});
+		""")
+		if self.onNotificationDone is not None:
+			JS("""
+				$wnd.plugin.notification.local.ontrigger = function(id, state, json) {self.onNotificationDone()};
+			""")
+
+	def cancel(self):
+		"""
+		Cancel modification
+		"""
+		JS("""
+			$wnd.plugin.notification.local.cancel(self.id);
+		""")
+
+class WebNotification(object):
+	counter = 0
+
+	def __init__(self, onNotification=None):
+		"""
+		Each Notification instance handles 1 local notification
+		"""
+		object.__init__(self)
+		self.onNotificationDone = onNotification
+		self.timer = Timer(notify=self.onTimer)
+
+	def onTimer(self):
+		if self.onNotificationDone is not None:
+			self.onNotificationDone()
+		MessageDialog(self.message, self.title)
+
+	def schedule(self, delay, message, title=_("Notifica")):
+		"""
+		Schedule (or reschedule) notification.
+
+		delay in millisec
+		"""
+		self.message = message
+		self.title = title
+		self.timer.cancel()
+		if delay > 0:
+			self.timer.schedule(delay)
+		elif delay == 0:
+			self.onTimer()
+
+	def cancel(self):
+		"""
+		Cancel modification
+		"""
+		self.timer.cancel()
+
+
+class ButtonsPanel(HorizontalPanel):
+	def __init__(self, buttons):
+		"""
+		Creates a panel with buttons and spacing between them.
+
+		buttons is a list of pairs (html, listener)
+		"""
+		HorizontalPanel.__init__(self)
+		self.setWidth('100%')
+		self.buttons = []
+		n = len(buttons)
+		width = "%d%%" % (int(100 / n) - 1)
+
+		for i in range(n):
+			html, listener = buttons[i]
+			b = Button(html, listener)
+			b.setWidth('100%')
+			self.add(b)
+			self.setCellWidth(b, width)
+			if i < n - 1:
+				self.add(HTML('&nbsp;'))
+			self.buttons.append(b)
+

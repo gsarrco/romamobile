@@ -115,3 +115,7 @@ class NewsPanel(VerticalPanel):
 	def hide(self):
 		self.owner.display_menu(False)
 
+	def onClick(self):
+		self.hide()
+
+

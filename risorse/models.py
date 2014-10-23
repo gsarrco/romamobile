@@ -104,7 +104,7 @@ class RisorsaCustom(Risorsa):
 class EsercizioCommerciale(Risorsa):
 	GeoModel = gis.Punto
 	indirizzo = models.CharField(max_length=255)
-	icon_auto = 'parcheggi.gif'
+	icon_auto = 'http://muovi.roma.it/percorso/js/parcheggi.gif'
 	icon_size_auto = (16, 16)
 	
 	def __unicode__(self):
@@ -128,7 +128,7 @@ class Farmacia(Risorsa):
 	GeoModel = gis.Punto
 	indirizzo = models.CharField(max_length=255)
 	telefono = models.CharField(max_length=255)
-	icon_auto = 'farmacia.png'
+	icon_auto = 'http://muovi.roma.it/percorso/js/farmacia.png'
 	icon_size_auto = (20, 20)
 	
 	def __unicode__(self):
@@ -151,7 +151,7 @@ class Farmacia(Risorsa):
 class CarSharing(Risorsa):
 	tipo_auto = 'Parcheggi car sharing'
 	GeoModel = gis.Punto
-	icon_auto = 'carsharing.png'
+	icon_auto = 'http://muovi.roma.it/percorso/js/carsharing.png'
 	icon_size_auto = (16, 16)
 	
 	def __unicode__(self):
@@ -173,7 +173,7 @@ except Exception:
 class Biblioteca(Risorsa):
 	tipo_auto = 'Biblioteche di Roma'
 	GeoModel = gis.Punto
-	icon_auto = 'biblio.png'
+	icon_auto = 'http://muovi.roma.it/percorso/js/biblio.png'
 	icon_size_auto = (24, 24)
 	municipio = models.CharField(max_length=63, blank=True, null=True)
 	indirizzo = models.CharField(max_length=127, blank=True, null=True)
@@ -190,16 +190,25 @@ class Biblioteca(Risorsa):
 		return self.nome_luogo
 
 	def descrizione(self):
+		tipo = ""
+		if self.tipo_biblio != '':
+			if self.tipo_biblio == 'point':
+				tipo = 'Bibliopoint<br />'
+			else:
+				tipo = 'Biblioteca ' + self.tipo_biblio + "<br />"
+
+		d = instance2dict(self)
+		d['tipo'] = tipo
+
 		return """
-			<a href="%(url_scheda)s">%(nome_luogo)s</a><br />
+			<a target="_blank" href="%(url_scheda)s">Orari e servizi</a><br />%(tipo)s
 			%(municipio)s - %(zona)s<br />
 			%(indirizzo)s<br />
 			%(cap)s<br />
-			Tel. %(tel)s<br />
-			Email: %(email)s<br />
 			Accessibilit&agrave;: %(accessibilita)s<br /><br />
-			<a href="%(url_cerca)s">Cerca libro</a><br />
-		""" % instance2dict(self)
+			<a target="_blank" href="http://www.bibliotu.it">Cerca libro</a><br />
+			<a target="_blank" href="http://www.spreaker.com/user/bibliotechediroma">Ascolta BiblioInforma Notizie</a><br />
+		""" % d
 
 	class Meta:
 		verbose_name = u'Biblioteca di Roma'

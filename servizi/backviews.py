@@ -23,7 +23,8 @@ from models import *
 from django.db import models, connections, transaction
 from paline.models import IndirizzoAutocompl, ParolaIndirizzoAutocompl, PalinaPreferita
 from percorso.models import IndirizzoPreferito
-from servizi.utils import dict_cursor, project, datetime2mysql, group_required
+from autenticazione.models import TokenApp, TOKEN_APP_LENGTH
+from servizi.utils import dict_cursor, project, datetime2mysql, group_required, generate_key
 from servizi.views import get_fav, login_app_id_sito, delete_fav
 from datetime import datetime, timedelta, time, date
 from jsonrpc import jsonrpc_method
@@ -36,7 +37,7 @@ import importlib
 from carpooling import models as carpooling
 session_engine = importlib.import_module(settings.SESSION_ENGINE)
 from django.contrib.auth import login, authenticate, logout, get_user
-
+import traceback
 
 login_ws_url = 'http://login.muoversiaroma.it/Handler.ashx'
 logout_url = 'http://login.muoversiaroma.it/Logout.aspx?IdSito=%d' % settings.ID_SITO
@@ -138,30 +139,63 @@ def get_user_groups(request):
 
 
 @jsonrpc_method('servizi_app_init', safe=True)
-def servizi_app_init(request, session_key, urlparams):
+def servizi_app_init(request, session_or_token, urlparams):
 	"""
 	Inizializzazione app: recupera la sessione e restituisce info su utente e parametri.
 
-	Se session_key vale '', utilizza i cookie per recuperare la sessione.
-	Se session_key vale '-', effettua il logout e crea una nuova sessione
+	session_or_token è il token_app (persistente) per gli utenti registrati, oppure una chiave di sessione (temporanea)
+	Se session_or_token vale '', utilizza i cookie per recuperare la sessione.
+	Se session_or_token vale '-', effettua il logout e crea una nuova sessione
 	"""
 	out = {}
 
-	# print "Input session key:", session_key
+	old_user = request.user
+
+	print "Input session key:", session_or_token
 
 	# Logout and clear session
-	if session_key == '-':
+	if session_or_token == '-':
 		logout(request)
+		out['session_key'] = request.session.session_key
 	# Restore session, if any
-	elif False: #session_key != '': # TODO: aggiornato il client, ripristinare
+	elif session_or_token == '':
+		# La sessione è stata aperta implicitamente (tramite cookie). Se l'utente è autenticato,
+		# rendila persistente generando un token_app
+		# print "Nessun token esplicito, cerco implicitamente"
+		if request.user.is_authenticated():
+			# print "Autenticato, genero token"
+			t = TokenApp(
+				user=request.user,
+				token_app=generate_key(TOKEN_APP_LENGTH),
+				ultimo_accesso=datetime.now(),
+			)
+			t.save()
+			out['session_key'] = t.token_app
+		else:
+			out['session_key'] = request.session.session_key
+	else:
+		# session_or_token passato esplicitamente, determina se è un token o una sessione
 		try:
-			request.session = session_engine.SessionStore(session_key=session_key)
-			request.user = get_user(request)
+			# print "Cerco token esplicito"
+			if len(session_or_token) == TOKEN_APP_LENGTH:
+				t = TokenApp.objects.get(token_app=session_or_token)
+				t.ultimo_accesso = datetime.now()
+				t.user.backend='django.contrib.auth.backends.ModelBackend'
+				login(request, t.user)
+				out['session_key'] = session_or_token
+			else:
+				raise Exception()
 		except:
-			pass
-
-	request.session.modified = True
-	out['session_key'] = request.session.session_key
+			# traceback.print_exc()
+			# print "Cerco sessione"
+			try:
+				request.session = session_engine.SessionStore(session_key=session_or_token)
+				request.user = get_user(request)
+				request.session.modified = True
+			except:
+				pass
+				# print "Sessione non trovata"
+			out['session_key'] = request.session.session_key
 
 	# Params decode
 	d = urlparse.parse_qs(urlparams)
@@ -180,6 +214,8 @@ def servizi_app_init(request, session_key, urlparams):
 	else:
 		out['user'] = None
 
+	out['utente_cambiato'] = u != old_user
+
 	# Favorites
 	fav = get_fav(request)
 	fav_list = [(k, fav[k][0], fav[k][1]) for k in fav]
@@ -188,6 +224,22 @@ def servizi_app_init(request, session_key, urlparams):
 	# print "Output session key:", out['session_key']
 
 	return out
+
+@jsonrpc_method('servizi_app_init_2', safe=True)
+def servizi_app_init_2(request, opzioni, urlparams):
+	session_or_token = opzioni['session_or_token']
+	res = servizi_app_init(request, session_or_token, urlparams)
+	v = VersioneApp.objects.get(versione=opzioni['versione'])
+	res['deprecata'] = False
+	res['aggiornamento'] = False
+	res['messaggio_custom'] = v.messaggio_custom
+	n = datetime.now()
+	if v.orario_deprecata is not None and v.orario_deprecata <= n:
+		res['deprecata'] = True
+	elif len(VersioneApp.objects.filter(beta=False, orario_rilascio__gt=v.orario_rilascio, orario_rilascio__lt=n)) > 0:
+		res['aggiornamento'] = True
+	return res
+
 
 @jsonrpc_method('servizi_app_login', safe=True)
 def app_login(request, temp_token):

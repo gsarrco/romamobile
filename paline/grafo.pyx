@@ -802,10 +802,88 @@ cdef class Dijkstra(object):
 					unr.add(v)
 			return unr
 			
-		return out	
-	
+		return out
 
-	cpdef cerca_vicini(self, NodoDijkstra s, risultati, double max_distanza, object dep_time=None, object opt=opzioni_cp, object s_context=context_cp):
+
+	cpdef archi_vicini(self, NodoDijkstra s, double max_distanza, object dep_time=None, object opt=opzioni_cp, object s_context=context_cp):
+		"""
+		Return edges near to node s
+		"""
+		cdef NodoDijkstra v, w
+		cdef long cnt
+		cdef double min_priority, new_prio, inc_prio
+		self.cleanup()
+		self.versione_cp += 1
+		cdef long versione_cp = self.versione_cp
+		opt['dijkstra'] = self
+		opt['rev'] = False
+		vars = self.vars
+		sv = <DijkstraVars>(vars[s.dijkstra_index])
+		sv.dist = 0
+		dist = 0
+		ai = ArcoIngresso(self.pool, s)
+		aiv = <DijkstraVars>(vars[ai.s.dijkstra_index])
+		aiv.context_i = 0
+		self.context[0] = s_context
+		sv.pred = ai
+		sv.time = dep_time if dep_time is not None else datetime.now()
+		sv.versione_cp = self.versione_cp
+		self.pq.insert(s, sv, 0)
+		cnt = 0
+		out = []
+		while not self.pq.is_empty() and dist < max_distanza:
+			cnt += 1
+			min_priority = self.pq.get_min_priority()
+			v = self.pq.delete_min()
+			vv = <DijkstraVars>(vars[v.dijkstra_index])
+			pred = vv.pred
+			w = <NodoDijkstra>(pred.s)
+			wv = <DijkstraVars>(vars[w.dijkstra_index])
+			vv.context_i = wv.context_i
+			# pprint(v.get_context(opt))
+			pred.aggiorna_contesto(opt)
+			time = vv.time
+			#print "Prio", min_priority
+			#print "Time", time
+			dist = vv.dist
+			vv.settled = True
+			for e in v.fstar:
+				if e.attraversabile_vicini(opt):
+					out.append(e)
+					w = <NodoDijkstra>(e.t)
+					wv = <DijkstraVars>(vars[w.dijkstra_index])
+					if wv.versione_cp != versione_cp:
+						inc_prio, tempo_arco = e.get_tempo(time, opt)
+						if inc_prio >= 0:
+							#print "inc_prio nuovo nodo", inc_prio
+							wv.versione_cp = versione_cp
+							wv.pred = e
+							wv.settled = False
+							new_prio = min_priority + inc_prio
+							wv.prio = new_prio
+							wv.time = time + timedelta(seconds=tempo_arco)
+							wv.dist = dist + e.get_distanza()
+							self.pq.insert(w, wv, new_prio)
+					elif not wv.settled:
+						inc_prio, tempo_arco = e.get_tempo(time, opt)
+						#print "inc_prio nodo esistente", inc_prio
+						if tempo_arco >= 0:
+							new_prio = min_priority + inc_prio
+							if new_prio < wv.prio:
+								wv.prio = new_prio
+								wv.time = time + timedelta(seconds=tempo_arco)
+								wv.dist = dist + e.get_distanza()
+								wv.pred = e
+								self.pq.decrease_key(wv, new_prio)
+
+		sv.pred = None
+		self.pool.rm_nodo(ai.s)
+
+		# print "Dijkstra (near edges) done, %d nodes reached" % (cnt,)
+		return out
+
+
+	cpdef cerca_vicini(self, NodoDijkstra s, risultati, double max_distanza, object dep_time=None, object opt=opzioni_cp, object s_context=context_cp, short solo_pedonale=True):
 		"""
 		Find fastest route from s to all vertices in ts
 		
@@ -825,6 +903,7 @@ cdef class Dijkstra(object):
 		vars = self.vars
 		sv = <DijkstraVars>(vars[s.dijkstra_index])
 		sv.dist = 0
+		dist = 0
 		ai = ArcoIngresso(self.pool, s)
 		aiv = <DijkstraVars>(vars[ai.s.dijkstra_index])
 		aiv.context_i = 0
@@ -834,7 +913,6 @@ cdef class Dijkstra(object):
 		sv.versione_cp = self.versione_cp
 		self.pq.insert(s, sv, 0)
 		cnt = 0
-		out = {}
 		while not self.pq.is_empty() and dist < max_distanza:
 			cnt += 1
 			min_priority = self.pq.get_min_priority()
@@ -855,7 +933,7 @@ cdef class Dijkstra(object):
 			if risultati.completo():
 				break
 			for e in v.fstar:
-				if e.attraversabile_vicini(opt):
+				if e.attraversabile_vicini(opt) or not solo_pedonale:
 					w = <NodoDijkstra>(e.t)
 					wv = <DijkstraVars>(vars[w.dijkstra_index])
 					if wv.versione_cp != versione_cp:

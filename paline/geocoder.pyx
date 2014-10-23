@@ -261,6 +261,24 @@ cdef class SegmentRepo(object):
 					minpoint = &(self.r[i])
 					min = d
 		return (minpoint.eid1, minpoint.eid2, minpoint.eid3)
+
+
+	cpdef find_near_segments(self, double x, double y, double distance):
+		#p = self.proj(x, y)
+		cdef long i
+		cdef double d
+		out = []
+		for i in range(0, self.n):
+			d = segment_point_dist(
+				self.r[i].Ax, self.r[i].Ay,
+				self.r[i].Bx, self.r[i].By,
+				x, y
+			)
+			if d < distance:
+				out.append((self.r[i].eid1, self.r[i].eid2, self.r[i].eid3, d))
+		return out
+
+
 	
 	cpdef find_nearest_segment_and_endpoints(self, double x, double y):
 		#p = self.proj(x, y)
@@ -331,7 +349,48 @@ class Geocoder(object):
 		e = self.graph.archi[(self.edge_type_id, eid1, eid2)]
 		#print "Trovato arco"
 		return e, i
-	
+
+	def _find_near_edges(self, point, distance):
+		res = self.repo.find_near_segments(point[0], point[1], distance)
+		out = []
+		for eid1, eid2, i, d in res:
+			out.append((self.graph.archi[(self.edge_type_id, eid1, eid2)], i, d))
+		#print "Trovato arco"
+		return out
+
+	def _find_near_independent_edges(self, point, max_distance, max_clearance, dijkstra):
+		#print "Cerco archi indipendenti"
+		es = self._find_near_edges(point, max_distance)
+		rm = set()
+		out = []
+		while len(es) > 0:
+			es_new = []
+			dmin = None
+			emin = None
+			imin = None
+			# Escludo gli archi topologicamente vicini agli archi già visitati (essi si trovano nel set rm),
+			# e al contempo cerca l'arco euclidianamente vicino degli archi rimanenti
+			#print "%d archi candidati, %d da escludere" % (len(es), len(rm))
+			for e, i, d in es:
+				if e not in rm:
+					if dmin is None or d < dmin:
+						if dmin is not None:
+							es_new.append((emin, imin, dmin))
+						dmin = d
+						imin = i
+						emin = e
+					else:
+						es_new.append((e, i, d))
+			es = es_new
+			if emin is not None:
+				#print "Aggiunto arco", emin
+				out.append((emin, imin))
+				# emin è l'arco più vicino dei rimanenti. Cerco gli archi topologicamente vicini ad emin
+				rm = set(dijkstra.archi_vicini(emin.t, max_clearance))
+		# pprint(out)
+		#print "Trovati %d archi indipendenti" % len(out)
+		return out
+
 	def find_nearest_edge(self, point):
 		return self._find_nearest_edge(point)[0]
 		
@@ -360,8 +419,6 @@ class Geocoder(object):
 			#print "Tutto"
 			a = punti1[-1]
 			b = punti2[0]
-		if a == b:
-			print "NOOOO! Sono uguali!!!" 
 		#print "Calcolo piede perpendicolare"
 		p_perp = piede_perpendicolare(a[0], a[1], b[0], b[1], p[0], p[1])
 		#print "Ok", p_perp
@@ -373,20 +430,52 @@ class Geocoder(object):
 		a2 = ArcoGeocoder(node, e.t, nome, e.auto, e.velocita, length(punti2), punti2, e.tipo, e.ztl, False)
 		a2r = ArcoGeocoder(e.t, node, nome, False, e.velocita, length(punti2), list(reversed(punti2)), e.tipo, e.ztl, True)
 		return (a1, a2, a1r, a2r)
+
+	def connect_to_node_multi(self, node, dijkstra, edge_distance=100, edge_clearance=400):
+		"""
+		Connect node to all edges within edge_distance, if they cannot be reached within edge_clearance from a previously connected edge
+		"""
+		#print "Connect multi"
+		p = node.get_coordinate()[0]
+		res = self._find_near_independent_edges(p, edge_distance, edge_clearance, dijkstra)
+		out = []
+		#print "i=", i
+		for e, i in res:
+			# TODO: remove from res already visited edges
+			punti1 = e.punti[:i + 1]
+			punti2 = e.punti[i + 1:]
+			#print punti1, punti2
+			if len(punti1) == 0:
+				#print "Solo punti2"
+				a, b = punti2[:2]
+			elif len(punti2) == 0:
+				#print "Solo punti1"
+				a, b = punti1[-2:]
+			else:
+				#print "Tutto"
+				a = punti1[-1]
+				b = punti2[0]
+			#print "Calcolo piede perpendicolare"
+			p_perp = piede_perpendicolare(a[0], a[1], b[0], b[1], p[0], p[1])
+			#print "Ok", p_perp
+			punti1 += [p_perp, p]
+			punti2 = [p, p_perp] + punti2 # [p, p_perp] +
+			nome = e.get_nome()
+			out.append(ArcoGeocoder(e.s, node, nome, e.auto, e.velocita, length(punti1), punti1, e.tipo, e.ztl, True))
+			out.append(ArcoGeocoder(node, e.s, nome, False, e.velocita, length(punti1), list(reversed(punti1)), e.tipo, e.ztl, False))
+			out.append(ArcoGeocoder(node, e.t, nome, e.auto, e.velocita, length(punti2), punti2, e.tipo, e.ztl, False))
+			out.append(ArcoGeocoder(e.t, node, nome, False, e.velocita, length(punti2), list(reversed(punti2)), e.tipo, e.ztl, True))
+		return out
+
 	
 	def connect_to_node_gis(self, node):
 		try:
 			p = node.get_coordinate()[0]
 			point = Point(p[0], p[1], srid=3004)
 			res = gis.geocode(point, StradaTomtom)
-			pprint(res)
 			stt = res['elem']
 			
 			e = self.graph.archi[(self.edge_type_id, stt.eid, stt.count)]
-			parts = res['parts']
-			print "%d parti" % len(parts)
-			print parts
-			print "Foot:", res['foot']
 			parts = res['parts']
 			p_perp = list(res['foot'])
 			if len(parts) > 1:
@@ -418,9 +507,9 @@ class Geocoder(object):
 		return self.connect_to_node_nogis(node)
 	
 		
-	def connect_to_point(self, point):
+	def connect_to_point(self, point, node_type=NodoGeocoder):
 		#print "Creo nodo"
-		node = NodoGeocoder(point)
+		node = node_type(point)
 		#print "Connetto"
 		archi = self.connect_to_node(node)
 		#print "Fatto"

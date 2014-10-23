@@ -429,7 +429,7 @@ def giorni_settimana(escludi=0):
 	return gs
 
 def default(request):
-	orari = Orari(None,"",True,date.today().strftime("%Y-%m-%d"))
+	orari = Orari(None, "", True, date.today().strftime("%Y-%m-%d"))
 	print orari
 	curtime = datetime.today().time()
 	ztl = ZTL.objects.all()
@@ -443,7 +443,7 @@ def default(request):
 			# attiva: la ztl e' attiva in questo momento
 			# passata: l'orario di fine e' precedente all'orario corrente
 			# futura: l'orario di inizio e' successivo all'orario corrente
-			if modificato:
+			if o['modificato']:
 				if f['attiva']:
 					f['stato'] = "attiva"
 				else:
@@ -451,14 +451,14 @@ def default(request):
 			else:
 				if f['inizio_ieri']:
 					if f['ora_fine'] >= curtime:
-							f['stato'] = "attiva"
+						f['stato'] = "attiva"
 					else:
-							f['stato'] = "passata"
+						f['stato'] = "passata"
 				if f['fine_domani']:
 					if f['ora_inizio'] > curtime:
-							f['stato'] = "futura"
+						f['stato'] = "futura"
 					else:
-							f['stato'] = "attiva"
+						f['stato'] = "attiva"
 		
 				if not(f['inizio_ieri']) and not(f['fine_domani']):
 					if f['ora_inizio'] <= curtime and f['ora_fine'] >= curtime:

@@ -35,7 +35,7 @@ import gmaps
 from paline.caricamento_rete.caricamento_rete import lancia_processo_caricamento_rete
 from django.core.mail import send_mail
 import traceback
-from servizi.utils import datetime2mysql, mysql2datetime, model2contenttype, contenttype2model
+from servizi.utils import datetime2mysql, mysql2datetime, model2contenttype, contenttype2model, getdef
 import settings
 from threading import Thread, Lock 
 from Queue import PriorityQueue, Queue
@@ -62,7 +62,10 @@ PERCORSI_INTERSEZIONE = [
 FATTORE_AVANZAMENTO_TEMPO = 0.8
 N_ISTANZE_PARALLELE = 3
 
-class RisultatiVicini(object):
+class PalineVicine(object):
+	"""
+	Contenitore per la ricerca di paline vicine
+	"""
 	def __init__(self, npaline, nlinee):
 		self.npaline = npaline
 		self.nlinee = nlinee
@@ -83,6 +86,9 @@ class RisultatiVicini(object):
 		return (len(self.paline) >= self.npaline) and (len(self.linee) >= self.nlinee)
 	
 class RisorseVicine(object):
+	"""
+	Contenitore per la ricerca di risorse vicine
+	"""
 	def __init__(self, n_ris):
 		self.n_ris = n_ris
 		self.ris = []
@@ -93,7 +99,25 @@ class RisorseVicine(object):
 		
 	def completo(self):
 		# print "Numero luoghi: %d su %d" % (len(self.luoghi), self.n_luoghi)
-		return len(self.ris) >= self.n_ris	
+		return len(self.ris) >= self.n_ris
+
+
+class PuntiVicini(object):
+	"""
+	Contenitore per la ricerca di punti vicini
+	"""
+	def __init__(self, n_ris, nodi):
+		self.n_ris = n_ris
+		self.ris = []
+		self.nodi = nodi
+
+	def aggiungi_punto(self, r, dist, tempo):
+		print "Aggiungo punto"
+		self.ris.append((r, dist, tempo))
+
+	def completo(self):
+		# print "Numero luoghi: %d su %d" % (len(self.luoghi), self.n_luoghi)
+		return len(self.ris) >= self.n_ris
 
 
 class Scheduler(Thread):
@@ -171,6 +195,8 @@ def TrovalineaFactory(
 			if tempo_reale: # Rimuovere per abilitare aggiornamento arrivi in modalità esclusivamente push
 				aggiorna_arrivi = tpl.Aggiornatore(r, timedelta(seconds=20 if tempo_reale else 60), num_threads=3, aggiorna_arrivi=tempo_reale)
 				aggiorna_arrivi.start()
+				aggiorna_upload_fcd = tpl.AggiornatoreUploadFCD(r, intervallo=timedelta(seconds=4*60))
+				aggiorna_upload_fcd.start()
 				
 			if download:
 				aggiorna_download = tpl.AggiornatoreDownload(r, timedelta(seconds=40))
@@ -245,6 +271,8 @@ def TrovalineaFactory(
 				icona_fermata = 'metro_fermata.png'				
 				if p.id_linea == 'MEA':
 					color = '#FF0000'
+				elif p.id_linea == 'MEC':
+					color = '#57B947'
 				else:
 					# Metro B
 					color = '#0000FF'
@@ -499,7 +527,6 @@ def TrovalineaFactory(
 			self._carica_nodo_risorsa(ct_ris, id_ris)
 			
 			
-		#@queued(daemon)
 		def exposed_calcola_percorso(
 			self,
 			punti,
@@ -646,6 +673,207 @@ def TrovalineaFactory(
 					'percorso_auto_salvato': pas.serialize(),
 					#'opzioni': opzioni_cp, # Servirà per la profilazione. Bug con opzioni_cp['tipi_luogo'], non riesce a serializzarlo
 				})
+
+		@autopickle
+		def exposed_cerca_percorso(self, infopoint):
+			# Begin parameters
+			punti = infopoint['punti']
+			auto = getdef(infopoint, 'mezzo', 1)
+			piedi = getdef(infopoint, 'piedi', 1)
+			bus = getdef(infopoint, 'bus', True)
+			metro = getdef(infopoint, 'metro', True)
+			ferro = getdef(infopoint, 'ferro', True)
+			fc = ferro
+			fr = ferro
+			teletrasporto = getdef(infopoint, 'teletrasporto', False)
+			max_distanza_bici = getdef(infopoint, 'max_distanza_bici', 5000)
+			carpooling = getdef(infopoint, 'carpooling', False)
+			data = getdef(infopoint, 'dt', datetime.now())
+			linee_escluse = getdef(infopoint, 'linee_escluse', [])
+			tipi_ris = getdef(infopoint, 'tipi_ris', [])
+			quando = getdef(infopoint, 'quando', 0)
+			carpooling_vincoli = getdef(infopoint, 'carpooling_vincoli', None)
+			ztl = getdef(infopoint, 'ztl', [])
+			cerca_punti = getdef(infopoint, 'cerca_punti', False)
+			# End parameters
+
+			if auto == 3:
+				bici = True
+				auto = 1
+			else:
+				bici = False
+
+			rev = quando == 3
+
+			peer = Peer.objects.filter(daemon=daemon)[0]
+			with peer.get_queue():
+				print "Calcolo il percorso"
+				le = set()
+				tipi_ris = [int(t) for t in tipi_ris]
+				if linee_escluse is not None:
+					for l in linee_escluse:
+						if l in self.rete.linee_equivalenti:
+							le.update(self.rete.linee_equivalenti[l])
+						else:
+							le.add(l)
+				# modi = ['modo_auto', 'modo_tpl', 'modo_pnr', 'modo_bnr', 'modo_carsharing', 'modo_carpooling']
+				if auto == 4:
+					ztl = [z.codice for z in ZTL.objects.all()]
+				ztl = set(ztl)
+				if auto < 2 or auto == 5:
+					opzioni_cp = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, True if auto==0 else False, carpooling, carpooling_vincoli, teletrasporto, ztl=ztl)
+				elif auto == 2:
+					opzioni_cp1 = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, True, carpooling, carpooling_vincoli, teletrasporto, ztl=ztl)
+					opzioni_cp2 = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, False, carpooling, carpooling_vincoli, teletrasporto, ztl=ztl)
+				elif auto == 4:
+					opzioni_cp1 = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, False, carpooling, carpooling_vincoli, teletrasporto, ztl=ztl, tpl=True)
+					opzioni_cp2 = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, True, carpooling, carpooling_vincoli, teletrasporto, True, ztl=ztl, tpl=True)
+
+				nodi_geo = []
+				nodi_del = []
+
+				s_context = {
+					'primo_tratto_bici': bici,
+					'max_distanza_bici': max_distanza_bici,
+					'nome_strada': -1,
+					'carpooling_usato': -1,
+					'distanza_piedi': 0.0,
+				}
+
+				try:
+					if cerca_punti:
+						# Ricerca di punti vicini
+						ds = []
+						start = punti[0]
+						punti = punti[1:]
+
+						# Begin specific params
+						num_ris = getdef(infopoint, 'num_ris', len(punti))
+						max_distanza = getdef(infopoint, 'max_distanza', 5000)
+						# End specific params
+
+						num_ris = min(num_ris, len(punti))
+
+						s, a = self.get_nodi_from_infopoint(start)
+						if len(a) > 0:
+							nodi_del.append(s)
+						for p in punti:
+							d, a = self.get_nodi_from_infopoint(p, tpl.NodoPuntoArrivo)
+							d.nome = p['ricerca']
+							ds.append(d)
+							if len(a) > 0:
+								nodi_del.append(d)
+
+						rv = PuntiVicini(num_ris, ds)
+						opzioni_cp['cerca_vicini'] = 'punti'
+						with self.dijkstra_queue.get_dijkstra() as d:
+							pprint(opzioni_cp)
+							d.cerca_vicini(s, rv, max_distanza, dep_time=data, opt=opzioni_cp, s_context=s_context, solo_pedonale=False)
+
+						out = []
+						for nodo, dist, tempo in rv.ris:
+							out.append({
+								'nome': nodo.nome,
+								'dist': dist,
+								'tempo': (tempo - data).seconds,
+							})
+
+					else:
+						# Cerca percorso ordinario
+
+						for p in punti:
+							s, a = self.get_nodi_from_infopoint(p)
+							nodi_geo.append(s)
+							if len(a) > 0:
+								nodi_del.append(s)
+
+						s = nodi_geo[0]
+						percorso = None
+						pas = carpoolingmodels.PercorsoAutoSalvato(self.grafo)
+						orario_inizio = datetime.now()
+						data_partenza = data
+						for i in range(1, len(nodi_geo)):
+							t = nodi_geo[i]
+
+							if auto not in [2, 4] and len(tipi_ris) == 0:
+								with self.dijkstra_queue.get_dijkstra() as d:
+									percorso, data = d.calcola_e_stampa(s, t, opzioni_cp, data, percorso, s_context=s_context, rev=rev)
+							else:
+								with self.dijkstra_queue.get_dijkstra(2) as d:
+									d1, d2 = d
+									if auto == 2 or auto == 4:
+										opzioni_cp1['cerca_vicini'] = 'risorse'
+										opzioni_cp1['tipi_ris'] = tipi_ris
+										opzioni_cp2['cerca_vicini'] = 'risorse'
+										opzioni_cp2['tipi_ris'] = tipi_ris
+										percorso, data = graph.calcola_e_stampa_vicini_tragitto(d1, d2, s, t, opt=opzioni_cp1, dep_time=data, tr=percorso, s_context=s_context, opt2=opzioni_cp2, mandatory=False)
+									else:
+										opzioni_cp['cerca_vicini'] = 'risorse'
+										opzioni_cp['tipi_ris'] = tipi_ris
+										percorso, data = graph.calcola_e_stampa_vicini_tragitto(d1, d2, s, t, opt=opzioni_cp, dep_time=data, tr=percorso, s_context=s_context)
+
+							percorso.partenza = {}
+							percorso.arrivo = {}
+							tratto.formatta_percorso(percorso, 'auto_salvato', pas, {'flessibilita': timedelta(0)})
+							s = t
+							tempo_calcolo = datetime.now() - orario_inizio
+							paline.LogCercaPercorso(
+								orario_richiesta=orario_inizio,
+								orario_partenza=data_partenza,
+								da=punti[i - 1]['ricerca'],
+								a=punti[i]['ricerca'],
+								piedi=piedi,
+								max_bici=-1 if not bici else max_distanza_bici,
+								tempo_calcolo=tempo_calcolo.seconds + tempo_calcolo.microseconds / 1000000.0,
+								bus=bus,
+								metro=metro,
+								fc=fc,
+								fr=fr,
+								auto=auto,
+								carpooling=carpooling,
+								linee_escluse=",".join(list(linee_escluse))
+							).save()
+
+
+						start = punti[0]
+						stop = punti[-1]
+
+						if 'palina' in start:
+							percorso.partenza['nome_palina'] = self.rete.paline[start['palina']].nome
+							percorso.partenza['id_palina'] = start['palina']
+						else:
+							percorso.partenza['address'] = start['address']
+						if 'palina' in stop:
+							percorso.arrivo['nome_palina'] = self.rete.paline[stop['palina']].nome
+							percorso.arrivo['id_palina'] = stop['palina']
+						else:
+							percorso.arrivo['address'] = stop['address']
+
+				except Exception:
+					print "Errore nel calcola percorso"
+					logging.error(traceback.format_exc())
+
+				for n in nodi_del:
+					self.dijkstra_queue.rm_nodo(n)
+
+				db.reset_queries()
+				if auto < 2 or auto == 5:
+					del opzioni_cp['dijkstra']
+				else:
+					del opzioni_cp1['dijkstra']
+					del opzioni_cp2['dijkstra']
+
+				#percorso.attualizza(datetime.now() + timedelta(hours=12), self.rete, self.grafo, opzioni_cp)
+				if cerca_punti:
+					return out
+
+				else:
+					return {
+						'percorso': percorso,
+						'percorso_auto_salvato': pas.serialize(),
+						#'opzioni': opzioni_cp, # Servirà per la profilazione. Bug con opzioni_cp['tipi_luogo'], non riesce a serializzarlo
+					}
+
 			
 		@autopickle
 		def exposed_attualizza_percorsi(self, d):
@@ -663,7 +891,7 @@ def TrovalineaFactory(
 			lancia_processo_caricamento_rete()
 			db.reset_queries()
 			
-		def get_nodi_from_infopoint(self, info):
+		def get_nodi_from_infopoint(self, info, node_type=geocoder.NodoGeocoder):
 			"""
 			Restituisce nodi ed archi dal geocoding di infopoint.
 			
@@ -677,7 +905,7 @@ def TrovalineaFactory(
 				l = info['risorsa'] # (ct_risorsa, id_risorsa)
 				s = self.grafo.nodi[(6, l[0], l[1])]
 			else:
-				s, archi = self.gc.connect_to_point((info['x'], info['y']))
+				s, archi = self.gc.connect_to_point((info['x'], info['y']), node_type=node_type)
 				self.dijkstra_queue.add_nodo(s)
 				for a in archi:
 					self.dijkstra_queue.add_arco(a)
@@ -688,7 +916,7 @@ def TrovalineaFactory(
 		def exposed_oggetti_vicini(self, start):
 			try:
 				print "Oggetti vicini"
-				rv = RisultatiVicini(5, 10)
+				rv = PalineVicine(7, 12)
 				s, archi_geo = self.get_nodi_from_infopoint(start)
 				opt = copy(graph.opzioni_cp)
 				opt['cerca_vicini'] = 'paline'
@@ -707,7 +935,6 @@ def TrovalineaFactory(
 		def exposed_risorse_vicine(self, start, tipi_ris, num_ris, max_distanza=1000):
 			print "Risorse vicine"
 			mappa = gmaps.Map()
-			bb = BoundingBox()
 			rv = RisorseVicine(num_ris)
 			s, archi_geo = self.get_nodi_from_infopoint(start)
 			opt = copy(graph.opzioni_cp)
@@ -742,7 +969,8 @@ def TrovalineaFactory(
 				infobox="Sono qui",
 			)
 			db.reset_queries()
-			return pickle.dumps(mappa.serialize())		
+			return pickle.dumps(mappa.serialize())
+
 		
 		def exposed_tempi_attesa(self, id_palina):
 			#print "Servo arrivi"
@@ -759,6 +987,27 @@ def TrovalineaFactory(
 					arrivi.append(a2)
 			db.reset_queries()
 			return pickle.dumps(arrivi)
+
+		@autopickle
+		def exposed_primi_arrivi_per_paline(self, param):
+			#print "Servo arrivi"
+			out = {}
+			for id_palina in param['id_paline']:
+				p = self.rete.paline[id_palina]
+				arrivi = []
+				n = datetime.now()
+				for k in p.fermate:
+					f = p.fermate[k]
+					f.rete_percorso.aggiorna_posizione_veicoli()
+					if len(f.arrivi) > 0:
+						a = f.arrivi[0]
+						a2 = copy(a)
+						if 'tratto_percorso' in a2:
+							del a2['tratto_percorso']
+						arrivi.append(a2)
+				out[id_palina] = arrivi
+			db.reset_queries()
+			return out
 
 		def exposed_arrivi_veicolo(self, id_veicolo):
 			#print "Servo arrivi veicolo"

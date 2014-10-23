@@ -308,13 +308,13 @@ def caricaPercorsi(percorsiFile, descrizionePercorsiFile, in_memoria=False, line
 	for row in dbf:
 		descrizioni[str(row['ID_PERCORS'])] = row['DESCRIZION']
 	# Carico percorsi		
-	percorsi_no_orario = set()
+	percorsi_no_orario = {}
 	if percorsiNoOrariFile is not None:
 		print "Carico percorsi senza orario"
 		dbf = Dbf()
 		dbf.openFile(percorsiNoOrariFile)
 		for row in dbf:
-			percorsi_no_orario.add(row['IDPERCORSO'])
+			percorsi_no_orario[row['IDPERCORSO']] = row['NOTEUTENTE']
 	print "Carico percorsi e associazione carteggi"
 	dbf = Dbf()
 	dbf.openFile(percorsiFile)	
@@ -354,6 +354,7 @@ def caricaPercorsi(percorsiFile, descrizionePercorsiFile, in_memoria=False, line
 				carteggio_quoz=carteggio,
 				descrizione=None if id_percorso not in descrizioni else descrizioni[id_percorso],
 				no_orari=id_percorso in percorsi_no_orario,
+				note_no_orari=percorsi_no_orario[id_percorso] if id_percorso in percorsi_no_orario else '',
 				soppresso=soppresso,
 			).save()
 		else:

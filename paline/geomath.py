@@ -88,6 +88,26 @@ def segment_point_dist(A, B, C):
 	else:
 		return distance(A, C)
 
+def azimuth_deg(p1, p2):
+	"""
+	Compute azimuth of segment p1p2, in degrees
+	"""
+	dx = p2[0] - p1[0]
+	dy = p2[1] - p1[1]
+	if dy == 0:
+		if dx > 0:
+			return 90
+		elif dx < 0:
+			return 270
+		else:
+			raise Exception('Cannot compute azimuth of null vector')
+
+	a = math.atan(dx / dy) * 180 / math.pi
+	if a < 0:
+		a += 180
+	if dx < 0 or (dx == 0 and dy < 0):
+		a += 180
+	return a
 
 
 class SegmentRepo(object):

@@ -68,6 +68,36 @@ class Tratto(RPyCAllowRead):
 		for s in self.sub:
 			v = fun_comb(self, v, s.get_funzione_ric(fun_get, val_init, fun_comb))
 		return v
+
+
+	def get_bounding_box(self):
+		n = w = e = s = None
+		ps = self.get_poly()
+
+		for p in ps:
+			if n is None:
+				n = s = p[1]
+				w = e = p[0]
+			else:
+				n = max(p[1], n)
+				s = min(p[1], s)
+				w = min(p[0], w)
+				e = max(p[0], e)
+
+		if n is not None:
+			return (w, n), (e, s)
+
+		return None
+
+	def get_bounding_box_wgs84(self):
+		bb = self.get_bounding_box()
+		if bb is None:
+			return None
+		nw, se = bb
+		nw_w = gbfe_to_wgs84(nw[0], nw[1])
+		se_w = gbfe_to_wgs84(se[0], se[1])
+		return (nw_w, se_w)
+
 		
 	def get_poly(self):
 		return self.get_funzione_ric(
@@ -461,13 +491,19 @@ def formattatore(tipo, tratti, post=False):
 		return k
 	return decoratore
 
-def arrotonda_distanza(n, step=50):
+def arrotonda_distanza(n, step=50, short=False):
 	k = round(n / float(step)) * step
 	if k == 0:
-		return _("meno di %(dist).0f metri") % {'dist': step}
+		if short:
+			return _("%(dist).0f m") % {'dist': step}
+		else:
+			return _("meno di %(dist).0f metri") % {'dist': step}
 	if k > 1000:
 		return _("%(dist).1f km") % {'dist': (k / 1000.0)}
-	return _("%(dist).0f metri") % {'dist': k}
+	if short:
+		return _("%(dist).0f m") % {'dist': k}
+	else:
+		return _("%(dist).0f metri") % {'dist': k}
 
 def arrotonda_tempo(t):
 	if t.second > 30:
@@ -537,7 +573,24 @@ class PercorsoIndicazioniIcona(object):
 		self.ricevi_nodo = False
 	
 	
-	def aggiungi_tratto(self, mezzo, linea, id_linea, dest, url='', id='', tipo_attesa='', tempo_attesa='', info_tratto='', info_tratto_exp='', icona=''):
+	def aggiungi_tratto(
+		self,
+		mezzo,
+		linea,
+		id_linea,
+		dest,
+		url='',
+		id='',
+		tipo_attesa='',
+		tempo_attesa='',
+		info_tratto='',
+		info_tratto_exp='',
+		icona='',
+		bb=None,
+		info_tratto_short='',
+		linea_short=None,
+		dist=0,
+	):
 		"""
 		Mezzi:
 			P: piedi
@@ -563,6 +616,10 @@ class PercorsoIndicazioniIcona(object):
 			'info_tratto_exp': info_tratto_exp,
 			'icona': icona,
 			'numero': self.numero_archi,
+			'bounding_box': bb,
+			'info_tratto_short': info_tratto_short,
+			'linea_short': linea if linea_short is None else linea_short,
+			'dist': dist,
 		}})
 		self.numero_archi += 1
 		self.ricevi_nodo = True
@@ -674,6 +731,7 @@ def format_indicazioni_icona_tratto_interscambio(tratto, ft, opz):
 		info_tratto='',
 		info_tratto_exp='',
 		icona=icona,
+		bb=tratto.get_bounding_box_wgs84(),
 	)
 	ft.aggiungi_nodo(
 		t=tratto.tempo + timedelta(seconds=tratto.tempo_percorrenza),
@@ -698,6 +756,7 @@ def format_indicazioni_icona_tratto_bus(tratto, ft, opz):
 	tempo_attesa = to_min(tratto.get_tempo_attesa())
 	tempo_s = tratto.tempo
 	tempo_t = tratto.tempo + timedelta(seconds=tratto.get_tempo_totale())
+	linea_short = None
 	if isinstance(tratto, TrattoFC):
 		mezzo = 'T'
 		icona = 'treno'
@@ -715,7 +774,8 @@ def format_indicazioni_icona_tratto_bus(tratto, ft, opz):
 	elif isinstance(tratto, TrattoMetro):
 		mezzo = 'M'
 		icona = 'metro'
-		tipo = 'S'		
+		tipo = 'S'
+		linea_short = tratto.descrizione_percorso.split(' ')[1]
 	elif isinstance(tratto, TrattoBus):
 		mezzo = 'B'
 		icona = 'bus'
@@ -761,8 +821,12 @@ def format_indicazioni_icona_tratto_bus(tratto, ft, opz):
 			'fermate': fermate,
 			'tempo': to_min(tratto.get_tempo_percorrenza()),
 		},
+		info_tratto_short=_("%(numero)d ferm.") % {'numero': numero_fermate},
 		info_tratto_exp=dettagli,
-		icona=icona + '.png'
+		icona=icona + '.png',
+		bb=tratto.get_bounding_box_wgs84(),
+		linea_short=linea_short,
+		dist=tratto.get_distanza(),
 	)
 	ft.aggiungi_nodo(
 		t=tempo_t,
@@ -779,7 +843,9 @@ def format_indicazioni_icona_tratto_bus(tratto, ft, opz):
 def format_indicazioni_icona_tratto_piedi(tratto, ft, opz):
 	sub = [s for s in tratto.sub if isinstance(s, TrattoPiediArco)]
 	if len(sub) > 0:
-		distanza = arrotonda_distanza(tratto.get_distanza()).capitalize()
+		distanza_tratto = tratto.get_distanza()
+		distanza = arrotonda_distanza(distanza_tratto).capitalize()
+		distanza_short = arrotonda_distanza(distanza_tratto, short=True).capitalize()
 		id = "O-%s" % sub[0].id_arco
 		dettagli = u''
 		ta = tratto.get_tempo_attesa()
@@ -824,8 +890,11 @@ def format_indicazioni_icona_tratto_piedi(tratto, ft, opz):
 				'distanza': distanza,
 				'tempo': to_min(tratto.get_tempo_percorrenza()),
 			}),
+			info_tratto_short=distanza_short,
 			info_tratto_exp=dettagli,
 			icona=icona,
+			bb=tratto.get_bounding_box_wgs84(),
+			dist=distanza_tratto,
 		)
 	return ft
 
@@ -834,7 +903,8 @@ def format_indicazioni_icona_tratto_car_pooling(tratto, ft, opz):
 	sub = [s for s in tratto.sub if isinstance(s, TrattoCarPoolingArco)]
 	nome_primo_arco = None
 	if len(sub) > 0:
-		distanza = arrotonda_distanza(tratto.get_distanza()).capitalize()
+		distanza_tratto = tratto.get_distanza()
+		distanza = arrotonda_distanza(distanza_tratto).capitalize()
 		id = "O-%s" % sub[0].id_arco
 		dettagli = u''
 		nome_corr = None
@@ -870,7 +940,10 @@ def format_indicazioni_icona_tratto_car_pooling(tratto, ft, opz):
 				'tempo': to_min(tp),
 			}),
 			info_tratto_exp=dettagli if 'espandi_tutto' in opz or ('espandi' in opz and opz['espandi']) == id else '',
+			info_tratto_short=to_min(tp),
 			icona='carpooling.png',
+			bb=tratto.get_bounding_box_wgs84(),
+			dist=distanza_tratto,
 		)
 		ft.aggiungi_nodo(
 			tratto.tempo + timedelta(seconds=ta + tp),
@@ -951,6 +1024,9 @@ def format_mappa_tratto_metro(tratto, ft, opz):
 	if tratto.id_linea[:3] == 'MEB':
 		icona = 'metro'
 		color = '#0000FF'
+	if tratto.id_linea == 'MEC':
+		icona = 'metro'
+		color = '#57B947'
 	ft.add_polyline(tratto.get_poly_wgs84(), 0.7, color, 5)
 	ft.add_marker(gbfe_to_wgs84(*tratto.coordinate_palina_s), '/paline/s/img/%s.png' % icona, icon_size=(16, 16), infobox=out)
 	tratti_intermedi = [x for x in tratto.sub if isinstance(x, TrattoBusArcoPercorso)]

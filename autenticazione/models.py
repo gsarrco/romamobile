@@ -23,6 +23,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 
+TOKEN_APP_LENGTH = 42
 
 class ServiziUser(User):
 	secret = models.CharField(max_length=127, unique=True, db_index=True)
@@ -42,6 +43,11 @@ class LogAutenticazioneServizi(models.Model):
 	
 	def __unicode__(self):
 		return "%s, %s" % (self.orario, self.user)
+
+class TokenApp(models.Model):
+	token_app = models.CharField(max_length=TOKEN_APP_LENGTH, db_index=True)
+	user = models.ForeignKey(User)
+	ultimo_accesso = models.DateTimeField(db_index=True)
 
 class Telefono(models.Model):
 	user = models.ForeignKey(User)

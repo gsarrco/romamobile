@@ -38,7 +38,7 @@ import osm
 import geocoder
 from servizi.utils import datetime2compact, datetime2time, transaction, date2datetime
 from servizi.utils import datetime2date, dateandtime2datetime, ricapitalizza
-from servizi.utils import model2contenttype, contenttype2model, batch_qs
+from servizi.utils import model2contenttype, contenttype2model, batch_qs, datetime2mysql
 from servizi.models import Festivita
 from parcheggi import models as parcheggi
 import os, os.path
@@ -58,6 +58,7 @@ import xmlrpclib
 import tomtom
 from collections import defaultdict
 from pprint import pprint
+from urllib_transport import UrllibTransport
 
 LINEE_MINI = ['90', '542', '61', 'MEB', 'MEB1', '998', 'MEA', 'FR1']
 #LINEE_MINI = ['012', '063', '90', '999', 'MEB', 'MEB1']
@@ -85,6 +86,7 @@ class RetePalina(object):
 		self.tratti_percorsi_precedenti = []
 		self.tratti_percorsi_successivi = []
 		self.soppressa = soppressa
+		self.ferroviaria = False
 		# Nota: le paline soppresse esistono, ed esistono anche le corrispondenti fermate.
 		#       Nel grafo, però, esistono solo i nodi relativi alle fermate, NON quelli relativi alle paline.
 		#       In questo modo sarà possibile transitare per le fermate ma non salire/scendere dal mezzo.
@@ -184,7 +186,7 @@ class RetePalina(object):
 			if f.aggiornabile_infotp():
 				return True
 		return False
-		
+
 class RetePercorso(object):
 	def __init__(self, id_percorso, id_linea, tipo, descrizione, soppresso, gestore):
 		object.__init__(self)
@@ -201,8 +203,12 @@ class RetePercorso(object):
 		self.tempo_stat_orari = []
 		self.dist = 0
 		self.veicoli = {}
+		self.ultimo_aggiornamento = None
 		for i in range(0, 7):
 			self.frequenza.append([(0.0, -1, -1) for j in range(0, 24)])
+
+	def __repr__(self):
+		return "Percorso %s (linea %s)" % (self.id_percorso, self.id_linea)
 
 	def serializza(self):
 		return {
@@ -227,7 +233,76 @@ class RetePercorso(object):
 		for id_veicolo in res['veicoli']:
 			if not id_veicolo in rete.veicoli:
 				rete.veicoli[id_veicolo] = ReteVeicolo(id_veicolo)
-			self.veicoli[id_veicolo] = rete.veicoli[id_veicolo]	
+			self.veicoli[id_veicolo] = rete.veicoli[id_veicolo]
+
+	def iter_punti_rev(self):
+		"""
+		Restituisce un iteratore sui punti della polilinea, dall'ultimo al primo
+		"""
+		tp = self.tratti_percorso[-1]
+		while tp is not None:
+			punti = tp.rete_tratto_percorsi.punti
+			n = len(punti)
+			for i in range(n-1, -1, -1):
+				yield punti[i]
+			tp = tp.s.tratto_percorso_precedente
+
+	def linear_to_coord(self, distanza_capolinea):
+		"""
+		A partire dalla posizione linearizzata, calcola coordinate e direzione del veicolo
+
+		Restituisce una terna (lng, lat, azimuth)
+		"""
+		op = None
+		mp = None
+		d = distanza_capolinea
+		for p in self.iter_punti_rev():
+			if op is not None:
+				dp = geomath.distance(p, op)
+				if d < dp:
+					frac = d / dp
+					#print "frac = ", frac
+					mp = (op[0] + frac * (p[0] - op[0]), op[1] + frac * (p[1] - op[1]))
+					#print "Posizione: ", mp
+					break
+				d -= dp
+			op = p
+			#print "Fine ciclo, distanza residua", d2
+		if mp is None:
+			return None
+		# p:  nuovo punto
+		# op: vecchio punto
+		# mp: posizione interpolata
+		mpw = gbfe_to_wgs84(*mp)
+		return (mpw[0], mpw[1], geomath.azimuth_deg(p, op))
+
+	def campioni_fvd(self, orario_min):
+		ss = self.fv.speed
+		out = []
+		for s in reversed(ss):
+			t, p, s, id = s
+			if orario_min is not None and t < orario_min:
+				break
+			res = self.linear_to_coord(p)
+			if res is None:
+				print "Errore nella posizione del veicolo"
+				continue
+			lng, lat, azimuth = res
+			out.append({
+				'id_veicolo': id,
+				'data_acquisizione': datetime2mysql(t),
+				'lon': lng,
+				'lat': lat,
+				'direzione': int(azimuth),
+				'velocita': int(s * 3.6),
+				'stato': 1,
+				'quality': 3,
+				'classe_veicolo': 'B',
+				'id_sistema': 'A',
+				'distanza': int(self.dist - p),
+			})
+		return out
+
 			
 	def stampa_tempi(self):
 		print " *** Tempi percorso %s (linea %s) ***" % (self.id_percorso, self.id_linea)
@@ -546,6 +621,8 @@ class ReteFermata(object):
 		self.arrivi_temp = []
 		self.ultimo_aggiornamento = None
 		rete_palina.fermate[rete_percorso.id_percorso] = self
+		if rete_percorso.tipo in TIPI_LINEA_FERRO:
+			rete_palina.ferroviaria = True
 		self.tratto_percorso_precedente = None
 		self.tratto_percorso_successivo = None
 		self.distanza_da_partenza = -1
@@ -1411,13 +1488,13 @@ class Rete(object):
 			ser = []
 			print "Carico paline"
 			if retina:
-				ps =  Palina.objects.by_date(versione).filter(fermata__percorso__linea__id_linea__in=LINEE_MINI)
+				ps = Palina.objects.by_date(versione).filter(fermata__percorso__linea__id_linea__in=LINEE_MINI)
 			else:
 				ps = Palina.objects.by_date(versione).all()
-			print "Carico percorsi"
 			for p in ps:
 				r.add_palina(p.id_palina, p.nome, p.soppressa)
 				ser.append(('palina', (p.id_palina, p.nome, p.soppressa)))
+			print "Carico percorsi"
 			ps = Percorso.objects.by_date(versione).all()
 			if retina:
 				ps = Percorso.objects.by_date(versione).filter(linea__id_linea__in=LINEE_MINI)
@@ -1713,6 +1790,52 @@ class AggiornatoreCarichi(Thread):
 			logging.error(traceback.format_exc())
 		print "Aggiornatore carichi, fine thread", str(self)
 
+
+
+class AggiornatoreUploadFCD(Thread):
+	"""
+	Caricatore degli FVD su servizio esterno.
+	"""
+	def __init__(self, rete, intervallo):
+		Thread.__init__(self)
+		self.rete = rete
+		self.intervallo = intervallo
+		self.ultimo_aggiornamento = None
+		self.stopped = False
+
+	def stop(self):
+		self.stopped = True
+
+	def run(self):
+		transport = UrllibTransport({
+			'http': 'http://192.168.90.44:80/',
+		})
+
+		s = xmlrpclib.ServerProxy('http://193.204.166.15:8000/', transport=transport)
+
+		while not self.stopped:
+			if self.ultimo_aggiornamento is not None:
+				t1 = self.ultimo_aggiornamento + self.intervallo
+				t2 =  datetime.now()
+				diff = (max(t1, t2) - min(t1, t2)).seconds
+				if diff > 0:
+					sleep(diff)
+			aggiornamento_precedente = self.ultimo_aggiornamento
+			self.ultimo_aggiornamento = datetime.now()
+			try:
+				out = []
+				for id_percorso in self.rete.percorsi:
+					p = self.rete.percorsi[id_percorso]
+					out.extend(p.campioni_fvd(aggiornamento_precedente))
+
+				# pprint(out)
+				s.add('rsmtoken', out)
+
+			except Exception, e:
+				logging.error(traceback.format_exc())
+		print "Stoppato"
+
+
 	
 class Aggiornatore(Thread):
 	"""
@@ -1840,6 +1963,21 @@ class NodoRisorsa(Nodo):
 			self.get_coordinate(),
 		)			
 		
+
+class NodoPuntoArrivo(geocoder.NodoGeocoder):
+	"""
+	Nodo usato per le ricerche di percorso single-source, multiple-destination, o per la ricerca di luoghi vicini
+	tra un insieme di nodi (NodoPuntoArrivo) passati come parametro
+	"""
+	def __init__(self, *args, **kwargs):
+		super(NodoPuntoArrivo, self).__init__(*args, **kwargs)
+		self.nome = ''
+
+	def aggiorna_risultati_vicini(self, risultati, opz):
+		if opz['cerca_vicini'] == 'punti' and self in risultati.nodi:
+			dist = self.get_vars(opz).get_distanza()
+			tempo = self.get_vars(opz).time
+			risultati.aggiungi_punto(self, dist, tempo)
 
 
 class NodoPalinaAttesa(Nodo):
@@ -2537,12 +2675,19 @@ def carica_rete_su_grafo(r, g, retina=False, versione=None):
 	except IOError:
 		print "Necessario ricalcolo"
 		ps = [r.paline[k] for k in r.paline if not r.paline[k].soppressa]
-		for i in range(0, len(ps)):
-			pi = ps[i]
-			ni = g.nodi[(1, pi.id_palina)]
-			archi_conn = gc.connect_to_node(ni)
-			for a in archi_conn:
-				g.add_arco(a)
+		dp = DijkstraPool(g, 1)
+		with dp.get_dijkstra() as dj:
+			for i in range(0, len(ps)):
+				pi = ps[i]
+				ni = g.nodi[(1, pi.id_palina)]
+				if pi.ferroviaria :
+					archi_conn = gc.connect_to_node_multi(ni, dj)
+					if len(archi_conn) == 0:
+						archi_conn = gc.connect_to_node(ni)
+				else:
+					archi_conn = gc.connect_to_node(ni)
+				for a in archi_conn:
+					g.add_arco(a)
 		g.serialize(geocoding_file, [geocoder.ArcoGeocoder], [geocoder.NodoGeocoder])
 
 	if not retina:
@@ -2688,9 +2833,9 @@ def calcola_frequenze():
 
 		
 def elabora_statistiche(data_inizio, data_fine, min_weight=5):
-		#with transaction(False):
-		StatTempoArco.objects.all().delete()
-		StatTempoAttesaPercorso.objects.all().delete()		
+	with transaction():
+		StatTempoArcoNew.objects.all().delete()
+		StatTempoAttesaPercorsoNew.objects.all().delete()
 		for s in StatPeriodoAggregazione.objects.all():
 			print s
 			wds = [getattr(s, "wd%d" % wd) for wd in range(0, 7)]
@@ -2705,7 +2850,7 @@ def elabora_statistiche(data_inizio, data_fine, min_weight=5):
 					print cnt, ids
 					if ids != None and cnt >= min_weight:
 						print "Salvo", ids, idt, tot/cnt, s
-						sta = StatTempoArco(
+						sta = StatTempoArcoNew(
 							id_palina_s=ids,
 							id_palina_t=idt,
 							tempo=tot / cnt,
@@ -2721,7 +2866,7 @@ def elabora_statistiche(data_inizio, data_fine, min_weight=5):
 					tot += lta.peso * lta.tempo
 					cnt += lta.peso
 			if ids != None and cnt >= min_weight:
-				sta = StatTempoArco(
+				sta = StatTempoArcoNew(
 					id_palina_s=ids,
 					id_palina_t=idt,
 					tempo=tot / cnt,
@@ -2738,7 +2883,7 @@ def elabora_statistiche(data_inizio, data_fine, min_weight=5):
 				idp2 = ltap.id_percorso
 				if idp != idp2:
 					if idp != None and cnt >= min_weight:
-						StatTempoAttesaPercorso(
+						StatTempoAttesaPercorsoNew(
 							id_percorso=idp,
 							tempo=tot / cnt,
 							numero_campioni=cnt,
@@ -2752,7 +2897,7 @@ def elabora_statistiche(data_inizio, data_fine, min_weight=5):
 					tot += ltap.tempo
 					cnt +=1
 			if idp != None and cnt >= min_weight:
-				StatTempoAttesaPercorso(
+				StatTempoAttesaPercorsoNew(
 					id_percorso=idp,
 					tempo=tot / cnt,
 					numero_campioni=cnt,

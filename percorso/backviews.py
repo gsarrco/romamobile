@@ -59,7 +59,8 @@ def percorso_cerca(
 		lang,
 		offset
 	)
-	
+
+
 @jsonrpc_method('urldecode', safe=True)
 def urldecode(request, urlparams):
 	d = urlparse.parse_qs(urlparams)

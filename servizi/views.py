@@ -51,7 +51,7 @@ import settings
 from carpooling import models as carpooling
 from pprint import pprint
 from mercury.models import Mercury
-from autenticazione.models import Sottosito
+from autenticazione.models import Sottosito, TokenApp
 from collections import OrderedDict
 #from pympler import tracker, muppy
 #import gc
@@ -171,6 +171,18 @@ def servizio(request, token, prodotto, servizio, lingua, apertoDalMenu):
 		'servizio': s.servizio.servizio.nome,
 	}
 
+def app_login_by_token(request, token):
+	"""
+	Effettua il login dell'app usando un token.
+
+	Questa vista restituisce una pagina web, con il solo obiettivo di impostare il cookie di sessione
+	"""
+	t = TokenApp.objects.get(token_app=token)
+	t.ultimo_accesso = datetime.now()
+	t.user.backend='django.contrib.auth.backends.ModelBackend'
+	login(request, t.user)
+	return messaggio(request, _('Bentornato, %(nome)s') % {'nome': t.user.first_name})
+
 
 def from_fav(request, fav):
 	t, pk = fav[0], int(fav[1:])
@@ -278,11 +290,12 @@ def servizi_new(request):
 		})
 	
 
+
 	# Altri messaggi (custom)
-	us.append({
-		'link': '/info/carpooling',
-		'messaggio': u'Nuovo servizio Car pooling',
-	})
+	# us.append({
+	# 	'link': '/info/carpooling',
+	# 	'messaggio': u'Nuovo servizio Car pooling',
+	# })
 
 	request.ctx['notifiche'].extend(us)
 

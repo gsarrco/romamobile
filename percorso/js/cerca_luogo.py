@@ -55,7 +55,7 @@ from pyjamas import DOM
 from prnt import prnt
 from util import StyledFixedColumnFlexTable, HTMLFlowPanel, DP, VP, HP, GP, SP, DeferrablePanel, ScrollAdaptivePanel
 from util import get_checked_radio, HidingPanel, ValidationErrorRemover, MyAnchor, LoadingButton
-from util import SearchBox, _, get_lang
+from util import SearchBox, _, get_lang, getdefault, LuogoPanel
 from datetime import date, time, datetime, timedelta
 from Calendar import Calendar, DateField, TimeField
 from map import MapPanel, Layer, LayerPanel, Marker
@@ -67,6 +67,10 @@ from util import JsonHandler, redirect
 
 client = JSONProxy(base_url + '/json/', ['risorse_lista_tipi', 'servizi_autocompleta_indirizzo'])
 
+class CRLuogoPanel(LuogoPanel):
+	pass
+	# def activateMarker(self):
+	# 	self.owner.setActiveMarker(None)
 
 class CercaLuogoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, DeferrablePanel):
 	def __init__(self, owner):
@@ -143,17 +147,10 @@ class CercaLuogoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 						},								
 					]
 				},
-				{
-					'class': SP,
-					'name': 'risultati_holder',
-					'sub': [],
-				},
 			],
 			add_to_owner=True,						
 		)
 		
-		self.risultati_holder = self.base.by_name('risultati_holder')
-		self.risultati = None
 		self.cl_layer = None
 		self.cr_lista_tipi = []
 		self.cr_a = None
@@ -229,44 +226,33 @@ class CercaLuogoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 		if query == '':
 			self.onCercaErrore({'stato': 'Error'})
 			return
-		if self.risultati is not None:
-			self.risultati_holder.remove(self.risultati)
-		self.risultati = DP(
-			None,
-			[ 
-				{
-					'class': VP,
-					'style': 'indicazioni',
-					'sub': [
-						{
-							'class': Label,
-							'args': [_('Risultati')],
-							'style': 'indicazioni-h1',
-							'height': None,
-						},									
-						{
-							'class': VerticalPanel,
-							'name': 'risultati_list',
-							'args': [],
-						},
-					
-						{
-							'class': HTML,
-							'args': ["""&copy; %d
-								<a class="inl" href="http://www.agenziamobilita.roma.it">Roma servizi per la mobilit&agrave; s.r.l.</a>""" % datetime.now().year
-							],
-						},									
-					]
-				}		
-			],
-			title=_('Luoghi trovati'),
-		)
-		self.risultati.setOpen(True)
-		self.risultati_holder.add(self.risultati)
-		risultati_list = self.risultati.by_name('risultati_list')
+
+		self.pannello_riepilogo = self.owner.creaPannelloRiepilogo(height='150px')
+
+		def on_cpda():
+			self.owner.cercaPercorsoDa(query)
+		def on_cpa():
+			self.owner.cercaPercorsoA(query)
+		def on_cr():
+			self.pannello_riepilogo.selectIndex(1)
+		def on_cl():
+			self.owner.cercaLinea(query, su_mappa=True, jump_to_result=True)
+		luogo_panel = CRLuogoPanel(self, on_cpda, on_cpa, on_cl, on_cr)
+		self.pannello_riepilogo.add(luogo_panel, title=query)
+
 		if tipi is None:
 			tipi = self.base.by_name('risorse').getSelectedValues()
-		self.map.loadNewLayer('cerca_risorsa', 'risorsa', (query, tipi, 2000), reload=True, info_panel=risultati_list, on_error=self.onCercaErrore)
+
+		if len(tipi) > 0:
+			self.map.loadNewLayer(
+				'cerca_risorsa',
+				'risorsa',
+				(query, tipi, 2000),
+				reload=True,
+				info_panel=self.pannello_riepilogo,
+				on_error=self.onCercaErrore,
+				onDone=self.onCercaDone,
+			)
 		
 		
 
@@ -283,6 +269,7 @@ class CercaLuogoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 
 				
 	def onCercaErrore(self, el):
+		self.owner.setTabLuogoMappa()
 		x, x_list, x_holder = self.getWidgets()
 		if el['stato'] == 'Ambiguous':
 			x.setVisible(False)
@@ -293,7 +280,12 @@ class CercaLuogoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 				x_list.addItem(i)
 		else:
 			x.addStyleName('validation-error')
-			
+		self.owner.setBottomWidget(None)
+
+	def onCercaDone(self, el):
+		self.owner.setTabMappaLuogo()
+		self.pannello_riepilogo.selectIndex(1)
+
 	def getWidgets(self):
 		x = self.base.by_name('query')
 		x_list = self.base.by_name('query_list')
