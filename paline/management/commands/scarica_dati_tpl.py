@@ -29,4 +29,3 @@ class Command(BaseCommand):
 		print "\n\n5 di 5: Aggiornamento rete nel database"
 		carica_rete()
 
-		

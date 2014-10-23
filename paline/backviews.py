@@ -21,26 +21,27 @@
 
 from models import *
 from django.db import models, connections, transaction
+from django.core.cache import cache
 from servizi.utils import dict_cursor, project, datetime2mysql, group_required, autodump
-from servizi.utils import model2contenttype
+from servizi.utils import model2contenttype, generate_key
 from servizi import infopoint
 from servizi.models import Luogo
 from parcheggi import models as parcheggi
 from mercury.models import Mercury
 from risorse import models as risorse
 from datetime import datetime, timedelta, time, date
-from pannelli import backviews as pannellibw
 from django.template.defaultfilters import date as datefilter, urlencode
 from jsonrpc import jsonrpc_method
 import rpyc
 import cPickle as pickle
 import gmaps
 import views
-from paline.views import paline7, _dettaglio_paline
+from paline.views import paline7, _dettaglio_paline, _dettaglio_paline_app
 from pprint import pprint
 from percorso.views import infopoint_to_cp
 from django.utils import translation
 from servizi.views import get_fav
+from copy import copy
 import logging
 import settings
 
@@ -53,41 +54,13 @@ def percorso_mappa(request, id_percorso, *args, **kwargs):
 
 @jsonrpc_method('paline_percorso_fermate', safe=True)
 def percorso_fermate(request, id_percorso, id_veicolo, lang):
-	p = Percorso.objects.by_date().get(id_percorso=id_percorso)
-	fs = Fermata.objects.by_date().filter(percorso=p).order_by('progressiva')
-	# ps = []
-	# for fr in fs:
-	# 	f = fr.palina
-	# 	if not f.soppressa:
-	# 		ps.append({
-	# 			'id_palina': f.id_palina,
-	# 			'nome': f.nome_ricapitalizzato(),
-	# 		})
 	translation.activate(lang)
-	giorni = []
-	t = date.today()
-	for i in range(7):
-		giorni.append({
-			'giorno': t.strftime('%Y-%m-%d'),
-			'nome': datefilter(t, "l j F").capitalize(),
-		})
-		t += timedelta(days=1)
+	return views.percorso_per_json(request, id_percorso, id_veicolo)
 
-	percorso = views._percorso(request, id_percorso, id_veicolo=id_veicolo, as_service=True)
-
-	return {
-		'fermate': percorso['fermate'],
-		'giorni': giorni,
-		'id_percorso': id_percorso,
-		'percorso': percorso['percorso'],
-		'percorsi':  percorso['percorsi'],
-	}
-	
 @jsonrpc_method('paline_orari', safe=True)
 def percorso_orari(request, id_percorso, data, lang):
 	translation.activate(lang)
 	orari = views.trovalinea_orari(None, '', id_percorso, data)
-	#print orari 
 	return orari
 
 
@@ -175,7 +148,7 @@ def mappa_layer(request, nome, lang):
 		out['descrizione'] = p.getNomeCompleto()
 		
 	elif tipo == 'risorsa':
-		print "Cerco una risorsa"
+		# print "Cerco una risorsa"
 		pprint(id)
 		address = id[0]
 		tipi_ris = id[1]
@@ -184,12 +157,8 @@ def mappa_layer(request, nome, lang):
 			out = {'errore': start}
 		else:
 			max_distanza = id[2]
-			max_distanza = 2000
 			out = pickle.loads(c.root.risorse_vicine(start, tipi_ris, 5, max_distanza))
 			out['descrizione'] = 'Luoghi trovati'
-
-	elif tipo == 'pannelli':
-		out = pannellibw.mappa_layer(request, nome)
 	
 	# pprint(out)
 	return out
@@ -206,31 +175,18 @@ def paline_smart_search(request, query, lang):
 		'indirizzi': [],
 		'paline_semplice': [],
 		'paline_extra': [],
-		'percorsi': [], 	
+		'percorsi': [],
+		'query': query,
 	}
-	out = views._default(request, query, ctx, True)
+	out = views._default(request, query, ctx, True, dett_paline=True)
 	# pprint(out)
 	return out
+
 
 @paline7.metodo("Mappa")
 def ws_mappa(request, token, tipo, id):
 	return mappa_layer(request, (tipo, id), 'it')
 
-@jsonrpc_method('paline_previsioni', safe=True)
-def previsioni(request, id_palina, lingua):
-	translation.activate(lingua)
-	try:
-		p = Palina.objects.by_date().get(id_palina=id_palina)
-	except:
-		raise errors.XMLRPC['XRE_NO_ID_PALINA']
-	prev = _dettaglio_paline(request, p.nome, [p], aggiungi=p.id_palina, as_service=True)
-	prev['collocazione'] = p.descrizione
-	if request.user.is_authenticated():
-		preferito = PalinaPreferita.objects.filter(gruppo__user=request.user, id_palina=id_palina).count() > 0
-	else:
-		preferito = False
-	prev['esiste_preferito'] = preferito
-	return prev
 
 @jsonrpc_method('paline_previsioni', safe=True)
 def previsioni(request, id_palina, lingua):
@@ -239,14 +195,8 @@ def previsioni(request, id_palina, lingua):
 		p = Palina.objects.by_date().get(id_palina=id_palina)
 	except:
 		raise errors.XMLRPC['XRE_NO_ID_PALINA']
-	prev = _dettaglio_paline(request, p.nome, [p], aggiungi=p.id_palina, as_service=True)
-	prev['collocazione'] = p.descrizione
-	if request.user.is_authenticated():
-		preferito = PalinaPreferita.objects.filter(gruppo__user=request.user, id_palina=id_palina).count() > 0
-	else:
-		preferito = False
-	prev['esiste_preferito'] = preferito
-	return prev
+	return _dettaglio_paline_app(request, p)
+
 
 @jsonrpc_method('paline_preferiti', safe=True)
 def preferiti(request, tipo, nome, descrizione, esiste):
@@ -271,3 +221,156 @@ def preferiti(request, tipo, nome, descrizione, esiste):
 	out['fav'] = fav_list
 
 	return out
+
+
+def _inizializza_notifica_arrivo_bus(request, id_richiesta, id_palina, linee, tempo):
+	p = Palina.objects.by_date().get(id_palina=id_palina)
+	arrivi = _dettaglio_paline(request, p.nome, [p], as_service=True)['arrivi']
+	linea_min = ''
+	veicolo_min = ''
+	arr = []
+	arr_dict = {}
+
+	for a in arrivi:
+		linea = a['linea']
+		t = a['tempo_attesa_secondi']
+		if t >= tempo and linea in linee:
+			id_veicolo = a['id_veicolo']
+			a2 = (t, linea, id_veicolo)
+			arr.append(a2)
+			arr_dict[id_veicolo] = a2
+
+	if len(arr) == 0:
+		scheduling = -1
+	else:
+		arr.sort(key=lambda a: a[0])
+		a = arr[0]
+		scheduling = a[0] - tempo
+		linea_min = a[1]
+		veicolo_min = a[2]
+
+	ret = {
+		'id_richiesta': id_richiesta,
+		'refresh': 60,
+		'scheduling': scheduling,
+		'id_linea': linea_min,
+		'id_veicolo': veicolo_min,
+	}
+
+	store = copy(ret)
+	store['tempo'] = tempo
+	store['id_palina'] = id_palina
+	store['linee'] = linee
+	store['arr_dict'] = arr_dict
+
+	cache.set('paline_notifarrivo_%s' % id_richiesta, store, 300)
+	return ret
+
+
+@jsonrpc_method('paline_imposta_notifica_arrivo_bus')
+def imposta_notifica_arrivo_bus(request, param):
+	"""
+	Imposta una notifica di arrivo del bus per l'app.
+
+	Param è un dizionario con i seguenti elementi:
+	- id_palina: id della palina per cui si richiede la notifica
+	- linee: lista delle linee di interesse
+	- tempo: distanza temporale (in secondi) dell'autobus nel momento di ricezione della notifica
+
+	Restituisce un dizionario con i seguenti elementi:
+	- refresh: distanza in secondi alla quale effettuare la prossima richiesta di aggiornamento
+	- id_richiesta: id della richiesta
+	- scheduling: distanza di scheduling, in secondi (oppure -1)
+	- id_linea: linea in arrivo (oppure stringa vuota)
+	- id_veicolo: veicolo in 	arrivo (oppure stringa vuota)
+	"""
+	id_richiesta = generate_key(40)
+	return _inizializza_notifica_arrivo_bus(request, id_richiesta, param['id_palina'], param['linee'], param['tempo'])
+
+
+@jsonrpc_method('paline_refresh_notifica_arrivo_bus')
+def refresh_notifica_arrivo_bus(request, id_richiesta):
+	"""
+	Restituisce un aggiornamento sugli arrivi relativi alla notifica richiesta
+
+	Il dizionario restituito è analogo a quello del metodo (paline_)imposta_notifica_arrivo_bus
+	"""
+	old = cache.get('paline_notifarrivo_%s' % id_richiesta)
+
+	if old is None:
+		return {'status': 'ERROR'}
+
+	id_palina = old['id_palina']
+	linee = old['linee']
+	tempo = old['tempo']
+	arr_old = old['arr_dict']
+
+	# Nessun autobus precedentemente in arrivo
+	if old['scheduling'] < 0:
+		return _inizializza_notifica_arrivo_bus(request, id_richiesta, id_palina, linee, tempo)
+
+	p = Palina.objects.by_date().get(id_palina=id_palina)
+	arrivi = _dettaglio_paline(request, p.nome, [p], as_service=True)['arrivi']
+	arr = []
+	arr_dict = {}
+
+	for a in arrivi:
+		linea = a['linea']
+		t = a['tempo_attesa_secondi']
+		if linea in linee:
+			id_veicolo = a['id_veicolo']
+			a2 = (t, linea, id_veicolo)
+			arr.append(a2)
+			if t >= tempo:
+				arr_dict[id_veicolo] = a2
+
+	arr.sort(key = lambda a: a[0])
+	for a in arr:
+		t, linea, id_veicolo = a
+		if t < tempo and id_veicolo in arr_old and arr_old[id_veicolo][0] > t:
+			# Il veicolo si è avvicinato dall'ultima ricerca: notifica immediata e annullamento richiesta
+			ret = {
+				'id_richiesta': '',
+				'refresh': 0,
+				'scheduling': 0,
+				'id_linea': linea,
+				'id_veicolo': id_veicolo,
+			}
+
+			cache.delete('paline_notifarrivo_%s' % id_richiesta)
+			return ret
+
+		elif t >= tempo:
+			# Primo veicolo in arrivo dopo il tempo. Imposto notifica futura
+			ret = {
+				'id_richiesta': id_richiesta,
+				'refresh': 60,
+				'scheduling': t - tempo,
+				'id_linea': linea,
+				'id_veicolo': id_veicolo,
+			}
+
+			store = copy(ret)
+			store['tempo'] = tempo
+			store['id_palina'] = id_palina
+			store['linee'] = linee
+			store['arr_dict'] = arr_dict
+			cache.set('paline_notifarrivo_%s' % id_richiesta, store, 300)
+			return ret
+
+	# Nessun veicolo in arrivo, nessuna notifica
+	ret = {
+		'id_richiesta': id_richiesta,
+		'refresh': 60,
+		'scheduling': -1,
+		'id_linea': '',
+		'id_veicolo': '',
+	}
+
+	store = copy(ret)
+	store['tempo'] = tempo
+	store['id_palina'] = id_palina
+	store['linee'] = linee
+	store['arr_dict'] = arr_dict
+	cache.set('paline_notifarrivo_%s' % id_richiesta, store, 300)
+	return ret

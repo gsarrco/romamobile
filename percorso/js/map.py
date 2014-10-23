@@ -20,6 +20,7 @@
 #
 
 
+from pyjamas.ui.ScrollPanel import ScrollPanel
 from pyjamas.ui.Calendar import Calendar, DateField
 from pyjamas.ui.RootPanel import RootPanel
 from pyjamas.ui.VerticalPanel import VerticalPanel
@@ -58,7 +59,7 @@ from __pyjamas__ import JS
 
 from DissolvingPopup import DissolvingPopup
 from util import JsonHandler, redirect, MenuCmd, HTMLFlowPanel, SearchPopup, DeferrablePanel, MyAnchor
-from util import _, get_lang
+from util import _, get_lang, PaginatedPanelPage
 from globals import base_url, make_absolute
 
 
@@ -116,7 +117,7 @@ class MapPanel(SimplePanel, DeferrablePanel):
 			this.map.addControl(zoom_ctrl);
 			osm = $wnd['L'].tileLayer('http://{s}.mqcdn.com/tiles/1.0.0/map/{z}/{x}/{y}.png', {
 				attribution: mapquestAttrib,
-				detectRetina: true,
+				detectRetina: false,
 				maxZoom: 18,
 				subdomains: ['otile1', 'otile2', 'otile3', 'otile4']
 			});
@@ -189,7 +190,7 @@ class MapPanel(SimplePanel, DeferrablePanel):
 			l.deserialize(res, info_panel=info_panel)
 			self.owner.center_and_zoom(l)
 			if onDone is not None:
-				self.onDone(l)
+				onDone(l)
 
 		return onLoadLayer
 			
@@ -212,27 +213,50 @@ class MapPanel(SimplePanel, DeferrablePanel):
 	def hideAllLayers(self):
 		for l in self.layers:
 			l.setVisible(False)
+
+	def centerMarkers(self, markers):
+		JS("""bounds = new $wnd['L'].latLngBounds([]);""")
+		for m in markers:
+			JS("""bounds.extend(m.marker.getLatLng());""")
+		JS("""self.map.fitBounds(bounds.pad(.25), {animate: self.animation_enabled});""")
+
+	def setBoundingBox(self, nw, se, pad=0.25):
+		n = nw[1]
+		w = nw[0]
+		e = se[0]
+		s = se[1]
+		JS("""
+			nw = new $wnd['L'].latLng(n, w);
+			se = new $wnd['L'].latLng(s, e);
+			bounds = new $wnd['L'].latLngBounds(nw, se);
+			self.map.fitBounds(bounds.pad(pad), {animate: self.animation_enabled});
+		""")
+
 			
-class InfoPanel(HorizontalPanel):
+class InfoPanel(PaginatedPanelPage, ScrollPanel):
 	def __init__(self, owner, icon, name, desc, distance, onClic=None):
-		HorizontalPanel.__init__(self)
+		PaginatedPanelPage.__init__(self)
+		ScrollPanel.__init__(self)
+		self.setHeight('126px')
+		self.hp = HorizontalPanel()
+		self.add(self.hp)
 		self.addStyleName('palina')
 		icon = make_absolute(icon)
 		self.image = Image(icon)
-		self.add(self.image)
+		self.hp.add(self.image)
 		self.hfp = HTMLFlowPanel()
-		self.hfp.addAnchor(name, self.onClic)
-		if distance is not None:
-			self.hfp.addHtml('&nbsp;a %s' % distance)
-		self.hfp.addBr()
+		# self.hfp.addAnchor(name, self.onClic)
+		# if distance is not None:
+		# 	self.hfp.addHtml('&nbsp;a %s' % distance)
+		# self.hfp.addBr()
 		self.hfp.addHtml(desc)
-		self.add(self.hfp)
+		self.hp.add(self.hfp)
 		self.onClicCallback = onClic
 		
 	def onClic(self):
 		if self.onClicCallback is not None:
 			self.onClicCallback()
-		
+
 	
 		
 class Layer:
@@ -277,9 +301,12 @@ class Layer:
 				if m['desc'] != '':
 					infobox += "<br /><br />%s" % m['desc']
 				marker = Marker(self, m['point'], m['icon'], m['iconSize'], infobox, m['label'], m['anchor'], visible=self.visible, name=name, open=open, drop_callback=dc)
-				if info_panel is not None:
+				if info_panel is not None and m['infobox'] != "Sono qui":
+					title = m['infobox']
+					if m['distance'] is not None:
+						title += _(" a ") + m['distance']
 					ip = InfoPanel(info_panel, m['icon'], m['infobox'], m['desc'], m['distance'], onClic=marker.openBubble)
-					info_panel.add(ip)
+					info_panel.add(ip, title=title)
 		if 'polylines' in res:		
 			for p in res['polylines']:
 				Polyline(self, p['points'], p['opacity'], p['color'], p['thickness'], p['zIndex'], visible=self.visible)
@@ -336,7 +363,7 @@ class Layer:
 				""")
 			else:
 				JS("""map.fitBounds(self.group.getBounds(), {animate: animate});""")
-		
+
 class LayerPanel(VerticalPanel):
 	def __init__(self, map):
 		VerticalPanel.__init__(self)
@@ -404,7 +431,8 @@ class Marker:
 		name=None,
 		open=False,
 		drop_callback=None,
-		max_width=None,
+		click_callback=None,
+		relative=False,
 	):
 		self.layer = layer
 		self.visible = visible
@@ -422,7 +450,8 @@ class Marker:
 		else:
 			ajs = None
 		draggable = False if drop_callback is None else True
-		icon_path = make_absolute(icon_path)
+		if not relative:
+			icon_path = make_absolute(icon_path)
 		JS("""
 			self.point = new $wnd['L'].latLng(x, y);
 			mImg = new $wnd['L'].icon({
@@ -466,6 +495,8 @@ class Marker:
 					infobox_listener(self)
 				else:
 					marker.openPopup()
+		if click_callback is not None:
+			JS("""marker.on('click', click_callback);""")
 
 	def openBubbleListener(self, marker):
 		self.openBubble()
@@ -482,8 +513,7 @@ class Marker:
 		self.bubble.setContent(res)
 		
 	def closeBubble(self):
-		# JS("""self.bubble.close();""")
-		pass
+		JS("""self.marker.closePopup();""")
 
 	def setVisible(self, visible):
 		self.visible = visible
@@ -492,6 +522,21 @@ class Marker:
 			self.marker.addTo(map)
 		else:
 			map.removeLayer(self.marker)
+
+	def setIcon(self, icon_path, anchor=None):
+		if anchor is not None:
+			ax = anchor[0]
+			ay = anchor[1]
+			JS("""ajs = new $wnd['L'].point(ax, ay);""")
+		else:
+			ajs = None
+		JS("""
+			icon = new $wnd['L'].icon({
+				iconUrl: icon_path,
+				iconAnchor: ajs
+			});
+			self.marker.setIcon(icon);
+		""")
 
 
 class Polyline:
@@ -662,13 +707,13 @@ class Geocoder(KeyboardHandler):
 		if self.layer is not None:
 			self.layer.destroy()
 
-def get_location(callback):
+def get_location(callback, callback_error=None):
 	JS("""
 		if (navigator.geolocation) {
 			navigator.geolocation.getCurrentPosition(function(position) {
 				lng = position.coords.longitude;
 				lat = position.coords.latitude;
 				callback(lng, lat);
-			});
+			}, callback_error);
 		}
   """)

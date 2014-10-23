@@ -116,6 +116,10 @@
 			(<a href="{% nohist %}/paline/percorso/{{ percorso.id_percorso }}?partenze=1{% endnohist %}">{% trans "Altri orari" %}</a>)
 		</p>
 	{% endif %}
+{% else %}
+	<p>
+		{{ percorso.note_no_orari }}
+	</p>
 {% endif %}
 
 <h2>{% trans "Fermate" %}</h2>

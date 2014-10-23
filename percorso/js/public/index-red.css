@@ -54,8 +54,9 @@ label {
 	line-height: 20px;
 }
 .gwt-DialogBox {
-background-color:white;
-border:2px outset;
+	background-color:white;
+	border:2px outset;
+	z-index: 5000;
 }
 .gwt-DialogBox .Caption {
 background-color:#ffffff;
@@ -676,7 +677,7 @@ a, a:visited {
 	width: 100%;
 }
 .tabella-settimana .desc-giorno {
-	padding: 2px;	
+	padding: 2px;
 	color: #333333;
 	font-weight: bold;
 	border-bottom: 1px solid #808080;
@@ -692,7 +693,7 @@ a, a:visited {
 	width: 100%;
 }
 .tabella-settimana .desc-giorno-festivo {
-	padding: 2px;	
+	padding: 2px;
 	color: #333333;
 	font-weight: bold;
 	border-bottom: 1px solid #cc0000;
@@ -730,6 +731,9 @@ a, a:visited {
 .vskip {
 	margin-top: 16px;
 }
+.vskip-s {
+	margin-top: 8px;
+}
 .feedback-panel {
 	margin-left: 8px;
 }
@@ -741,7 +745,7 @@ table.bollettino {
 	margin:0px;
 	border: 1px solid black;
 	margin-left: auto;
-	margin-right: auto;	
+	margin-right: auto;
 }
 
 .bollettino .tc {
@@ -904,16 +908,16 @@ table.bollettino th.primo {
 }
 .inl-ie6 {
 	display: inline;
-	vertical-align: middle;	
+	vertical-align: middle;
 }
 
 .linea-label {
-	background-color: rgb(222, 126, 68);
+	background-color: #B6D9CA;
 }
 .linea-label-sx {
 	padding-left: 3px;
 	padding-right: 3px;
-	border-right: 2px solid #CCCCCC;
+	border-right: 2px solid #FFFFFF;
 }
 .linea-label-dx {
 	padding-left: 3px;
@@ -935,7 +939,7 @@ table.bollettino th.primo {
 .logo {
 	background-color: #83092B;
 	background-image: url('logo-rp.png');
-	background-repeat: repeat-x; 
+	background-repeat: repeat-x;
 }
 .copy {
 	color: white;
@@ -1002,6 +1006,10 @@ color: white;
 	top: 0px;
 	right: 5px;
 	text-align: center;
+}
+.waiting-image {
+	margin-top: 9px;
+	margin-left: 9px;
 }
 .big-list {
 	border-radius: 3px;
@@ -1122,7 +1130,7 @@ color: white;
 	left: 28px;
 	top: 4px;
 	margin-bottom: -42px;
-	z-index: 1;
+	z-index: 2000;
 	padding: 5px;
 	border: 1px solid #13985F;
 	border-radius: 4px;
@@ -1134,7 +1142,17 @@ color: white;
 	border-bottom: 2px solid transparent;
 }
 .search-popup {
-	z-index: 10;
+	z-index: 2000;
+}
+.menu-popup-panel {
+	border-radius: 3px;
+	line-height: 50px;
+	border: medium none;
+	margin-bottom: 5px;
+	width: 300px;
+	color: rgb(82, 64, 69);
+	background-color: #FFFFFF;
+	z-index: 2000;
 }
 .pannello-carpooling {
 	background-color: #B6D9CA;
@@ -1184,4 +1202,112 @@ color: white;
 	background: #efefef;
 	padding: 5px;
 	color: black;
+}
+.matrix-choice-unselected * {
+	background-color: #D5D5D5;
+	border-radius: 4px;
+	margin: 1px;
+	padding: 3px;
+	font-size: 18px;
+	cursor: pointer;
+}
+.matrix-choice-selected * {
+	background-color: #62b290;
+	border-radius: 4px;
+	margin: 1px;
+	padding: 3px;
+  font-size: 18px;
+}
+.timepicker-label {
+	background-color: #62b290;
+	border-radius: 4px;
+	margin: 1px;
+	padding: 3px;
+	font-size: 18px;
+	text-align: center;
+	color: white;
+}
+.timepicker-time {
+	font-size: 18px;
+	text-align: center;
+}
+.paginated-panel * {
+	font-size: 13px;
+}
+.paginated-arrow {
+	background: #62b290;
+	border-radius: 5px;
+	margin: 2px;
+	text-decoration: none;
+	cursor: pointer;
+}
+.paginated-inactive {
+	visibility: hidden;
+}
+.paginated-title {
+  background: #13985F;
+  color: #FFFFFF;
+	font-size: 1em;
+	text-transform: uppercase;
+	font-weight: bold;
+	padding: 2px 4px 2px 4px;
+	height: 26px;
+}
+.about p {
+	padding: 5px;
+}
+.text-image-button {
+	background: #13985F;
+	border-radius: 5px;
+	margin: 2px;
+	text-decoration: none;
+	cursor: pointer;
+}
+.text-image-button-text {
+	color: #FFFFFF;
+	font-size: 11px;
+}
+.bottom-popup {
+	background-color: #FFFFFF;
+	border: 1px solid #13985F;
+	right: 6px; bottom: 20px;
+}
+.orari-open {
+	margin-left: 2px;
+	margin-bottom: 6px;
+}
+.tip-balloon-sp {
+    position: relative;
+}
+.tip-balloon-vp {
+    position: absolute;
+    top: 1px;
+    left: 11px;
+    z-index: 12;
+    width: 64%;
+    box-shadow: -1px 1px 4px -1px gray;
+}
+.tip-balloon-punta {
+    position: relative;
+    top: 1px;
+    z-index: 14;
+}
+.tip-balloon-vp2 {
+    background-color: #FFFFFF;
+    border: 1px solid #13985F;
+    z-index: 13;
+    width: 100%;
+}
+.tip-balloon-vp2 * {
+    font-size: 13px;
+    margin: 3px;
+}
+.focus-sink {
+	width: 0;
+	height: 0;
+	margin: 0;
+	padding: 0;
+	position: fixed;
+	top: 0;
+	left: 0;
 }

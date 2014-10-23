@@ -53,7 +53,8 @@ from django.db import models
 from django.utils.encoding import force_unicode
 from django.contrib.contenttypes import models as contenttypes
 import traceback
-
+import string
+import random
 
 def service_reply(f):
 	def g(*args):
@@ -704,6 +705,13 @@ def getdef(dict, key, default=None):
 	"""
 	return dict[key] if key in dict else default
 
+def setdef(dict, key, default):
+	"""
+	If key is not in dict: set dict[key] = default
+	"""
+	if not key in dict:
+		dict[key] = default
+
 def extend_to_child_model(parent_instance, child_model):
 	"""
 	Given an instance a of a model A, and a model B that extends A, create and return an instance of B extending a (since a "is a" B)
@@ -850,3 +858,15 @@ def instance2dict(instance, key_format=None):
 		else:
 			d[key(field.name)] = []
 	return d
+
+def generate_key(length):
+	chars = string.ascii_letters + string.digits + '_'
+	return ''.join(random.choice(chars) for i in range(length))
+
+
+def cache_method(timeout_sec):
+	def decorator(f):
+		def g(*args, **kwargs):
+			return f(*args, **kwargs)
+		return g
+	return decorator

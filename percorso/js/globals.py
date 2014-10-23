@@ -4,37 +4,70 @@ flavors = ['app', 'web']
 flavor_id = JS("""$wnd.flavor_id""")
 flavor = flavors[flavor_id]
 
+version = '2.6.0'
+
 base_url = ['http://muovi.roma.it', ''][flavor_id]
+
 
 def make_absolute(url):
 	if not url.startswith('http://'):
 		return base_url + url
 	return url
 
+
 users = [None]
 controls = [None]
+
 
 def set_user(u):
 	users[0] = u
 
+
 def get_user():
 	return users[0]
+
 
 def set_control(c):
 	controls[0] = c
 
+
 def get_control():
 	return controls[0]
+
+
+def android():
+	if flavor == 'web':
+		return False
+	platform = JS("""$wnd.window.device.platform""")
+	return platform == 'Android'
+
 
 def old_android():
 	if flavor == 'web':
 		return False
 	platform = JS("""$wnd.window.device.platform""")
+	if platform != "Android":
+		return False
 	version = JS("""$wnd.window.device.version""")
-	return platform == "Android" and int(version.split(".")[0]) < 4
+	v = version.split(".")[0]
+	if not v.isdigit():
+		return False
+	return int(v) < 4
+
 
 def ios():
 	if flavor == 'web':
 		return False
 	platform = JS("""$wnd.window.device.platform""")
 	return platform == "iOS"
+
+
+def get_os():
+	if flavor == 'web':
+		return 'web'
+	elif old_android():
+		return 'android-old'
+	elif android():
+		return 'android'
+	else:
+		return 'ios'

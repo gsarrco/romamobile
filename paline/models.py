@@ -30,7 +30,7 @@ from servizi.utils import oggetto_con_min, oggetto_con_max, aggiungi_banda, gior
 from servizi.utils import ricapitalizza, FunctionInThread, PickledObjectField, transaction
 from datetime import datetime, timedelta
 from servizi.models import VersioneManager, VersionatoManager, VersioneVersioning, Versionato, RichiestaNotifica
-from servizi.models import UtenteGenerico, Luogo
+from servizi.models import UtenteGenerico, Luogo, Festivita
 from news.models import News
 from django.db.models import Q
 from django.contrib.auth.models import User
@@ -53,6 +53,7 @@ ABILITA_CACHING = True
 INTERVALLO_IN_ARRIVO = 90 # secondi
 
 TIPI_LINEA_INFOTP = ['BU', 'TR']
+TIPI_LINEA_FERRO = ['ME', 'FR', 'FC']
 GESTORI_INFOTP = ['ATAC']
 
 # istanziazione versioning paline
@@ -221,6 +222,30 @@ TIPO_LINEA_CHOICES = (
 
 TIPO_LINEA_CHOICES_DICT = dict(TIPO_LINEA_CHOICES)
 
+def componi_annuncio(el, short=False):
+	if int(el['a_capolinea']):
+		if short:
+			return _("Capol.")
+		else:
+			return _("Capolinea")
+	if int(el['in_arrivo']):
+		return _("In Arrivo")
+	tempo = int(el['tempo_attesa'])
+	fermate = int(el['distanza_fermate'])
+	if tempo == -1:
+		tempo_s = '*'
+	else:
+		tempo_s = "%d'" % int(round(tempo / 60.0))
+	if fermate == 1:
+		if short:
+			return _("1 Ferm. (%(tempo)s)") % {'tempo': tempo_s}
+		else:
+			return _("1 Fermata (%(tempo)s)") % {'tempo': tempo_s}
+	if short:
+		return _("%(fermate)d Ferm. (%(tempo)s)") % {'fermate': fermate, 'tempo': tempo_s}
+	else:
+		return _("%(fermate)d Fermate (%(tempo)s)") % {'fermate': fermate, 'tempo': tempo_s}
+
 class Linea(VersionatoPaline, Disabilitabile):
 	id_linea = models.CharField(max_length=30, db_index=True)
 	monitorata = models.IntegerField()
@@ -264,6 +289,7 @@ class Linea(VersionatoPaline, Disabilitabile):
 
 	def getTipoDec(self):
 		return TIPO_LINEA_CHOICES_DICT[self.tipo]
+
 	
 class DisabilitazionePalina(Disabilitazione):
 	id_palina = models.CharField(db_index=True, max_length=20)
@@ -347,28 +373,13 @@ class Palina(VersionatoPaline, Disabilitabile):
 				l['prossima_partenza'] = ''
 				if a_capolinea and percorso is not None:
 					l['prossima_partenza'] = percorso.getProssimaPartenza()
-				l['annuncio'] = self.componi_annuncio(l)
+				l['annuncio'] = componi_annuncio(l)
 				linee.append(l)
 	
 		# informazioni sulla palina
 		ret['nome'] = self.nome_ricapitalizzato()
 		ret['veicoli'] = linee
-		return ret	
-	
-	def componi_annuncio(self, el):
-		if int(el['a_capolinea']):
-			return _("Capolinea")
-		if int(el['in_arrivo']):
-			return _("In Arrivo")
-		tempo = int(el['tempo_attesa'])
-		fermate = int(el['distanza_fermate'])
-		if tempo == -1:
-			tempo_s = '*'
-		else:
-			tempo_s = "%d'" % int(round(tempo / 60.0))
-		if fermate == 1:
-			return _("1 Fermata (%(tempo)s)") % {'tempo': tempo_s} 
-		return _("%(fermate)d Fermate (%(tempo)s)") % {'fermate': fermate, 'tempo': tempo_s}
+		return ret
 	
 	def getVeicoliCaching(self, lineas=None):
 		"""
@@ -414,7 +425,7 @@ class Palina(VersionatoPaline, Disabilitabile):
 				el2['aria'] = int(el['aria'])
 				el2['meb'] = int(el['meb'])
 				el2['a_capolinea'] = int(a_capolinea)
-				el2['annuncio'] = self.componi_annuncio(el2)
+				el2['annuncio'] = componi_annuncio(el2)
 				el2['prossima_partenza'] = ''
 				if a_capolinea:
 					try:
@@ -549,6 +560,7 @@ class Percorso(VersionatoPaline, Disabilitabile):
 	descrizione = models.CharField(max_length=150, null=True, default=None)
 	no_orari = models.BooleanField(blank=True, default=False)
 	soppresso = models.BooleanField(blank=True, default=False)
+	note_no_orari = models.CharField(max_length=127, blank=True, default='')
 	
 	chiave_disabilitazione = 'id_percorso'
 	disabilitazione = DisabilitazionePercorso
@@ -715,6 +727,193 @@ class Percorso(VersionatoPaline, Disabilitabile):
 				out.append(el)
 		return out
 
+	def adesso_attivo(self):
+		key = 'percorso_adesso_attivo_%s' % self.id_percorso
+		a = cache.get(key)
+		if a is not None:
+			return a
+		if self.no_orari:
+			return True
+		now = datetime.now()
+		count = PartenzeCapilinea.objects.filter(
+			id_percorso=self.id_percorso,
+			orario_partenza__gt=now - timedelta(minutes=60),
+			orario_partenza__lt=now + timedelta(minutes=60),
+		).count()
+		a = count > 0
+		cache.set(key, a, 20 * 60)
+		return a
+
+
+
+# def dettaglio_palina(palina, linee_escluse=set([]), nome_palina=None, caching=False, as_service=False):
+# 	v = palina.getVeicoli(caching=caching)['veicoli']
+# 	v.sort(cmp=_cmp_linea_tempo)
+# 	v1 = []
+# 	v2 = []
+# 	linee_usate = set()
+# 	linee_disabilitate = set()
+# 	linea = None
+# 	carteggi_usati = set()
+# 	for x in v:
+# 		if x['linea'] not in linee_escluse:
+# 			x['id_palina'] = palina.id_palina
+# 			x['nome_palina'] = nome_palina
+# 			if not as_service:
+# 				for dotaz in ['meb', 'moby', 'aria', 'pedana']:
+# 					_converti_dotazioni_bordo(x, dotaz)
+# 			x['tempo_attesa'] = int(round(int(x['tempo_attesa']) / 60))
+# 			carteggi_usati.update(set(x['carteggi']))
+# 			linee_usate.add(x['linea'])
+# 			x['disabilitata'] = False
+# 			try:
+# 				perc = Percorso.objects.by_date().get(id_percorso=x['id_percorso'])
+# 				f = Fermata.objects.by_date().filter(percorso=perc, palina=palina)[0]
+# 				x['destinazione'] = perc.arrivo.nome_ricapitalizzato()
+# 				disabilitata = not f.abilitata_complessivo()
+# 				x['disabilitata'] = disabilitata
+# 				if disabilitata:
+# 					news = f.news_disabilitazione_complessivo()
+# 					if as_service:
+# 						x['id_news'] = news.pk if news is not None else -1
+# 					else:
+# 						x['news'] = news
+# 					linee_disabilitate.add(x['linea'])
+# 			except (Percorso.DoesNotExist, Fermata.DoesNotExist()):
+# 				pass
+# 			if linea != x['linea']:
+# 				ultima_linea_a_capolinea = False
+# 				if x['a_capolinea'] and x['prossima_partenza'] != '':
+# 					ultima_linea_a_capolinea = True
+# 					x['partenza'] = timefilter(x['prossima_partenza'], _("H:i"))
+# 				if not x['disabilitata']:
+# 					linea = x['linea']
+# 					v1.append(x)
+# 			elif not x['disabilitata']:
+# 				if x['a_capolinea'] and x['prossima_partenza'] != '' and not ultima_linea_a_capolinea:
+# 					ultima_linea_a_capolinea = True
+# 					x['partenza'] = timefilter(x['prossima_partenza'], _("H:i"))
+# 					v2.append(x)
+# 				elif not x['a_capolinea']:
+# 					v2.append(x)
+# 	fermate = Fermata.objects.by_date().filter(palina=palina)
+# 	percorsi = Percorso.objects.by_date().filter(fermata__in=fermate, soppresso=False)
+# 	ld = Linea.objects.by_date().filter(percorso__in=percorsi, tipo__in=TIPI_LINEA_INFOTP).distinct()
+# 	v3 = []
+# 	for l in ld:
+# 		if l.id_linea not in linee_escluse:
+# 			if True: #l.id_linea[0].lower() != 'n':
+# 				x = {}
+# 				x['nome_palina'] = nome_palina
+# 				x['id_palina'] = palina.id_palina
+# 				if not l.abilitata_complessivo() or not l.monitorata:
+# 					news = None
+# 					if not l in linee_disabilitate:
+# 						x['linea'] = l.id_linea
+# 						if not l.monitorata:
+# 							x['non_monitorata'] = True
+# 						else:
+# 							x['disabilitata'] = True
+# 							news = l.news_disabilitazione_complessivo()
+# 						if as_service:
+# 							x['id_news'] = news.pk if news is not None else -1
+# 						else:
+# 							x['news'] = news
+# 						_aggiungi_dotazioni_default(x, as_service)
+# 						v3.append(x)
+# 				elif l.id_linea not in linee_usate:
+# 					x['linea'] = l.id_linea
+# 					x['nessun_autobus'] = True
+# 					_aggiungi_dotazioni_default(x, as_service)
+# 					v3.append(x)
+# 	return v1, v2, v3, carteggi_usati
+
+
+
+def get_primi_arrivi(paline):
+	ids = [p.id_palina for p in paline]
+	arrivi_raw = Mercury.sync_any_static(settings.MERCURY_WEB, 'primi_arrivi_per_paline', {'id_paline': ids})
+	out = {}
+	for palina in paline:
+		fermate = Fermata.objects.by_date().filter(palina=palina)
+		percorsi = Percorso.objects.by_date().filter(fermata__in=fermate, soppresso=False)
+		percorsi = [p for p in percorsi if p.adesso_attivo()]
+		id_percorsi = dict([(p.id_percorso, p) for p in percorsi])
+		linee = Linea.objects.by_date().filter(percorso__in=percorsi, tipo__in=TIPI_LINEA_INFOTP).distinct()
+		ret = {}
+		# Preparazione linee
+		info_linee = {}
+		for l in linee:
+			linea = {}
+			info_linee[l.id_linea] = linea
+			linea['linea'] = l.id_linea
+			if not l.abilitata_complessivo():
+				linea['disabilitata'] = True
+				news = l.news_disabilitazione_complessivo()
+				linea['id_news'] = news.pk if news is not None else -1
+			elif not l.monitorata:
+				linea['non_monitorata'] = True
+			else:
+				linea['nessun_autobus'] = True
+
+		# Aggiornamento linee con dati realtime
+		id_palina = palina.id_palina
+		v = arrivi_raw[id_palina]
+		veicoli = []
+		for el in v:
+			el2 = {}
+			id_linea = el['id_linea']
+			if id_linea in info_linee:
+				tempo = int(el['tempo'])
+				distanza_fermate = int(el['fermate'])
+				if tempo > (10 + 4 * distanza_fermate) * 60:
+					tempo = -1
+				a_capolinea = el['a_capolinea']
+				id_percorso = el['id_percorso']
+				el2['tempo_attesa'] = str(tempo)
+				el2['distanza_fermate'] = str(distanza_fermate)
+				el2['id_percorso'] = id_percorso
+				# el2['destinazione'] = id_percorsi[id_percorso].arrivo.nome_ricapitalizzato()
+				el2['id_veicolo'] = el['id_veicolo']
+				el2['in_arrivo'] = int((tempo == -1 and distanza_fermate < 1) or (not a_capolinea and tempo >= 0 and tempo <= INTERVALLO_IN_ARRIVO))
+				el2['a_capolinea'] = int(a_capolinea)
+				el2['annuncio'] = componi_annuncio(el2, short=True)
+				el2['partenza'] = ''
+				if a_capolinea:
+					try:
+						percorso = id_percorsi[id_percorso]
+						prossima_partenza = percorso.getProssimaPartenza()
+						if prossima_partenza is not None:
+							el2['partenza'] = str(prossima_partenza)[11:16]
+					except Exception as e:
+						pass
+				# try:
+				# 	p = id_percorsi[id_percorso].arrivo.nome_ricapitalizzato()
+				# 	el2['carteggi_dec'] = p.decodeCarteggio()
+				# 	el2['carteggi'] = p.carteggio_quoz
+				# 	arrivo = p.getArrivo()
+				# 	el2['capolinea'] = arrivo['nome']
+				# except Exception, e:
+				# 	#e = errors.XMLRPC['XRE_NO_PERCORSO']
+				# 	#e.message = "Percorso inesistente: %s, %s" % (type(l['id_percorso']), str(l['id_percorso']))
+				# 	#raise e
+				# 	#print e
+				# 	el2['carteggi_dec'] = ''
+				# 	el2['capolinea'] = ''
+				# 	el2['carteggi'] = ''
+				info_linee[id_linea].update(el2)
+				info_linee[id_linea]['nessun_autobus'] = False
+		veicoli = [info_linee[id_linea] for id_linea in info_linee]
+		veicoli.sort(key=lambda v: v['linea'])
+		ret['veicoli'] = veicoli
+		ret['nome_palina'] = palina.nome_ricapitalizzato()
+		ret['id_palina'] = id_palina
+		out[id_palina] = ret
+
+	return out
+
+
+
 
 def _converti_dotazioni_bordo(x, dotaz):
 	if x[dotaz]:
@@ -754,7 +953,9 @@ def dettaglio_palina(palina, linee_escluse=set([]), nome_palina=None, caching=Fa
 			if not as_service:
 				for dotaz in ['meb', 'moby', 'aria', 'pedana']:
 					_converti_dotazioni_bordo(x, dotaz)
-			x['tempo_attesa'] = int(round(int(x['tempo_attesa']) / 60))
+			tempo_attesa_secondi = int(x['tempo_attesa'])
+			x['tempo_attesa'] = int(round(tempo_attesa_secondi / 60.0))
+			x['tempo_attesa_secondi'] = tempo_attesa_secondi
 			carteggi_usati.update(set(x['carteggi']))
 			linee_usate.add(x['linea'])
 			x['disabilitata'] = False
@@ -977,6 +1178,20 @@ class FrequenzaPercorso(models.Model):
 	frequenza = models.FloatField()
 	da_minuto = models.IntegerField(default=0)
 	a_minuto = models.IntegerField(default=59)
+
+	@classmethod
+	def by_datetime(cls, id_percorso, dt=None):
+		if dt is None:
+			dt = datetime.now()
+		d = Festivita.get_weekday(dt, compatta_feriali=True)
+		f = cls.objects.get(
+			id_percorso=id_percorso,
+			ora_inizio=dt.hour,
+			giorno_settimana=d,
+		)
+		if f.da_minuto <= dt.minute <= f.a_minuto:
+			return f.frequenza
+		return -1
 	
 class PartenzeCapilinea(models.Model):
 	id_percorso = models.CharField(max_length=30, primary_key=True)
@@ -1082,7 +1297,22 @@ class StatTempoArco(models.Model):
 	periodo_aggregazione = models.ForeignKey(StatPeriodoAggregazione)
 	
 
+class StatTempoArcoNew(models.Model):
+	id_palina_s = models.CharField(db_index=True, max_length=20)
+	id_palina_t = models.CharField(db_index=True, max_length=20)
+	tempo = models.FloatField()
+	numero_campioni = models.IntegerField()
+	periodo_aggregazione = models.ForeignKey(StatPeriodoAggregazione)
+
+
 class StatTempoAttesaPercorso(models.Model):
+	id_percorso = models.CharField(db_index=True, max_length=30)
+	tempo = models.FloatField()
+	numero_campioni = models.IntegerField()
+	periodo_aggregazione = models.ForeignKey(StatPeriodoAggregazione)
+
+
+class StatTempoAttesaPercorsoNew(models.Model):
 	id_percorso = models.CharField(db_index=True, max_length=30)
 	tempo = models.FloatField()
 	numero_campioni = models.IntegerField()
@@ -1193,7 +1423,7 @@ class ParolaIndirizzoAutocompl(models.Model):
 			cls.objects.all().delete()
 			ias = IndirizzoAutocompl.objects.all()
 			for ia in ias:
-				print ia.indirizzo
+				# print ia.indirizzo
 				for p in ia.indirizzo.split():
 					ParolaIndirizzoAutocompl(
 						parola=p.lower(),

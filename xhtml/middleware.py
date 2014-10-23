@@ -273,6 +273,14 @@ class Middleware:
 		response.context_data['formaction'] = mark_safe('action="%s"' % request.path_info)
 		response.context_data['id_sito'] = settings.ID_SITO		
 		response.context_data['request'] = request
+		platform = 'generic'
+		ua = request.META['HTTP_USER_AGENT']
+		if ua.find('Android') > -1:
+			platform = 'Android'
+		elif ua.find('iPhone') > -1:
+			platform = 'iOS'
+		response.context_data['platform'] = platform
+
 		if request.servizio is not None:
 			s = request.servizio.nome()
 		else:

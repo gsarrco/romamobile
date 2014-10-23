@@ -19,6 +19,7 @@
 
 from pyjamas.ui.HTML import HTML
 from pyjamas.ui.RootPanel import RootPanel
+from __pyjamas__ import JS
 
 main_panel = None
 
@@ -26,6 +27,7 @@ def prnt(s, title=""):
 	#main_panel.aggiungi_errore(HTML(s), title)
 	s = str(s)
 	print s
+	#JS("""alert(s);""")
 	return
 	s.replace('\n', '<br />')
 	RootPanel().add(HTML(s))

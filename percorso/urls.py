@@ -26,8 +26,7 @@ import os, os.path
 
 urlpatterns = patterns('',
 	url('^$', views.default),
-	url(r'^js/$', django.views.static.serve,
-		{'document_root': os.path.join(os.path.dirname(__file__), 'js/output').replace('\\','/'), 'path': 'index.html'}),
+	url(r'^js/$', views.percorso_js),
 	url(r'^js/(?P<path>.*)$', django.views.static.serve,
 		{'document_root': os.path.join(os.path.dirname(__file__), 'js/output').replace('\\','/')}),
 	url(r'^jsd/$', django.views.static.serve,

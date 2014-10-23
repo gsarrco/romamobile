@@ -58,15 +58,16 @@ from prnt import prnt
 from util import StyledFixedColumnFlexTable, HTMLFlowPanel, DP, VP, HP, GP, SP, enforce_login
 from util import get_checked_radio, HidingPanel, ValidationErrorRemover, MyAnchor
 from util import ToggleImage, FavSearchBox, DeferrablePanel, ScrollAdaptivePanel
-from util import wait_start, wait_stop, _, get_lang
+from util import wait_start, wait_stop, _, get_lang, TimeBox, PaginatedPanelPage, PaginatedPanel
 from datetime import date, time, datetime, timedelta
 from Calendar import Calendar, DateField, TimeField
 from map import MapPanel, Layer, LayerPanel, Marker
 from globals import base_url, make_absolute
-
-
 from DissolvingPopup import DissolvingPopup
 from util import JsonHandler, redirect
+
+SOGLIA_DIST_TRATTO_PIEDI = 200
+
 
 client = JSONProxy(base_url + '/json/', [
 	'percorso_cerca',
@@ -111,6 +112,274 @@ class LineaLabel(HorizontalPanel):
 			chiudi = self.chiudi_listener
 			self.chiudi_listener = None
 			chiudi()
+
+class RiepilogoPercorsoPanel(ScrollPanel, PaginatedPanelPage):
+	def __init__(self, owner, stat, linee_escluse):
+		ScrollPanel.__init__(self)
+		self.owner = owner
+		self.setHeight('136px')
+		self.stat = stat
+		self.init_done = False
+		self.linee_escluse = linee_escluse
+
+	def notifyShow(self):
+		if not self.init_done:
+			self.lazy_init()
+
+	def lazy_init(self):
+		self.init_done = True
+		self.base = VP(
+			self,
+			sub=[
+				{
+					'class': SimplePanel,
+					'name': 'tratti',
+					'style': 'vskip',
+					'horizontal_alignment': HasAlignment.ALIGN_CENTER,
+				},
+				{
+					'class': HTMLPanel,
+					'args': ["<b>%s</b>" % self.stat['tempo_totale_format']],
+					'style': 'vskip',
+					'horizontal_alignment': HasAlignment.ALIGN_CENTER,
+				},
+				{
+					'class': HTMLFlowPanel,
+					'name': 'esclusioni',
+					'args': [],
+					'horizontal_alignment': HasAlignment.ALIGN_CENTER,
+				},
+			],
+			add_to_owner=True,
+		)
+
+		self.base.setWidth('96%')
+
+		self.tratti = HorizontalPanel()
+		sopratratti = self.base.by_name('tratti')
+		sopratratti.add(self.tratti)
+		self.n_tratti = 0
+		self.qualche_tratto = False
+
+		# Esclusioni
+		if len(self.linee_escluse) > 0:
+			esclusioni = self.base.by_name('esclusioni')
+			esclusioni.addHtml(_('<b>Esclusioni:</b>&nbsp;'))
+			for el in self.linee_escluse:
+				id_linea, nome_linea = el['id_linea'], el['nome']
+				ll = LineaLabel(nome_linea)
+				ll.addCloseListener(self.owner.onIncludiFactory(id_linea))
+				esclusioni.add(ll)
+				esclusioni.addHtml('&nbsp;')
+				self.owner.linee_escluse[id_linea] = nome_linea
+
+	def getMenu(self):
+		return [
+			{
+				'id': 'opzioni',
+				'text': _('Opzioni di viaggio'),
+				'listener': self.owner.onOpzioni,
+			},
+			{
+				'id': 'ritorno',
+				'text': _('Cerca ritorno'),
+				'listener': self.owner.onRitorno,
+			},
+			{
+				'id': 'parti_qui',
+				'text': _('Ricalcola da posizione attuale'),
+				'listener': self.owner.onPartiQui,
+			},
+			{
+				'id': 'email',
+				'text': _('Invia per email'),
+				'listener': self.owner.onEmail,
+			},
+			{
+				'id': 'link',
+				'text': _('Link al percorso'),
+				'listener': self.owner.onGetLink,
+			},
+		]
+
+	def addTratto(self, tratto):
+		# if self.n_tratti % 4 == 0:
+		# 	self.tratti = HorizontalPanel()
+		# 	self.base.by_name('tratti').append(self.tratti)
+		self.n_tratti += 1
+		if tratto['dist'] >= SOGLIA_DIST_TRATTO_PIEDI:
+			n_tratti = self.n_tratti
+			tratti = self.tratti
+			if self.qualche_tratto:
+				freccia = Image('freccia_dx.png', Height='24px')
+				tratti.add(freccia)
+				tratti.setCellVerticalAlignment(freccia, HasAlignment.ALIGN_MIDDLE)
+			self.qualche_tratto = True
+			t = VerticalPanel()
+			icona, hfp, w1, w2, escludi = self.owner.decodeResTratto(tratto, False, True)
+			def onClick():
+				self.paginated_panel.selectIndex(n_tratti)
+			icona.addClickListener(onClick)
+			icona.setSize('24px', '24px')
+			t.add(icona)
+			t.setCellHorizontalAlignment(icona, HasAlignment.ALIGN_CENTER)
+			t.add(w1)
+			t.setCellHorizontalAlignment(w1, HasAlignment.ALIGN_CENTER)
+			t.add(w2)
+			t.setCellHorizontalAlignment(w2, HasAlignment.ALIGN_CENTER)
+			tratti.add(t)
+			tratti.setCellVerticalAlignment(t, HasAlignment.ALIGN_TOP)
+
+
+
+class TrattoPercorsoPanel(ScrollPanel, PaginatedPanelPage):
+	def __init__(self, owner, nodo_partenza, tratto, nodo_arrivo):
+		ScrollPanel.__init__(self)
+		self.owner = owner
+		self.setHeight('136px')
+		self.init_done = False
+		self.marker = None
+		self.nodo_partenza = nodo_partenza
+		self.tratto = tratto
+		self.nodo_arrivo = nodo_arrivo
+		self.id_palina = None
+
+	def notifyShow(self):
+		if not self.init_done:
+			self.lazy_init()
+
+	def formatNodo(self, n, nome_tempo, nome_nodo, con_tempi=False):
+		self.base.by_name(nome_tempo).setHTML(n['t'])
+		tipo = n['tipo']
+		out = self.base.by_name(nome_nodo)
+		if tipo == 'F':
+			out.addHtml(_("Fermata&nbsp;"))
+
+		if n['url'] != '':
+			out.addAnchor(n['nome'], self.owner.onPalinaFactory(n['id']))
+			if con_tempi:
+				self.id_palina = n['id']
+				self.insertMenuItem(2,
+					{
+						'id': 'tempi_attesa',
+						'text': _('Tempi di attesa della fermata'),
+						'listener': self.onTempiAttesa,
+					},
+				)
+		else:
+			out.addHtml(n['nome'])
+
+
+	def lazy_init(self):
+		self.init_done = True
+		self.base = VP(
+			self,
+			sub=[
+				{
+					'class': GP,
+					'column_count': 2,
+					'name': 'indicazioni',
+					'sub': [
+						{
+							'class': HTML,
+							'center': True,
+							'style': 'indicazioni-orario',
+							'name': 'tempo_p',
+							'expand': False,
+						},
+						{
+							'class': HTMLFlowPanel,
+							'name': 'nodo_p',
+							'expand': False,
+						},
+						{
+							'class': SP,
+							'center': True,
+							'name': 'icona',
+							'expand': False,
+						},
+						{
+							'class': SP,
+							'name': 'tratto',
+							'expand': False,
+						},
+						{
+							'class': HTML,
+							'center': True,
+							'style': 'indicazioni-orario',
+							'name': 'tempo_a',
+							'expand': False,
+						},
+						{
+							'class': HTMLFlowPanel,
+							'name': 'nodo_a',
+							'expand': False,
+						},
+					],
+				},
+			],
+			add_to_owner=True,
+		)
+
+		self.formatNodo(self.nodo_partenza, 'tempo_p', 'nodo_p', con_tempi=True)
+
+		icona, hfp, d1, d2, escludi = self.owner.decodeResTratto(self.tratto, True, False)
+		if escludi is not None:
+			self.insertMenuItem(2,
+				{
+					'id': 'escludi',
+					'text': _('Escludi questa linea'),
+					'listener': escludi,
+				},
+			)
+		icona.addStyleName('tratto')
+		self.base.by_name('icona').add(icona)
+		self.base.by_name('tratto').add(hfp)
+		self.formatNodo(self.nodo_arrivo, 'tempo_a', 'nodo_a')
+
+	def onSintesi(self):
+		self.paginated_panel.selectIndex(0)
+
+	def onTempiAttesa(self):
+		self.owner.cercaLinea(self.id_palina, su_mappa=False)
+
+	def onEscludi(self):
+		pass
+
+	def getMenu(self):
+		return [
+			{
+				'id': 'sintesi',
+				'text': _('Sintesi del percorso'),
+				'listener': self.onSintesi,
+			},
+			{
+				'id': 'opzioni',
+				'text': _('Opzioni di viaggio'),
+				'listener': self.owner.onOpzioni,
+			},
+			{
+				'id': 'ritorno',
+				'text': _('Cerca ritorno'),
+				'listener': self.owner.onRitorno,
+			},
+			{
+				'id': 'parti_qui',
+				'text': _('Ricalcola da posizione attuale'),
+				'listener': self.owner.onPartiQui,
+			},
+			{
+				'id': 'email',
+				'text': _('Invia per email'),
+				'listener': self.owner.onEmail,
+			},
+			{
+				'id': 'link',
+				'text': _('Link al percorso'),
+				'listener': self.owner.onGetLink,
+			},
+		]
+
 
 class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, DeferrablePanel):
 	def __init__(self, owner):
@@ -516,31 +785,34 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 										'vertical_alignment': HasAlignment.ALIGN_MIDDLE,
 									},											
 									{
-										'class': TextBox,
+										'class': TimeBox,
 										'name': 'ora',
 										'enabled': False,
-										'call_setVisibleLength': ([5], {}),
 										'vertical_alignment': HasAlignment.ALIGN_MIDDLE,
 									},											
 								]
 							},
 							{
-								'class': HTML,
-								'args': [
-									_("""
-									<p>
-										Questo servizio calcola il miglior percorso con i mezzi
-										Atac, Roma TPL e le ferrovie regionali Trenitalia.
-										Usa i dati in tempo reale per tener conto dello stato
-										del traffico e della posizione degli autobus.
-									<p>
-									</p>
-										Il software, sviluppato dall'Agenzia per la Mobilit&agrave;
-										di Roma, &egrave; <a href="http://www.agenziamobilita.roma.it/servizi/open-data/codice-sorgente.html" target="_blank">rilasciato
-										con licenza open source.</a>
-									</p>
-									""")
-								],
+								'class': HP,
+								'sub': [
+									{
+										'class': Button,
+										'args': [_("Cerca"), self.onCerca],
+										'name': 'cerca2',
+										'width': '49%',
+									},
+									{
+										'class': SP,
+										'sub': [],
+										'width': '2%',
+									},
+									{
+										'class': Button,
+										'args': [_("Ritorno"), self.onScambia],
+										'name': 'scambia2',
+										'width': '49%',
+									},
+								]
 							},
 						]
 					}],
@@ -550,6 +822,30 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 					'name': 'risultati_holder',
 					'sub': [],
 				},
+				{
+					'class': HTML,
+					'style': 'indicazioni',
+					'args': [
+						_("""
+						<p>
+							Questo servizio calcola il miglior percorso con i mezzi
+							Atac, Roma TPL e le ferrovie regionali Trenitalia.
+							Usa i dati in tempo reale per tener conto dello stato
+							del traffico e della posizione degli autobus.
+						<p>
+						</p>
+							Il software, sviluppato dall'Agenzia per la Mobilit&agrave;
+							di Roma, &egrave; <a href="http://www.agenziamobilita.roma.it/servizi/open-data/codice-sorgente.html" target="_blank">rilasciato
+							con licenza open source.</a>
+						</p>
+						<p>
+							&copy; %d
+							<a class="inl" href="http://www.agenziamobilita.roma.it">Roma servizi per la mobilit&agrave; s.r.l.</a>
+						</p>
+						""") % datetime.now().year
+					],
+				},
+
 			],
 			add_to_owner=True,
 		)
@@ -567,7 +863,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 			self.base.by_name('teletrasporto').setVisible(True)
 		
 		self.base.by_name('data').getTextBox().setText(n.strftime('%d/%m/%Y'))
-		self.base.by_name('ora').setText(n.strftime('%H:%M'))
+		self.base.by_name('ora').getTextBox().setText(n.strftime('%H:%M'))
 		self.cp_layer = None
 		self.linee_escluse = None
 		self.percorsi_realtime = []
@@ -579,6 +875,11 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 		# self.owner.owner.add(self.realtime)
 
 		self.cercaLuogoInit = False
+
+
+	def scrollaAOpzioni(self):
+		self.base.by_name('opzioni_avanzate').setOpen(True)
+		self.base.getElement().scrollIntoView()
 
 
 	def scrollaAPercorso(self):
@@ -672,6 +973,103 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 
 	def getSelectedZtl(self):
 		return self.base.by_name('ztl').getSelectedValues()
+
+	def decodeResTratto(self, t, dettaglio, riepilogo):
+		"""
+		Decode a dict corresponding to a route part.
+
+		Return (image, description, linea, quanto)
+		- image: Image
+		- description: HtmlFlowPanel (iff dettaglio)
+		- linea: widget linea (iff riepilogo)
+		- quanto: indicazioni sulla durata del tratto (iff riepilogo)
+		- escludi: callback per ricalcolare il percorso escludendo la linea del tratto; None se non è una linea
+		"""
+		icona = Image(make_absolute("/percorso/s/img/%s" % t['icona']))
+
+		out = linea = quanto = None
+		escludi = None
+
+		if dettaglio:
+			out = HTMLFlowPanel()
+			def addHtml(hfp, w):
+				hfp.addHtml(w)
+			def add(hfp, w):
+				hfp.add(w)
+			def addBr(hfp):
+				hfp.addBr()
+			def addAnchor(hfp, a, b):
+				hfp.addAnchor(a, b)
+		else:
+			def addHtml(hfp, w):
+				pass
+			def add(hfp, w):
+				pass
+			def addBr(hfp):
+				pass
+			def addAnchor(hfp, a):
+				pass
+
+		mezzo = t['mezzo']
+		tipo_attesa = t['tipo_attesa']
+		if mezzo == 'Z':
+			addHtml(out, 'Teletrasporto')
+		elif mezzo == 'I':
+			addHtml(out, _('Cambia linea'))
+		else:
+			if mezzo in ['P', 'C', 'CP', 'A', 'CS']:
+				if mezzo =='P':
+					desc = _('A piedi')
+				elif mezzo == 'C':
+					desc = _('In bici')
+				elif mezzo == 'CP':
+					desc = _('Car pooling')
+					# w = CarPoolingChiediPanel(self, t['id'])
+				elif mezzo == 'A':
+					desc = _('In automobile')
+				elif mezzo == 'CS':
+					desc =_('Car sharing')
+				addHtml(out, desc)
+				if tipo_attesa == 'Z':
+					addBr(out)
+					addHtml(out, _('Apertura ZTL ore&nbsp;'))
+					addHtml(out, " %s" % t['tempo_attesa'])
+				if riepilogo:
+					linea = HTML() #desc)
+			else:
+				if mezzo == 'B':
+					addHtml(out, _('Linea&nbsp;'))
+				linea = t['linea_short']
+				id_linea = t['id_linea']
+				ll = LineaLabel(linea)
+				add(out, ll)
+				addHtml(out, _("&nbsp;direz. ") + t['dest'])
+				addBr(out)
+				escludi = self.onEscludiFactory(id_linea, linea)
+				ll.addCloseListener(escludi)
+				id_percorso = t['id'].split('-')[-1]
+				ll.addLineaListener(self.onLineaFactory(id_percorso))
+				if mezzo == 'B':
+					self.percorsi_realtime.append(id_percorso)
+				if tipo_attesa == 'O':
+					addHtml(out, _('Partenza ore&nbsp;'))
+				elif tipo_attesa == 'S':
+					addHtml(out, _('Attesa circa&nbsp;'))
+				elif tipo_attesa == 'P' and t['numero'] == 0:
+					addHtml(out, _('In arrivo fra&nbsp;'))
+				elif tipo_attesa == 'P' and t['numero'] > 0:
+					addHtml(out, _('In arrivo dopo&nbsp;'))
+				addHtml(out, " %s" % t['tempo_attesa'])
+				if riepilogo:
+					linea = ll
+			addBr(out)
+			sp = SimplePanel()
+			addAnchor(out, t['info_tratto'], self.onInfoEsteseFactory(sp, t['info_tratto_exp']))
+			addBr(out)
+			add(out, sp)
+			if riepilogo:
+				quanto = HTML(t['info_tratto_short'])
+		return icona, out, linea, quanto, escludi
 
 		
 	def onCercaLuogo(self):
@@ -846,7 +1244,6 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 		self.base.by_name('a').setText(a)
 		
 	def cercaPercorso(self, tipi_risorse=None, su_mappa=False):
-		self.owner.setDirty()
 		cerca = self.base.by_name('cerca')
 		n = datetime.now().strftime('%d/%m/%Y %H:%M')
 		quando = get_checked_radio(self.base, 'quando', range(4))
@@ -857,7 +1254,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 			data = self.base.by_name('data').getTextBox()
 			ora = self.base.by_name('ora')
 			data.removeStyleName('validation-error')
-			ora.removeStyleName('validation-error')
+			ora.getTextBox().removeStyleName('validation-error')
 			n = '%s %s' % (data.getText(), ora.getText())
 		try:
 			mdb = self.base.by_name('max_distanza_bici')
@@ -879,7 +1276,8 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 			self.owner.cercaLinea(da_in)
 		
 		elif da_in != '' and a_in != '' and cerca.isEnabled():
-			cerca.setEnabled(False)
+			self.base.by_name('cerca').setEnabled(False)
+			self.base.by_name('cerca2').setEnabled(False)
 			wait_start()
 			# cerca.setHTML('<img width="16" height="16" src="loading.gif" />')
 			self.ripristinaWidgets()
@@ -939,10 +1337,13 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 		def onLinea(source):
 			self.owner.cercaLineaPercorso(id_percorso, su_mappa=True)
 		return onLinea
+
+	def cercaLinea(self, query, su_mappa=True):
+		self.owner.cercaLinea(query, su_mappa)
 	
 	def onPalinaFactory(self, id_palina):
 		def onPalina(source):
-			self.owner.cercaLinea(id_palina, su_mappa=True)
+			self.cercaLinea(id_palina, su_mappa=True)
 		return onPalina	
 	
 	def onInfoEsteseFactory(self, panel, info_ext):
@@ -997,8 +1398,8 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 		return x_list.getSelectedItemText()[0]
 	
 	def abilitaCerca(self):
-		cerca = self.base.by_name('cerca')
-		cerca.setEnabled(True)
+		self.base.by_name('cerca').setEnabled(True)
+		self.base.by_name('cerca2').setEnabled(True)
 		wait_stop()
 		# cerca.setText('Cerca')
 	
@@ -1021,8 +1422,9 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 
 	def onCercaDoneSuMappa(self, res):
 		self.onCercaDone(res, su_mappa=True)
+
 		
-	def onCercaDone(self, res, su_mappa=False):
+	def onCercaDone(self, res, su_mappa=True):
 		self.abilitaCerca()
 		
 		# Errori
@@ -1035,7 +1437,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 		
 		if 'errore-data' in res:
 			self.base.by_name('data').getTextBox().addStyleName('validation-error')
-			self.base.by_name('ora').addStyleName('validation-error')
+			self.base.by_name('ora').getTextBox().addStyleName('validation-error')
 			return
 		
 		# OK
@@ -1114,15 +1516,9 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 							'column_count': 2,
 							'name': 'indicazioni',
 							'sub': [],
-						},									
-						{
-							'class': HTML,
-							'args': [_("""&copy; %d
-								<a class="inl" href="http://www.agenziamobilita.roma.it">Roma servizi per la mobilit&agrave; s.r.l.</a>""") % datetime.now().year
-							],
-						},									
+						},
 					]
-				}		
+				}
 			],
 			title=_('Percorso trovato'),
 		)
@@ -1130,7 +1526,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 		indicazioni = self.risultati.by_name('indicazioni')
 		count = 0
 		numero_indicazioni = len(res['indicazioni'])
-		
+
 		# Riepilogo
 		stat = res['stat']
 		riepilogo = self.risultati.by_name('riepilogo')
@@ -1152,130 +1548,116 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 		else:
 			self.risultati.by_name('esclusioni-header').setVisible(False)
 
+		# Costruisco pannello riepilogo
+		self.pannello_riepilogo = self.owner.creaPannelloRiepilogo(height='150px')
+		rpp = RiepilogoPercorsoPanel(self, stat, res['linee_escluse'])
+		totali = len([x for x in res['indicazioni'] if 'tratto' in x])
+		self.pannello_riepilogo.add(
+			rpp,
+			self.setBoundingBoxFactory(*res['bounding_box']),
+			PaginatedPanel.generaPuntiPassi(-1, totali),
+			menu_description=rpp.getMenu(),
+		)
+
 		# Indicazioni
-		self.owner.setBottomWidget()
 		carpooling_trovato = False
+		n_tratto = 0
 		for i in res['indicazioni']:
 			count += 1
 			
 			# Tratto
 			if 'tratto' in i:
-				out = HTMLFlowPanel()
+				n_tratto += 1
 				t = i['tratto']
-				indicazioni.addStyledWidget(Image(make_absolute("/percorso/s/img/%s" % t['icona'])), expand=False, center=True, style="tratto")
-				mezzo = t['mezzo']
-				tipo_attesa = t['tipo_attesa']
-				if mezzo == 'Z':
-					out.addHtml('Teletrasporto')
-				elif mezzo == 'I':
-					out.addHtml(_('Cambia linea'))
-				else:
-					if mezzo in ['P', 'C', 'CP', 'A', 'CS']:
-						if mezzo =='P':
-							out.addHtml(_('A piedi'))
-						elif mezzo == 'C':
-							out.addHtml(_('In bici'))
-						elif mezzo == 'CP':
-							out.addHtml(_('Car pooling'))
-							w = CarPoolingChiediPanel(self, t['id'])
-							self.owner.setBottomWidget(w)
-							carpooling_trovato = True
-						elif mezzo == 'A':
-							out.addHtml(_('In automobile'))
-						elif mezzo == 'CS':
-							out.addHtml(_('Car sharing'))
-						if tipo_attesa == 'Z':
-							out.addBr()
-							out.addHtml(_('Apertura ZTL ore&nbsp;'))
-							out.addHtml(" %s" % t['tempo_attesa'])
-					else:
-						if mezzo == 'B':
-							out.addHtml(_('Linea&nbsp;'))
-						linea = t['linea']
-						id_linea = t['id_linea']
-						ll = LineaLabel(linea)
-						out.add(ll)
-						out.addHtml(_("&nbsp;direz. ") + t['dest'])
-						out.addBr()
-						ll.addCloseListener(self.onEscludiFactory(id_linea, linea))
-						id_percorso = t['id'].split('-')[-1]
-						ll.addLineaListener(self.onLineaFactory(id_percorso))
-						if mezzo == 'B':
-							self.percorsi_realtime.append(id_percorso)
-						if tipo_attesa == 'O':
-							out.addHtml(_('Partenza ore&nbsp;'))
-						elif tipo_attesa == 'S':
-							out.addHtml(_('Attesa circa&nbsp;'))
-						elif tipo_attesa == 'P' and t['numero'] == 0:
-							out.addHtml(_('In arrivo fra&nbsp;'))
-						elif tipo_attesa == 'P' and t['numero'] > 0:
-							out.addHtml(_('In arrivo dopo&nbsp;'))
-						out.addHtml(" %s" % t['tempo_attesa'])
-					out.addBr()
-					sp = SimplePanel()
-					out.addAnchor(t['info_tratto'], self.onInfoEsteseFactory(sp, t['info_tratto_exp']))
-					out.addBr()
-					out.add(sp)
-				indicazioni.addStyledWidget(out)
+				tpp = TrattoPercorsoPanel(
+					self,
+					res['indicazioni'][count - 2]['nodo'],
+					t,
+					res['indicazioni'][count]['nodo'],
+				)
+				self.pannello_riepilogo.add(
+					tpp,
+					self.setBoundingBoxFactory(*t['bounding_box']),
+					PaginatedPanel.generaPuntiPassi(n_tratto - 1, totali),
+					menu_description=tpp.getMenu(),
+				)
+				rpp.addTratto(t)
+
+				def deferrable(indicazioni, t):
+					def f():
+						icona, hfp, d1, d2, escludi = self.decodeResTratto(t, True, False)
+						indicazioni.addStyledWidget(icona, expand=False, center=True, style="tratto")
+						indicazioni.addStyledWidget(hfp)
+					return f
+
+				self.do_or_defer(deferrable(indicazioni, t))
+
+
 				
 			# Nodo
 			else:
-				out = HTMLFlowPanel()
-				
-				n = i['nodo']
-				partenza = False
-				arrivo = False
-				if count == 1:
-					icona = 'partenza.png'
-					partenza = True
-				elif count == numero_indicazioni:
-					icona = 'arrivo.png'
-					arrivo = True
-				else:
-					icona = 'icon.png'				
-				vp = VP(
-					indicazioni,
-					[
-						{
-							'class': Image,
-							'args': [make_absolute("/percorso/s/img/%s" % icona)],
-							'width': '24px',
-							'height': '24px',
-							'horizontal_alignment': HasAlignment.ALIGN_CENTER,
-						},
-						{
-							'class': HTML,
-							'args': [n['t']],
-							'horizontal_alignment': HasAlignment.ALIGN_CENTER,
-							'style': 'indicazioni-orario',
-						}
-					],
-					add_to_owner=False,
-					expand=False,
-					center=True
-				)
-				indicazioni.addStyledWidget(vp, expand=False, center=True, style="nodo")
-				tipo = n['tipo']
-				if tipo == 'F':
-					out.addHtml(_("Fermata&nbsp;"))
-				if tipo == 'L':
-					ll = LineaLabel(n['nome'])
-					out.add(ll)
-					ll.addCloseListener(self.onEscludiFactory(n['id'], n['nome']))
-					out.addHtml(n['info_exp'])
-				elif n['url'] != '':
-					out.addAnchor(n['nome'], self.onPalinaFactory(n['id']))
-				else:
-					out.addHtml(n['nome'])
+				def deferrable_nodo(count, numero_indicazioni, indicazioni, n):
+					def f():
+						out = HTMLFlowPanel()
 
-				indicazioni.addStyledWidget(out)
+						partenza = False
+						arrivo = False
+						if count == 1:
+							icona = 'partenza.png'
+							partenza = True
+						elif count == numero_indicazioni:
+							icona = 'arrivo.png'
+							arrivo = True
+						else:
+							icona = 'icon.png'
+						vp = VP(
+							indicazioni,
+							[
+								{
+									'class': Image,
+									'args': [make_absolute("/percorso/s/img/%s" % icona)],
+									'width': '24px',
+									'height': '24px',
+									'horizontal_alignment': HasAlignment.ALIGN_CENTER,
+								},
+								{
+									'class': HTML,
+									'args': [n['t']],
+									'horizontal_alignment': HasAlignment.ALIGN_CENTER,
+									'style': 'indicazioni-orario',
+								}
+							],
+							add_to_owner=False,
+							expand=False,
+							center=True
+						)
+						indicazioni.addStyledWidget(vp, expand=False, center=True, style="nodo")
+						tipo = n['tipo']
+						if tipo == 'F':
+							out.addHtml(_("Fermata&nbsp;"))
+						if tipo == 'L':
+							ll = LineaLabel(n['nome'])
+							out.add(ll)
+							ll.addCloseListener(self.onEscludiFactory(n['id'], n['nome']))
+							out.addHtml(n['info_exp'])
+						elif n['url'] != '':
+							out.addAnchor(n['nome'], self.onPalinaFactory(n['id']))
+						else:
+							out.addHtml(n['nome'])
+
+						indicazioni.addStyledWidget(out)
+					return f
+
+				self.do_or_defer(deferrable_nodo(count, numero_indicazioni, indicazioni, i['nodo']))
 				
 		risultati_holder.add(self.risultati)
 
 		if self.modo == 5 and not carpooling_trovato:
-			self.owner.setBottomWidget(CarPoolingNessunRisultatoPanel(self))
+			pass
+			# self.owner.setBottomWidget(CarPoolingNessunRisultatoPanel(self))
 		elif self.modo == 0:
-			self.owner.setBottomWidget(CarPoolingOffriPassaggioPanel(self))
+			pass
+			# self.owner.setBottomWidget(CarPoolingOffriPassaggioPanel(self))
 
 		self.cp_layer.deserialize(res['mappa'], callbacks={
 			'drop_start': self.onRightClickDa,
@@ -1290,20 +1672,39 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 		# 	self.realtime.setVisible(True)
 		# 	self.realtime.setText("Tempo reale off")
 
-		# Prova
-		# self.owner.setBottomWidget(HTML("Ti piace il percorso trovato?"))
-
 		
 	def onScambia(self):
 		da, a = self.base.by_name('da').getStatus(), self.base.by_name('a').getStatus()
 		self.base.by_name('da').setStatus(*a)
 		self.base.by_name('a').setStatus(*da)
+		self.onCerca()
+
+	def onPartiOra(self):
+		self.base.by_name('quando_0').setChecked(True)
+		self.onCerca()
+
+	def onPartiQui(self):
+		self.base.by_name('a').setText(self.owner.posizione)
+		self.onPartiOra()
+
+	def onRitorno(self):
+		self.onScambia()
+
+	def onOpzioni(self):
+		self.owner.setTabPercorsoMappa()
+		self.scrollaAOpzioni()
+
 
 	def onGetLink(self):
 		LinkDialog(self, self.base.by_name('da').getText(), self.base.by_name('a').getText())
 
 	def onEmail(self):
 		EmailDialog(self)
+
+	def setBoundingBoxFactory(self, nw, se):
+		def setBoundingBox():
+			self.map.setBoundingBox(nw, se)
+		return setBoundingBox
 
 class LinkDialog(DialogBox, FocusHandler):
 	def __init__(self, owner, origine, destinazione):
@@ -1498,7 +1899,8 @@ class CarPoolingChiediPanel(SimplePanel):
 		self.nome_linea_esclusa = res['nome_linea_esclusa']
 
 	def onDettaglioOffertaChiediDone(self, res):
-		self.owner.owner.setBottomWidget(CarPoolingChiestoPanel(self.owner))
+		pass
+		# self.owner.owner.setBottomWidget(CarPoolingChiestoPanel(self.owner))
 
 	@enforce_login
 	def onChiedi(self):

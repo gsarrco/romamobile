@@ -67,6 +67,7 @@ pattern_list = [
 			{'document_root': settings.MEDIA_ROOT}),
 	url(r'^facebook$', lambda req: HttpResponseRedirect('https://www.facebook.com/pages/Muoversi-a-Roma/202373936538862')),
 	url(r'^twitter$', lambda req: HttpResponseRedirect('http://twitter.com/romamobilita')),
+	url(r'^gplus$', lambda req: HttpResponseRedirect('https://plus.google.com/communities/106108189655603875446')),
 	url(r'^atacmobile.php$', 'servizi.views.servizi_new'),	
 	url(r'^$', 'servizi.views.servizi_new'),
 	url(r'^i18n/', include('django.conf.urls.i18n')),

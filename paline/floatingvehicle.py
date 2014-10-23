@@ -75,7 +75,7 @@ class FVPath(object):
 					dt = float((new[0] - old[0]).seconds)
 					dd = old[1] - new[1]
 					if dt > 0 and dd > 0:
-						self.speed.append((new[0], (new[1] + old[1]) / 2.0, dd / dt))
+						self.speed.append((new[0], (new[1] + old[1]) / 2.0, dd / dt, id))
 					"""
 					else:
 						if dt <= 0:
@@ -99,7 +99,7 @@ class FVPath(object):
 		cnt = 0
 		weight = 0
 		for el in self.speed:
-			t, p, s = el
+			t, p, s, id = el
 			if t < t1:
 				dt = (t1 - t).seconds
 			elif t > t2:
@@ -134,6 +134,3 @@ class FVPath(object):
 			pass
 			#print "Scartata velocita', il peso vale ", weight
 		return (-1, 0)
-			
-			
-	

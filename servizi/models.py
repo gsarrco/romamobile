@@ -693,3 +693,12 @@ class DisabilitatoreRichiestaNotifica(DisabililtatoreConFasce):
 	
 class FasciaRichiestaNotifica(FasciaValidita):
 	con_fasce = models.ForeignKey(RichiestaNotifica, related_name='fasce')
+
+# App
+
+class VersioneApp(models.Model):
+	versione = models.CharField(max_length=13, db_index=True)
+	orario_rilascio = models.DateTimeField(db_index=True)
+	orario_deprecata = models.DateTimeField(null=True, blank=True, default=None)
+	beta = models.BooleanField(blank=True, default=False)
+	messaggio_custom = models.CharField(max_length=2047, blank=True, null=True)

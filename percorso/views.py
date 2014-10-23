@@ -30,7 +30,7 @@ from servizi.utils import dict_cursor, project, populate_form, StyledSelect, BrR
 from servizi.utils import	ricapitalizza, template_to_mail
 from servizi.utils import messaggio, hist_redirect, group_excluded, richiedi_conferma
 from servizi.utils import modifica_url_con_storia_link, apply_ric, giorni_settimana
-from servizi.utils import prossima_data, dateandtime2datetime, datetime2mysql, getdef
+from servizi.utils import prossima_data, dateandtime2datetime, datetime2mysql, getdef, setdef
 from servizi.models import RicercaRecente, UtenteGenerico
 from mercury.models import Mercury
 import string
@@ -89,21 +89,6 @@ def inizializza_linee_escluse(linee_escluse=None):
 
 	return linee_escluse
 
-@percorso1.xmlrpc("percorso.StazioniRfi")
-@percorso1.logger("StazioniRfi")
-def stazioni_rfi(request, token, id_palina):
-	try:
-		s = StazioneRfi.objects.get(id_palina=id_palina)
-	except StazioneRfi.DoesNotExist:
-		raise errors.XMLRPC['XRE_NO_ID_PALINA']
-	except Exception as e:
-		raise errors.XMLRPC['XRE_DB']
-	return {
-		'id_richiesta': hashlib.md5(uuid.uuid1().hex).hexdigest(),
-		'nome_stazione': s.nome_stazione,
-		'codice_rfi_stazione': s.codice_rfi_stazione,
-	}
-
 
 def cerca(
 	request, 
@@ -115,17 +100,38 @@ def cerca(
 	lang,
 	offset=0,
 ):
+	"""
+	Cerca percorso
+
+	Se indirizzo_arrivo è una lista invece di una stringa, cerca il percorso verso destinazioni multiple
+	e restituisce un sommario con le distanze dei punti
+	"""
+
 	translation.activate(lang)
 	out = {}
 
+	punti = []
 	start = infopoint_to_cp(request, indirizzo_partenza)
-	stop = infopoint_to_cp(request, indirizzo_arrivo)
+	punti.append(start)
+
+	if isinstance(indirizzo_arrivo, list):
+		cerca_punti = True
+		for i in indirizzo_arrivo:
+			stop = infopoint_to_cp(request, i)
+			if stop['stato'] != 'OK':
+				out['errore-arrivo'] = stop
+				break
+			else:
+				punti.append(stop)
+	else:
+		cerca_punti = False
+		stop = infopoint_to_cp(request, indirizzo_arrivo)
+		punti.append(stop)
+		if stop['stato'] != 'OK':
+			out['errore-arrivo'] = stop
 	
 	if start['stato'] != 'OK':
 		out['errore-partenza'] = start
-		
-	if stop['stato'] != 'OK':
-		out['errore-arrivo'] = stop
 	
 	try:
 		orario = datetime.strptime(orario, "%Y-%m-%d %H:%M:%S") + timedelta(seconds=offset)
@@ -147,7 +153,7 @@ def cerca(
 	
 	if len(out) == 0:
 		request.session['infopoint'] = {
-			'punti': [start, stop],
+			'punti': punti,
 			'piedi': opzioni['piedi'],
 			'bus': opzioni['bus'],
 			'metro': opzioni['metro'],
@@ -155,6 +161,8 @@ def cerca(
 			'teletrasporto': getdef(opzioni, 'teletrasporto', False),
 			'mezzo': opzioni['mezzo'],
 			'max_distanza_bici': float(opzioni['max_distanza_bici']),
+			'max_distanza': getdef(opzioni, 'max_distanza', 50000),
+			'num_ris': getdef(opzioni, 'num_ris', 10),
 			'dt': orario,
 			'linee_escluse': opzioni['linee_escluse'] if 'linee_escluse' in opzioni else inizializza_linee_escluse(),
 			'carpooling': carpooling,
@@ -166,6 +174,7 @@ def cerca(
 			'ztl': getdef(opzioni, 'ztl', []),
 			'versione': getdef(opzioni, 'versione', 2),
 			'hl': lang,
+			'cerca_punti': cerca_punti,
 		}
 
 		return calcola_percorso_dinamico(request, True)
@@ -191,6 +200,25 @@ def cerca1(
 percorso1.xmlrpc("percorso.Cerca")(percorso1.logger("Cerca")(cerca1))
 percorso2.xmlrpc("percorso.Cerca")(percorso1.logger("Cerca")(cerca))
 
+def infopoint_normalize(infopoint):
+	"""
+	Set missing infopoint properties to their default values
+	"""
+	setdef(infopoint, 'mezzo', 1)
+	setdef(infopoint, 'piedi', 1)
+	setdef(infopoint, 'bus', True)
+	setdef(infopoint, 'metro', True)
+	setdef(infopoint, 'ferro', True)
+	setdef(infopoint, 'teletrasporto', False)
+	setdef(infopoint, 'max_distanza_bici', 5000)
+	setdef(infopoint, 'carpooling', False)
+	setdef(infopoint, 'data', datetime.now())
+	setdef(infopoint, 'quando', 0)
+	setdef(infopoint, 'linee_escluse', [])
+	setdef(infopoint, 'carpooling_vincoli', None)
+	setdef(infopoint, 'ztl', [])
+	setdef(infopoint, 'tipi_ris', [])
+
 def infopoint_to_get_params(infopoint, da=True):
 	params = {
 		'bus': 1 if infopoint['bus'] else 0,
@@ -213,34 +241,6 @@ def infopoint_to_get_params(infopoint, da=True):
 		params['da'] = infopoint_address_to_string(infopoint['punti'][0]).encode('utf8')
 	return urllib.urlencode(params)
 
-@percorso1.xmlrpc("percorso.AggiornaPosizione")
-@percorso2.xmlrpc("percorso.AggiornaPosizione")
-@percorso1.logger("AggiornaPosizione")
-def aggiorna_posizione_ws(
-	request, 
-	token,
-	id_palina,
-	lang,
-):
-	translation.activate(lang)
-	out = {}
-	paline = palinemodels.Palina.objects.by_date().filter(id_palina=id_palina)
-	if len(paline) == 0:
-		raise errors.XMLRPC['XRE_NO_ID_PALINA'] 
-	p = paline[0]
-	infopoint = request.session['infopoint']
-	infopoint['start'] = {
-		'address': 'fermata:%s' % id_palina,
-		'palina': id_palina,
-		'place': 'Roma',
-		'indirizzo': "%s (%s)" % (p.nome_ricapitalizzato(), p.id_palina),
-		'ricerca': address,
-	}
-	infopoint['dt'] = datetime.now()
-	indicazioni, mappa = calcola_percorso_dinamico(request, True)
-	out['indicazioni'] = apply_ric(indicazioni, safe_string_to_unicode)
-	out['mappa'] = mappa.render()
-	return out
 
 def _get_percorso(percorso):
 	banda = -1
@@ -314,42 +314,30 @@ def calcola_percorso_dinamico(request, webservice=False, ctx=None):
 	punti = infopoint['punti']
 	for p in punti:
 		RicercaRecente.update(request, p['ricerca'], p['indirizzo'])
-	mezzo = infopoint['mezzo']
-	piedi = infopoint['piedi']
-	bus = infopoint['bus']
-	metro = infopoint['metro']
-	ferro = infopoint['ferro']
-	data = infopoint['dt']
-	quando = infopoint['quando']
-	bici = mezzo == 3
-	rev = quando == 3
-	if not 'teletrasporto' in infopoint:
-		infopoint['teletrasporto'] = False
-	teletrasporto = infopoint['teletrasporto']
-	max_distanza_bici = infopoint['max_distanza_bici']
-	linee_escluse = set([k for k in infopoint['linee_escluse']])
-	carpooling = infopoint['carpooling']
-	tipi_ris = infopoint['tipi_ris'] if 'tipi_ris' in infopoint else []
-	ztl = infopoint['ztl'] if 'ztl' in infopoint else []
+
 	if not 'hl' in infopoint:
 		infopoint['hl'] = request.lingua.codice
-	if carpooling > 0:
-		carpooling_vincoli = infopoint['carpooling_vincoli']
-	else:
-		carpooling_vincoli = None
+	infopoint['start'] = punti[0]
+	infopoint['stop'] = punti[-1]
+	ctx['mappa_statica'] = not re.search("Android|iPhone", request.META['HTTP_USER_AGENT'])
+	ctx['carpooling'] = getdef(infopoint, 'carpooling', False)
+	infopoint_normalize(infopoint)
+
+	mezzo = getdef(infopoint, 'mezzo', 1)
 	if mezzo == 2:
 		tipi_ris = []
 		if infopoint['parcheggi_scambio']:
 			tipi_ris.append(parcheggi.PARCHEGGI)
 		if infopoint['parcheggi_autorimesse']:
 			tipi_ris.append(parcheggi.AUTORIMESSE)
+		infopoint['tipi_ris'] = tipi_ris
 	if mezzo == 4:
-		tipi_ris = [risorse.models.CAR_SHARING]
-	infopoint['tipi_ris'] = tipi_ris
-	infopoint['start'] = punti[0]
-	infopoint['stop'] = punti[-1]
-	ctx['mappa_statica'] = not re.search("Android|iPhone", request.META['HTTP_USER_AGENT'])
-	ctx['carpooling'] = carpooling
+		infopoint['tipi_ris'] = [risorse.models.CAR_SHARING]
+
+	if getdef(infopoint, 'cerca_punti', False):
+		out = Mercury.sync_any_static(settings.MERCURY_WEB, 'cerca_percorso', infopoint, by_queue=True)
+		return out
+
 	t1 = datetime.now()
 	ck = infopoint_to_cache_key(infopoint)
 	tr = cache.get(ck)
@@ -365,19 +353,20 @@ def calcola_percorso_dinamico(request, webservice=False, ctx=None):
 			return messaggio(request, _("Il servizio temporaneamente non &egrave; disponibile, riprova pi&ugrave; tardi."))
 	if tr is None:
 		cache.set(ck, 'WAIT', 60)
-		c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB, by_queue=True)
-		trs = pickle.loads(c.root.calcola_percorso(punti, piedi, bus, metro, ferro, ferro, pickle.dumps(data), bici, max_distanza_bici, linee_escluse, 1 if mezzo==3 else mezzo, carpooling, carpooling_vincoli, teletrasporto, rev, tipi_ris, ztl))
+		trs = Mercury.sync_any_static(settings.MERCURY_WEB, 'cerca_percorso', infopoint, by_queue=True)
 		t2 = datetime.now()
 		ctx['tempo_calcolo'] = str(t2 - t1)
 		tr = trs['percorso']
 		infopoint['percorso_auto_salvato'] = trs['percorso_auto_salvato']
 		cache.set(ck, tr, 60)
-	request.session['percorso-trattoroot'] = tr 
+	request.session['percorso-trattoroot'] = tr
 	return formatta_calcola_percorso(request, webservice, ctx, tr)
 
 
 def formatta_calcola_percorso(request, webservice, ctx, tr, opzioni=None, mail=None):
 	infopoint = request.session['infopoint']
+
+
 	punti = infopoint['punti']
 	versione = getdef(infopoint, 'versione', 2)
 	if opzioni is None:
@@ -406,6 +395,7 @@ def formatta_calcola_percorso(request, webservice, ctx, tr, opzioni=None, mail=N
 			'mappa': mappa,
 			'stat': stat.__dict__,
 			'linee_escluse': ctx['linee_escluse'],
+			'bounding_box': tr.get_bounding_box_wgs84(),
 		}
 	ctx['params'] = infopoint_to_get_params(infopoint)
 	indicazioni_icona.mark_safe()
@@ -971,4 +961,9 @@ def aggiungi_widget(request):
 	ctx['form']=f
 	
 	return TemplateResponse(request, 'crea_widget.html', ctx)
-	
+
+def percorso_js(request):
+	ctx = {}
+	if 'stylesheet' in request.GET:
+		ctx['css'] = request.GET['stylesheet']
+	return TemplateResponse(request, 'percorso-js.html', ctx)
