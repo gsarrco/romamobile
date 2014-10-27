@@ -21,7 +21,7 @@ class Command(BaseCommand):
 		print "\n\n1 di 5: Download orari partenza"
 		scarica_orari_partenza()
 		print "\n\n2 di 5: Ricalcolo frequenze da timetable"
-		calcola_frequenze()
+		calcola_frequenze(percorsi_da_rete=False)
 		print "\n\n3 di 5: Download statistiche passaggi"
 		scarica_stat_passaggi()		
 		print "\n\n4 di 5: Download rete"
