@@ -2733,13 +2733,19 @@ def carica_rete_e_grafo(retina=False, versione=None):
 	return (rete, g)
 
 # Frequenza bus
-def calcola_frequenze_giorno(giorno, giorno_settimana):
+def calcola_frequenze_giorno(giorno, giorno_settimana, percorsi_da_rete=True):
 	with transaction():
 		FrequenzaPercorso.objects.filter(giorno_settimana=giorno_settimana).delete()
 		giorno_succ = giorno + timedelta(days=1)
-		for percorso in Percorso.objects.by_date(giorno).all():
+		if percorsi_da_rete:
+			ps = Percorso.objects.by_date(giorno).all()
+			id_percorsi = [p.id_percorso for p in ps]
+		else:
+			pcs = PartenzeCapilinea.objects.filter(orario_partenza__gte=giorno, orario_partenza__lt=giorno_succ).distinct('id_percorso')
+			id_percorsi = [p.id_percorso for p in pcs]
+		for id_percorso in id_percorsi:
 			#print percorso.id_percorso
-			pcs = PartenzeCapilinea.objects.filter(id_percorso=percorso.id_percorso, orario_partenza__gte=giorno, orario_partenza__lt=giorno_succ)
+			pcs = PartenzeCapilinea.objects.filter(id_percorso=id_percorso, orario_partenza__gte=giorno, orario_partenza__lt=giorno_succ)
 			sum = [0.0 for i in range(24)]
 			cnt = [0 for i in range(24)]
 			da = [0 for i in range(24)]
@@ -2773,7 +2779,7 @@ def calcola_frequenze_giorno(giorno, giorno_settimana):
 					if dx:
 						h2 = 23
 					"""
-					if percorso.id_percorso == '51035':
+					if id_percorso == '51035':
 						print "%d - %d" % (h1, h2)
 					"""
 					for i in range(h1, h2 + 1):
@@ -2794,7 +2800,7 @@ def calcola_frequenze_giorno(giorno, giorno_settimana):
 						da[h2] = m2
 				old = op
 			"""
-			if percorso.id_percorso == '51035':
+			if id_percorso == '51035':
 				print cnt
 				print sum
 			"""
@@ -2804,7 +2810,7 @@ def calcola_frequenze_giorno(giorno, giorno_settimana):
 				else:
 					f = -1
 				fp = FrequenzaPercorso(
-					id_percorso=percorso.id_percorso,
+					id_percorso=id_percorso,
 					ora_inizio=h,
 					giorno_settimana=giorno_settimana,
 					frequenza=f,
@@ -2815,7 +2821,7 @@ def calcola_frequenze_giorno(giorno, giorno_settimana):
 				fp.save()
 
 
-def calcola_frequenze():
+def calcola_frequenze(percorsi_da_rete=True):
 	def cerca_giorno(i):
 		if i < 0 or i > 6:
 			raise Exception("Il giorno deve variare tra 0 (lunedi') e 6 (domenica)")
@@ -2829,7 +2835,7 @@ def calcola_frequenze():
 	for gi in giorni:
 		g = cerca_giorno(gi)
 		print g
-		calcola_frequenze_giorno(g, gi)
+		calcola_frequenze_giorno(g, gi, percorsi_da_rete)
 
 		
 def elabora_statistiche(data_inizio, data_fine, min_weight=5):
