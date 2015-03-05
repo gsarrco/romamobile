@@ -43,7 +43,7 @@ from django.utils.encoding import force_unicode
 from itertools import chain
 from django.utils.html import escape, conditional_escape
 from django.utils.safestring import mark_safe
-import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont
 from StringIO import StringIO
 from django.http import HttpResponse
 import rpyc 
@@ -52,6 +52,7 @@ from paline import gmaps
 from datetime import date, time, datetime, timedelta
 from django.template.defaultfilters import date as datefilter
 from django.template.loader import render_to_string
+from django.views.defaults import server_error
 import re
 from urllib import quote
 from servizi import infopoint
@@ -65,6 +66,7 @@ from xhtml.templatetags.format_extras import arrotonda_distanza
 from mercury.models import Mercury
 import hashlib
 from pprint import pprint
+
 
 logger = logging.getLogger('paline')
 
@@ -422,6 +424,8 @@ def _percorso(request, id_percorso, ctx=None, id_veicolo=None, giorno_partenze=N
 			if 'orari_partenza_vicini' in ctx:
 				ctx['orari_partenza_vicini'] = [o.orario_partenza for o in ctx['orari_partenza_vicini']]
 			return ctx
+		if not 'paline-mappa-statica' in request.session or request.session['paline-mappa-statica'][1] != id_percorso:
+			request.session['paline-mappa-statica'] = (datetime.now(), id_percorso, None, None, None, None, None)
 		return TemplateResponse(request, 'paline-fermate.html', ctx)
 	except Percorso.DoesNotExist:
 		return TemplateResponse(request, 'messaggio.html', {'msg': _("Il percorso %s non esiste") % id_percorso})
@@ -497,8 +501,11 @@ def visualizza_mappa(request, id_percorso):
 	except Percorso.DoesNotExist:
 		return TemplateResponse(request, 'messaggio.html', {'msg': _("Il percorso %s non esiste") % id_percorso})
 	
-def visualizza_mappa_statica(request, id_percorso, zoom=None, center_x=None, center_y=None):
+def visualizza_mappa_statica(request, action=None):
 	ctx = {}
+	dt_orig, id_percorso, zoom, center_x, center_y, shift_h, shift_v = request.session['paline-mappa-statica']
+	if datetime.now() - dt_orig < timedelta(seconds=3):
+		return messaggio(request, _(u'Spiacenti, si è verificato un errore. Ti preghiamo di riprovare.'))
 	try:
 		p = Percorso.objects.by_date().get(id_percorso=id_percorso)
 		ctx['percorso'] = p
@@ -514,20 +521,27 @@ def visualizza_mappa_statica(request, id_percorso, zoom=None, center_x=None, cen
 		
 		m = gmaps.Map()
 		c.root.percorso_su_mappa(id_percorso, m, '/paline/s/img/')
+		if zoom is not None and action is not None:
+			if action == 'i' and zoom < 19:
+				zoom += 1
+			if action == 'o' and zoom > 9:
+				zoom -= 1
+			if action == 'n':
+				center_y += shift_v
+			if action == 's':
+				center_y -= shift_v
+			if action == 'w':
+				center_x -= shift_h
+			if action == 'e':
+				center_x += shift_h
 		ret = m.render_static(zoom, center_y, center_x, id_palina=id_palina)
 		ctx['mappa'] = ret['map']
-		ctx['zoom'] = ret['zoom']
-		if ret['zoom'] < 19:
-			ctx['zoom_up'] = int(ret['zoom']) + 1
-		if ret['zoom'] > 9:
-			ctx['zoom_down'] = int(ret['zoom']) - 1
-		ctx['center_x'] = ret['center_x']
-		ctx['center_y'] = ret['center_y']
-		ctx['up'] = "%f" % (float(ret['center_y']) + float(ret['shift_v']))
-		ctx['down'] = "%f" % (float(ret['center_y']) - float(ret['shift_v']))
-		ctx['left'] = "%f" % (float(ret['center_x']) - float(ret['shift_h']))
-		ctx['right'] = "%f" % (float(ret['center_x']) + float(ret['shift_h']))
-		ctx['id_percorso'] = id_percorso
+		zoom = ret['zoom']
+		request.session['paline-mappa-statica'] = (dt_orig, id_percorso, zoom, float(ret['center_x']), float(ret['center_y']), ret['shift_h'], ret['shift_v'])
+		if zoom < 19:
+			ctx['zoom_up'] = True
+		if zoom > 9:
+			ctx['zoom_down'] = True
 		return percorso(request, id_percorso, ctx)
 	except Percorso.DoesNotExist:
 		return TemplateResponse(request, 'messaggio.html', {'msg': _("Il percorso %s non esiste") % id_percorso})				
@@ -777,13 +791,13 @@ def _disambigua(request,
 		p1 = []
 		p2 = []
 		for palina in paline_extra:
-			palina.preferita = palina.id_palina in preferite
-			if palina.preferita:
-				p1.append(palina)
-			else:
-				p2.append(palina)
-			nuovi_percorsi = not nascondi_duplicati
 			if palina.ha_linee_infotp():
+				nuovi_percorsi = not nascondi_duplicati
+				palina.preferita = palina.id_palina in preferite
+				if palina.preferita:
+					p1.append(palina)
+				else:
+					p2.append(palina)
 				ps = [p for p in Percorso.objects.by_date().select_related('linea').filter(fermata__palina=palina, soppresso=False)]
 				ps.sort(key=lambda p: (p.linea.id_linea, len(p.carteggio)))
 				linee = []
@@ -997,7 +1011,7 @@ def percorsi_special(request, token):
 	c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB)
 	out = pickle.loads(c.root.percorsi_special())
 	return out
-	
+
 
 def default(request):
 	f = populate_form(request, MultiForm, cerca='')
@@ -1033,9 +1047,9 @@ def carica_rete(request):
 			f = open(os.path.join(settings.TROVALINEA_PATH_RETE, 'temp/shp.zip'), 'wb')
 			f.write(shape.read())
 			f.close()
-			c = Mercury.rpyc_connect_any_static(settings.MERCURY_CARICA_RETE)
-			caricatore = rpyc.async(c.root.carica_rete)
-			caricatore()
+			# c = Mercury.rpyc_connect_any_static(settings.MERCURY_CARICA_RETE)
+			# caricatore = rpyc.async(c.root.carica_rete)
+			# caricatore()
 	else:
 		ctx['form'] = CaricaReteForm()
 	return TemplateResponse(request, 'paline-carica-rete.html', ctx)
@@ -1358,7 +1372,19 @@ def get_veicoli_tutti_percorsi(request, token):
 		'ultimo_aggiornamento': unmarshal_datetime(r.ultimo_aggiornamento),
 		'percorsi': vs,
 	}
-	
+
+@paline7.metodo("GetVeicoliPercorsoConPrevisioni")
+def get_veicoli_percorso_con_previsioni(request, token, id_percorso):
+	"""
+	Restituisce i veicoli di un percorso
+
+	Per l'università di Tor Vergata
+	"""
+	c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB)
+	vs = pickle.loads(c.root.veicoli_tutti_percorsi(True, True))
+
+	return vs
+
 @paline7.metodo("GetOrarioUltimoAggiornamentoArrivi")
 def get_orario_ultimo_aggiornamento_arrivi(request, token):
 	"""_

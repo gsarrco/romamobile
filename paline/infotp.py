@@ -30,6 +30,7 @@ from datetime import date, time, datetime, timedelta
 from threading import Lock
 
 delta = 30 # seconds
+TIMEOUT = 3 # seconds
 
 # disable proxy in 3 steps
 # 1: define a proxy handler which does not use a proxy (empty dict)
@@ -60,9 +61,11 @@ def log_infotp(id_palina, s):
 
 def call_infotp(id_palina):
 	u = urllib2.urlopen('http://localhost/Xml_PrevNodo.php?IdFermata=%s' % id_palina)
-	response = u.read()
+	response = u.read().strip()
 	u.close()
 	logging.debug(response)
+	if response.upper().find('ERROR') >= 0 or not response.endswith('</palina>'):
+		raise Exception('Errore nella risposta di InfoTP')
 	soup = Soup(response)
 	log_infotp(id_palina, str(soup))
 	return soup

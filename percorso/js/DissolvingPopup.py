@@ -68,6 +68,7 @@ class DissolvingPopup(PopupPanel):
 		self.html = HTML(s)
 		self.html.setWordWrap(False)
 		self.html.setHorizontalAlignment(HasAlignment.ALIGN_CENTER)
+		self.addStyleName("dissolving-popup")
 		if not error:
 			self.html.setStyleName("showcase-popup")
 		else:
@@ -82,7 +83,7 @@ class DissolvingPopup(PopupPanel):
 		DissolvingPopup.old_dp = self
 		self.setGlassPosition()
 		self.show()
-		self.timer = Timer(5000, self)
+		self.timer = Timer(2500 if error else 5000, self)
 		#Window.addWindowResizeListener(self.setGlassPosition)
 
 	def setGlassPosition(self): 
@@ -91,10 +92,8 @@ class DissolvingPopup(PopupPanel):
 		height = Window.getClientHeight() 
 		width = Window.getClientWidth()
 		self.setPopupPosition(left, top)
-		 
 
 	def onTimer(self, t):
 		self.hide()
 		DissolvingPopup.old_dp = None
 
-		

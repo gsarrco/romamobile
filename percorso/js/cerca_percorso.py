@@ -1,3 +1,5 @@
+# coding: utf-8
+
 #
 #    Copyright 2013-2014 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
@@ -61,10 +63,10 @@ from util import ToggleImage, FavSearchBox, DeferrablePanel, ScrollAdaptivePanel
 from util import wait_start, wait_stop, _, get_lang, TimeBox, PaginatedPanelPage, PaginatedPanel
 from datetime import date, time, datetime, timedelta
 from Calendar import Calendar, DateField, TimeField
-from map import MapPanel, Layer, LayerPanel, Marker
+from map import MapPanel, Layer, LayerPanel, Marker, get_location, GeoJson
 from globals import base_url, make_absolute
 from DissolvingPopup import DissolvingPopup
-from util import JsonHandler, redirect
+from util import JsonHandler, JsonInteractiveHandler, redirect
 
 SOGLIA_DIST_TRATTO_PIEDI = 200
 
@@ -76,6 +78,7 @@ client = JSONProxy(base_url + '/json/', [
 	'ztl_get_lista',
 	'percorso_get_params',
 	'percorso_email',
+	'percorso_posizione_attuale',
 	'servizi_autocompleta_indirizzo',
 	'carpooling_dettaglio_offerta',
 ])
@@ -431,14 +434,15 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 														'class': ListBox,
 														'name': 'da_list',
 														'width': '100%',
+														'height': '100%',
 													},
-													{
-														'class': Button,
-														'args': ['X', self.onChiudiDa],
-														'width': '40px',
-														'style': 'close-button',
-													}														
-												]
+												],
+										},
+										{
+											'class': Button,
+											'args': ['X', self.onChiudiDa],
+											'width': '40px',
+											'style': 'close-button',
 										},
 									]
 								},
@@ -466,14 +470,14 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 														'name': 'a_list',
 														'width': '100%',
 													},
-													{
-														'class': Button,
-														'args': ['X', self.onChiudiA],
-														'width': '40px',
-														'style': 'close-button',
-													}														
 												]
-										},
+											},
+											{
+												'class': Button,
+												'args': ['X', self.onChiudiA],
+												'width': '40px',
+												'style': 'close-button',
+											}
 									]
 								},
 							]
@@ -680,29 +684,39 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 									},
 								],
 							},
-									
 							{
-								'class': HP,
+								'class': VP,
 								'name': 'opzioni_bnr',
 								'call_setVisible': ([False], {}),
 								'sub': [
 									{
-										'class': HTML,
-										'args': [_('Max distanza in bici:&nbsp;')],
-										'vertical_alignment': HasAlignment.ALIGN_MIDDLE,
+										'class': CheckBox,
+										'args': [_('Porta la bici sui mezzi pubblici'), True],
+										'name': 'bici_sul_tpl',
+										'checked': False,
 									},
 									{
-										'class': TextBox,
-										'name': 'max_distanza_bici',
-										'call_setVisibleLength': ([3], {}),
-										'call_setText': (['5'], {}),
-										'vertical_alignment': HasAlignment.ALIGN_MIDDLE,
+										'class': HP,
+										'sub': [
+											{
+												'class': HTML,
+												'args': [_('Max distanza in bici:&nbsp;')],
+												'vertical_alignment': HasAlignment.ALIGN_MIDDLE,
+											},
+											{
+												'class': TextBox,
+												'name': 'max_distanza_bici',
+												'call_setVisibleLength': ([3], {}),
+												'call_setText': (['5'], {}),
+												'vertical_alignment': HasAlignment.ALIGN_MIDDLE,
+											},
+											{
+												'class': HTML,
+												'args': [_('&nbsp;km')],
+												'vertical_alignment': HasAlignment.ALIGN_MIDDLE,
+											},
+										],
 									},
-									{
-										'class': HTML,
-										'args': [_('&nbsp;km')],
-										'vertical_alignment': HasAlignment.ALIGN_MIDDLE,
-									},		
 								],
 							},
 							{
@@ -740,13 +754,11 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 								'args': ['quando', _('Adesso')],
 								'name': 'quando_0',
 								'checked': True,
-								'click_listener': self.onQuando01,					
 							},
 							{
 								'class': RadioButton,
 								'args': ['quando', _('Fra 5 minuti')],
 								'name': 'quando_1',
-								'click_listener': self.onQuando01,						
 							},
 							{
 								'class': HP,
@@ -756,15 +768,13 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 										'class': RadioButton,
 										'args': ['quando', _('Parti alle:&nbsp;'), True],
 										'name': 'quando_2',
-										'click_listener': self.onQuando23,
-										'vertical_alignment': HasAlignment.ALIGN_MIDDLE,					
+										'vertical_alignment': HasAlignment.ALIGN_MIDDLE,
 									},											
 									{
 										'class': RadioButton,
 										'args': ['quando', _('Arriva alle:&nbsp;'), True],
 										'name': 'quando_3',
-										'click_listener': self.onQuando23,
-										'vertical_alignment': HasAlignment.ALIGN_MIDDLE,					
+										'vertical_alignment': HasAlignment.ALIGN_MIDDLE,
 									},											
 								]
 							},
@@ -776,7 +786,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 										'class': DateField,
 										'args': ['%d/%m/%Y'],
 										'name': 'data',
-										'enabled': False,
+										'call_addChangeListener': ([self.onDateTimeChanged], {}),
 										'vertical_alignment': HasAlignment.ALIGN_MIDDLE,
 									},
 									{
@@ -787,8 +797,8 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 									{
 										'class': TimeBox,
 										'name': 'ora',
-										'enabled': False,
 										'vertical_alignment': HasAlignment.ALIGN_MIDDLE,
+										'call_addChangeListener': ([self.onDateTimeChanged], {}),
 									},											
 								]
 							},
@@ -867,6 +877,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 		self.cp_layer = None
 		self.linee_escluse = None
 		self.percorsi_realtime = []
+		self.usa_dss = False
 		
 		# self.realtime = Button("Tempo reale off", self.onRealtime)
 		# self.realtime.addStyleName('realtime')
@@ -875,6 +886,12 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 		# self.owner.owner.add(self.realtime)
 
 		self.cercaLuogoInit = False
+		self.navigator_on = False
+		self.timer_navigator = Timer(notify=self.navigatorUpdate)
+
+		# Mapping tra gli indici degli elementi del risultato del cerca percorso, e gli indici dei tratti
+		# (escludendo quindi i nodi)
+		self.indice_tratto = {}
 
 
 	def scrollaAOpzioni(self):
@@ -885,6 +902,35 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 	def scrollaAPercorso(self):
 		if self.risultati is not None:
 			self.risultati.getElement().scrollIntoView()
+
+	def navigatorStart(self):
+		self.navigator_on = True
+		self.navigatorUpdate()
+
+	def navigatorUpdate(self):
+		if self.navigator_on:
+			get_location(self.navigatorOnLocation, self.navigatorOnLocationError)
+
+	def navigatorOnLocation(self, lng, lat):
+		if self.navigator_on:
+			client.percorso_posizione_attuale(lng, lat, JsonHandler(self.navigatorOnPosizioneAttualeDone, self.navigatorOnLocationError))
+
+	def navigatorOnPosizioneAttualeDone(self, res):
+		if self.navigator_on:
+			indice_el = res['indice_percorso']
+			indice_tr = self.indice_tratto[indice_el]
+			self.pannello_riepilogo.selectIndex(indice_tr + 1)
+			#self.timer_navigator.schedule(res['refresh'] * 1000)
+			self.timer_navigator.schedule(10000)
+
+
+	def navigatorOnLocationError(self):
+		if self.navigator_on:
+			self.timer_navigator.schedule(10000)
+
+	def navigator_stop(self):
+		self.navigator_on = False
+		self.timer_navigator.cancel()
 
 		
 	def cambiaModo(self, modo):
@@ -927,6 +973,10 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 		self.base.by_name('come_header').setText(_("Come: %s") % come[self.modo])
 		if car:
 			self.getZtl()
+
+	def onDateTimeChanged(self):
+		if self.base.by_name('quando_0').isChecked() or self.base.by_name('quando_1').isChecked():
+			self.base.by_name('quando_2').setChecked(True)
 
 	def onModo(self, sender):
 		self.cambiaModo(sender.data)
@@ -1077,7 +1127,6 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 		self.base.by_name('opzioni_avanzate').setOpen(True)
 		self.base.by_name('risorse').setVisible(v)
 		q3 = self.base.by_name('quando_3')
-		q3.setEnabled(not v)
 		if v and q3.isChecked():
 			self.base.by_name('quando_0').setChecked(True)
 		if not self.cercaLuogoInit:
@@ -1094,10 +1143,12 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 			'bus',
 			'metro',
 			'ferro',
+			'usa_dss',
 			'mezzo',
 			'piedi',
 			'quando',
 			'max_distanza_bici',
+			'bici_sul_tpl',
 			'dt',
 			'linee_escluse',
 			'carpooling',
@@ -1121,15 +1172,17 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 			self.base.by_name('ferro').setChecked(value==1)
 		if param == 'quando':
 			self.base.by_name('quando_%d' % value).setChecked(True)
-			if int(value) == 2 or int(value) == 3:
-				self.base.by_name('data').setEnabled(True)
-				self.base.by_name('ora').setEnabled(True)			
+		if param == 'usa_dss':
+			self.usa_dss = True
+			self.cambiaModo(0)
 		if param == 'mezzo':
 			self.cambiaModo(int(value))
 		if param == 'piedi':
 			self.base.by_name('piedi_%d' % value).setChecked(True)			
 		if param == 'max_distanza_bici':
-			self.base.by_name('max_distanza_bici').setText(value)			
+			self.base.by_name('max_distanza_bici').setText(value)
+		if param == 'bici_sul_tpl':
+			self.base.by_name('bici_sul_tpl').setChecked(value=='1')
 		if param == 'dt':
 			self.base.by_name('data').getTextBox().setText('%s/%s/%s' % (value[8:10], value[5:7], value[:4]))
 			self.base.by_name('ora').setText('%s:%s' % (value[11:13], value[14:16]))
@@ -1147,10 +1200,9 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 		if param == 'ztl':
 			self.get_ztl = value.split(",")
 		if param == 'cp':
-			self.owner.hide(False)
+			self.owner.showSidePanel()
 			self.cercaPercorso()
-	
-		
+
 	def onChange(self, el):
 		el.removeStyleName('validation-error')
 		
@@ -1184,6 +1236,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 				make_absolute('/paline/s/img/partenza_percorso.png'),
 				icon_size=(32, 32),
 				anchor=(16, 32),
+				drop_callback=self.onRightClickDa,
 			)
 			
 			
@@ -1202,16 +1255,9 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 				make_absolute('/paline/s/img/arrivo_percorso.png'),
 				icon_size=(32, 32),
 				anchor=(16, 32),
+				drop_callback=self.onRightClickA,
 			)			
-		
 
-	def onQuando01(self):
-		self.base.by_name('data').setEnabled(False)
-		self.base.by_name('ora').setEnabled(False)
-		
-	def onQuando23(self):
-		self.base.by_name('data').setEnabled(True)
-		self.base.by_name('ora').setEnabled(True)
 		
 	def ripristinaWidgets(self):
 		for x, x_list, x_holder in [self.getWidgets(t) for t in (False, True)]:
@@ -1301,7 +1347,10 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 				'parcheggi_scambio': self.base.by_name('parcheggi_scambio').isChecked(),
 				'parcheggi_autorimesse': self.base.by_name('parcheggi_autorimesse').isChecked(),
 				'ztl': ztl,
+				'bici_sul_tpl': self.base.by_name('bici_sul_tpl').isChecked(),
 			}
+			if self.usa_dss and self.modo == 0:
+				opzioni['usa_dss'] = True
 			if self.linee_escluse is not None:
 				opzioni['linee_escluse'] = self.linee_escluse
 			if su_mappa:
@@ -1315,7 +1364,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 				n,
 				get_lang(),
 				offset,
-				JsonHandler(callback, self.onCercaErroreRemoto)
+				JsonInteractiveHandler(callback, self.onCercaErroreRemoto)
 			)
 		
 	def onEscludiFactory(self, id_linea, linea):
@@ -1385,11 +1434,15 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 		x, x_list, x_holder = self.getWidgets(False)
 		x_holder.setVisible(False)
 		x.setVisible(True)
+		x.setText('')
+		x.setFocus()
 		
 	def onChiudiA(self):
 		x, x_list, x_holder = self.getWidgets(True)
 		x_holder.setVisible(False)
-		x.setVisible(True)		
+		x.setVisible(True)
+		x.setText('')
+		x.setFocus()
 
 	def getIndirizzo(self, arrivo):
 		x, x_list, x_holder = self.getWidgets(arrivo)
@@ -1423,6 +1476,64 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 	def onCercaDoneSuMappa(self, res):
 		self.onCercaDone(res, su_mappa=True)
 
+
+	def onCercaDoneDss(self, res):
+		GeoJson(self.cp_layer, res['geojson'])
+
+		Marker(
+			self.cp_layer,
+			res['start'],
+			make_absolute('/paline/s/img/partenza_percorso.png'),
+			icon_size=(32, 32),
+			anchor=(16, 32),
+			drop_callback=self.onRightClickDa,
+		)
+
+		Marker(
+			self.cp_layer,
+			res['stop'],
+			make_absolute('/paline/s/img/arrivo_percorso.png'),
+			icon_size=(32, 32),
+			anchor=(16, 32),
+			drop_callback=self.onRightClickA,
+		)
+
+		risultati_holder = self.base.by_name('risultati_holder')
+		if self.risultati is not None:
+			risultati_holder.remove(self.risultati)
+
+		self.risultati = DP(
+			None,
+			[
+				{
+					'class': VP,
+					'style': 'indicazioni',
+					'sub': [
+						{
+							'class': GP,
+							'column_count': 2,
+							'name': 'proprieta',
+							'sub': [],
+						},
+					]
+				}
+			],
+			title=_('Percorso trovato'),
+		)
+
+		prop = self.risultati.by_name('proprieta')
+		stats = res['stats']
+		for k in stats:
+			prop.add(HTML('<b>%s</b>:' % k))
+			prop.add(HTML(stats[k]))
+
+		self.risultati.setOpen(True)
+		risultati_holder.add(self.risultati)
+
+		self.owner.center_and_zoom(self.cp_layer)
+		if self.owner.isSmall():
+			self.do_or_defer(self.scrollaAPercorso)
+
 		
 	def onCercaDone(self, res, su_mappa=True):
 		self.abilitaCerca()
@@ -1439,15 +1550,21 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 			self.base.by_name('data').getTextBox().addStyleName('validation-error')
 			self.base.by_name('ora').getTextBox().addStyleName('validation-error')
 			return
-		
+
 		# OK
 		if su_mappa:
 			self.owner.setTabMappaPercorso()
 		else:
 			self.owner.setTabPercorsoMappa()
 		self.createCpLayer()
+
 		self.percorsi_realtime = []
 		self.base.by_name('opzioni_avanzate').setOpen(False)
+
+		# DSS
+		if 'dss' in res:
+			return self.onCercaDoneDss(res['dss'])
+
 		risultati_holder = self.base.by_name('risultati_holder')
 		if self.risultati is not None:
 			risultati_holder.remove(self.risultati)
@@ -1562,6 +1679,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 		# Indicazioni
 		carpooling_trovato = False
 		n_tratto = 0
+		self.indice_tratto = {}
 		for i in res['indicazioni']:
 			count += 1
 			
@@ -1582,6 +1700,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 					menu_description=tpp.getMenu(),
 				)
 				rpp.addTratto(t)
+				self.indice_tratto[count - 1] = n_tratto
 
 				def deferrable(indicazioni, t):
 					def f():
@@ -1666,6 +1785,8 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 		self.owner.center_and_zoom(self.cp_layer)
 		if self.owner.isSmall():
 			self.do_or_defer(self.scrollaAPercorso)
+
+		# self.navigatorStart()
 
 		# if len(self.percorsi_realtime) > 0:
 		# 	self.realtime_status = False
@@ -1828,7 +1949,7 @@ class EmailDialog(DialogBox):
 		self.setPopupPosition(left, top)
 
 	def onInvia(self):
-		client.percorso_email(self.base.by_name('email').getText().strip(), JsonHandler(self.onEmailDone))
+		client.percorso_email(self.base.by_name('email').getText().strip(), JsonInteractiveHandler(self.onEmailDone))
 		self.hide()
 
 	def onEmailDone(self, res):
@@ -1885,7 +2006,7 @@ class CarPoolingChiediPanel(SimplePanel):
 		self.addStyleName('indicazioni')
 		self.id_linea_esclusa = None
 		self.nome_linea_esclusa = None
-		client.carpooling_dettaglio_offerta(id_offerta, False, JsonHandler(self.onDettaglioOffertaDone))
+		client.carpooling_dettaglio_offerta(id_offerta, False, JsonInteractiveHandler(self.onDettaglioOffertaDone))
 
 	def onDettaglioOffertaDone(self, res):
 		html = """
@@ -1904,7 +2025,7 @@ class CarPoolingChiediPanel(SimplePanel):
 
 	@enforce_login
 	def onChiedi(self):
-		client.carpooling_dettaglio_offerta(self.id_offerta, True, JsonHandler(self.onDettaglioOffertaChiediDone))
+		client.carpooling_dettaglio_offerta(self.id_offerta, True, JsonInteractiveHandler(self.onDettaglioOffertaChiediDone))
 
 	def onEscludi(self, res):
 		if self.id_linea_esclusa is not None:

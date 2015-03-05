@@ -745,91 +745,6 @@ class Percorso(VersionatoPaline, Disabilitabile):
 		return a
 
 
-
-# def dettaglio_palina(palina, linee_escluse=set([]), nome_palina=None, caching=False, as_service=False):
-# 	v = palina.getVeicoli(caching=caching)['veicoli']
-# 	v.sort(cmp=_cmp_linea_tempo)
-# 	v1 = []
-# 	v2 = []
-# 	linee_usate = set()
-# 	linee_disabilitate = set()
-# 	linea = None
-# 	carteggi_usati = set()
-# 	for x in v:
-# 		if x['linea'] not in linee_escluse:
-# 			x['id_palina'] = palina.id_palina
-# 			x['nome_palina'] = nome_palina
-# 			if not as_service:
-# 				for dotaz in ['meb', 'moby', 'aria', 'pedana']:
-# 					_converti_dotazioni_bordo(x, dotaz)
-# 			x['tempo_attesa'] = int(round(int(x['tempo_attesa']) / 60))
-# 			carteggi_usati.update(set(x['carteggi']))
-# 			linee_usate.add(x['linea'])
-# 			x['disabilitata'] = False
-# 			try:
-# 				perc = Percorso.objects.by_date().get(id_percorso=x['id_percorso'])
-# 				f = Fermata.objects.by_date().filter(percorso=perc, palina=palina)[0]
-# 				x['destinazione'] = perc.arrivo.nome_ricapitalizzato()
-# 				disabilitata = not f.abilitata_complessivo()
-# 				x['disabilitata'] = disabilitata
-# 				if disabilitata:
-# 					news = f.news_disabilitazione_complessivo()
-# 					if as_service:
-# 						x['id_news'] = news.pk if news is not None else -1
-# 					else:
-# 						x['news'] = news
-# 					linee_disabilitate.add(x['linea'])
-# 			except (Percorso.DoesNotExist, Fermata.DoesNotExist()):
-# 				pass
-# 			if linea != x['linea']:
-# 				ultima_linea_a_capolinea = False
-# 				if x['a_capolinea'] and x['prossima_partenza'] != '':
-# 					ultima_linea_a_capolinea = True
-# 					x['partenza'] = timefilter(x['prossima_partenza'], _("H:i"))
-# 				if not x['disabilitata']:
-# 					linea = x['linea']
-# 					v1.append(x)
-# 			elif not x['disabilitata']:
-# 				if x['a_capolinea'] and x['prossima_partenza'] != '' and not ultima_linea_a_capolinea:
-# 					ultima_linea_a_capolinea = True
-# 					x['partenza'] = timefilter(x['prossima_partenza'], _("H:i"))
-# 					v2.append(x)
-# 				elif not x['a_capolinea']:
-# 					v2.append(x)
-# 	fermate = Fermata.objects.by_date().filter(palina=palina)
-# 	percorsi = Percorso.objects.by_date().filter(fermata__in=fermate, soppresso=False)
-# 	ld = Linea.objects.by_date().filter(percorso__in=percorsi, tipo__in=TIPI_LINEA_INFOTP).distinct()
-# 	v3 = []
-# 	for l in ld:
-# 		if l.id_linea not in linee_escluse:
-# 			if True: #l.id_linea[0].lower() != 'n':
-# 				x = {}
-# 				x['nome_palina'] = nome_palina
-# 				x['id_palina'] = palina.id_palina
-# 				if not l.abilitata_complessivo() or not l.monitorata:
-# 					news = None
-# 					if not l in linee_disabilitate:
-# 						x['linea'] = l.id_linea
-# 						if not l.monitorata:
-# 							x['non_monitorata'] = True
-# 						else:
-# 							x['disabilitata'] = True
-# 							news = l.news_disabilitazione_complessivo()
-# 						if as_service:
-# 							x['id_news'] = news.pk if news is not None else -1
-# 						else:
-# 							x['news'] = news
-# 						_aggiungi_dotazioni_default(x, as_service)
-# 						v3.append(x)
-# 				elif l.id_linea not in linee_usate:
-# 					x['linea'] = l.id_linea
-# 					x['nessun_autobus'] = True
-# 					_aggiungi_dotazioni_default(x, as_service)
-# 					v3.append(x)
-# 	return v1, v2, v3, carteggi_usati
-
-
-
 def get_primi_arrivi(paline):
 	ids = [p.id_palina for p in paline]
 	arrivi_raw = Mercury.sync_any_static(settings.MERCURY_WEB, 'primi_arrivi_per_paline', {'id_paline': ids})
@@ -866,6 +781,8 @@ def get_primi_arrivi(paline):
 			if id_linea in info_linee:
 				tempo = int(el['tempo'])
 				distanza_fermate = int(el['fermate'])
+				# Protezione da malfunzionamenti algoritmo previsione causati da dati di input errati:
+				# in caso di tempi anomali, rendi tempo non disponibile
 				if tempo > (10 + 4 * distanza_fermate) * 60:
 					tempo = -1
 				a_capolinea = el['a_capolinea']
@@ -1369,6 +1286,12 @@ class LogCercaPercorso(models.Model):
 	auto = models.IntegerField()
 	carpooling = models.BooleanField()
 	linee_escluse = models.CharField(max_length=127)
+	da_lng = models.FloatField(null=True, blank=True, default=None)
+	da_lat = models.FloatField(null=True, blank=True, default=None)
+	a_lng = models.FloatField(null=True, blank=True, default=None)
+	a_lat = models.FloatField(null=True, blank=True, default=None)
+	distanza = models.FloatField(null=True, blank=True, default=None)
+	tempo = models.IntegerField(null=True, blank=True, default=None)
 	
 	def __unicode__(self):
 		return "[%s] %s -> %s" % (self.orario_richiesta, self.da, self.a)

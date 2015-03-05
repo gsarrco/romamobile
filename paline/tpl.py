@@ -59,18 +59,21 @@ import tomtom
 from collections import defaultdict
 from pprint import pprint
 from urllib_transport import UrllibTransport
+from random import Random
 
 LINEE_MINI = ['90', '542', '61', 'MEB', 'MEB1', '998', 'MEA', 'FR1']
 #LINEE_MINI = ['012', '063', '90', '999', 'MEB', 'MEB1']
 VALIDITA_TEMPO_ARCHI = timedelta(minutes=60)
-# Per ogni ciclo di aggiornamento tempi archi, massimo numero di tentativi per ciascun arco 
-MAX_TENTATIVI_TEMPO_ARCO = 2
+# Per ogni ciclo di aggiornamento tempi archi, massimo numero di tentativi per ciascun arcoprint
 MAX_PERIODO_PERCORSO_ATTIVO = timedelta(minutes=58)
 
 MIN_PESO_VELOCITA = 0.1
 
 TIMEOUT_VALIDITA_VEICOLO = timedelta(minutes=4)
 AVANZAMENTO_INTERPOLATO = False
+
+TIMEOUT_AGGIORNAMENTO_RETE = timedelta(seconds=90)
+MAX_TENTATIVI_INFOTP = 5
 
 class RetePalina(object):
 	def __init__(self, id_palina, nome, soppressa=False):
@@ -90,7 +93,7 @@ class RetePalina(object):
 		# Nota: le paline soppresse esistono, ed esistono anche le corrispondenti fermate.
 		#       Nel grafo, però, esistono solo i nodi relativi alle fermate, NON quelli relativi alle paline.
 		#       In questo modo sarà possibile transitare per le fermate ma non salire/scendere dal mezzo.
-		
+
 	def aggiorna_arrivi(self, solo_capilinea=False, aggiorna_fv=False):
 		s = infotp.call_infotp(self.id_palina)
 		linee = s.findAll('linea')
@@ -138,19 +141,19 @@ class RetePalina(object):
 			'arrivi': self.arrivi,
 			'ultimo_aggiornamento': self.ultimo_aggiornamento,
 		}
-		
+
 	def deserializza_dinamico(self, rete, res):
 		self.arrivi = res['arrivi']
 		self.ultimo_aggiornamento = res['ultimo_aggiornamento']
-	
-				
+
+
 	def serializza(self):
 		return {
 			'id': self.id_palina,
 			'x': self.x,
 			'y': self.y,
 		}
-	
+
 	def deserializza(self, res):
 		self.x = res['x']
 		self.y = res['y']
@@ -168,7 +171,10 @@ class RetePalina(object):
 		for k in self.fermate:
 			f = self.fermate[k]
 			if f.aggiornabile_infotp() and f.is_capolinea():
+				p = f.rete_percorso
+				p.begin_aggiorna_veicoli()
 				f.propaga_arrivi_indietro()
+				p.end_aggiorna_veicoli()
 
 	def distanza(self, p):
 		if self.x == -1 or p.x == -1:
@@ -176,7 +182,7 @@ class RetePalina(object):
 		a = self.x - p.x
 		b = self.y - p.y
 		return math.sqrt(a * a + b * b)
-	
+
 	def aggiornabile_infotp(self):
 		"""
 		E' il capolinea per almeno una fermata di cui interessa interrogare InfoTP
@@ -204,6 +210,7 @@ class RetePercorso(object):
 		self.dist = 0
 		self.veicoli = {}
 		self.ultimo_aggiornamento = None
+		self.orario_inizio_aggiornamento_veicoli = None
 		for i in range(0, 7):
 			self.frequenza.append([(0.0, -1, -1) for j in range(0, 24)])
 
@@ -216,18 +223,31 @@ class RetePercorso(object):
 			'frequenza': self.frequenza,
 			'tempo_stat_orari': self.tempo_stat_orari,
 		}
-	
+
 	def deserializza(self, res):
 		self.frequenza = res['frequenza']
 		self.tempo_stat_orari = res['tempo_stat_orari']
-		
+
+	def begin_aggiorna_veicoli(self):
+		self.orario_inizio_aggiornamento_veicoli = datetime.now()
+
+	def end_aggiorna_veicoli(self):
+		da_cancellare = []
+		for id_veicolo in self.veicoli:
+			v = self.veicoli[id_veicolo]
+			if v.ultimo_aggiornamento < self.orario_inizio_aggiornamento_veicoli:
+				da_cancellare.append(id_veicolo)
+		for id_veicolo in da_cancellare:
+			del self.veicoli[id_veicolo]
+		self.orario_inizio_aggiornamento_veicoli = None
+
 	def serializza_dinamico(self):
 		return {
 			'type': 'RetePercorso',
 			'id': self.id_percorso,
 			'veicoli': [id_veicolo for id_veicolo in self.veicoli],
 		}
-		
+
 	def deserializza_dinamico(self, rete, res):
 		self.veicoli = {}
 		for id_veicolo in res['veicoli']:
@@ -303,7 +323,7 @@ class RetePercorso(object):
 			})
 		return out
 
-			
+
 	def stampa_tempi(self):
 		print " *** Tempi percorso %s (linea %s) ***" % (self.id_percorso, self.id_linea)
 		i = 0
@@ -314,18 +334,18 @@ class RetePercorso(object):
 			#else:
 			#	s = str(t.tempo_percorrenza_interpolato) + " (I)"
 			print "%d - %s" % (i, s)
-			
+
 	def calcola_distanze(self):
 		self.tratti_percorso[0].s.distanza_da_partenza = 0
 		d = 0
 		for tp in self.tratti_percorso:
 			d += tp.rete_tratto_percorsi.dist
 			tp.t.distanza_da_partenza = d
-			
+
 	def get_destinazione(self):
 		return self.tratti_percorso[-1].t.rete_palina.nome_ricapitalizzato
-		
-	
+
+
 	def calcola_percorrenze(self):
 		dist_rem = self.dist
 		n = datetime.now()
@@ -345,20 +365,20 @@ class RetePercorso(object):
 				#print "Non disponibile"
 			dist_rem = nd
 		#print "Distanza finale: ", dist_rem
-		
+
 	def get_fermate(self):
 		fs = []
 		for tp in self.tratti_percorso:
 			fs.append(tp.s)
 		fs.append(tp.t)
 		return fs
-	
+
 	def get_paline(self):
 		return [f.rete_palina for f in self.get_fermate()]
-	
+
 	def is_circolare(self):
 		return self.tratti_percorso[0].s.rete_palina == self.tratti_percorso[-1].t.rete_palina
-	
+
 	def aggiorna_posizione_veicoli(self):
 		if AVANZAMENTO_INTERPOLATO:
 			veicoli_spostati = {}
@@ -402,23 +422,23 @@ class RetePercorso(object):
 						dt = ds / velocita
 						fermata.add_arrivo(v, n + timedelta(seconds=t + dt), ferm)
 						veicoli_propaganti[id_veicolo] = (v, 0, t + dt, ferm + 1)
-		else:
+		# else:
 			# Elimino veicoli vecchi
-			for tpo in self.tratti_percorso:
-				da_cancellare = []
-				arrivi = tpo.t.arrivi
-				for a in arrivi:
-					id_veicolo = a['id_veicolo']
-					if id_veicolo in self.veicoli:
-						v = self.veicoli[id_veicolo]
-						if not v.is_valido():
-							da_cancellare.append(a)
-					else:
-						da_cancellare.append(a)
-				for a in da_cancellare:
-					arrivi.remove(a)
-			
-	
+			# for tpo in self.tratti_percorso:
+			# 	da_cancellare = []
+			# 	arrivi = tpo.t.arrivi
+			# 	for a in arrivi:
+			# 		id_veicolo = a['id_veicolo']
+			# 		if id_veicolo in self.veicoli:
+			# 			v = self.veicoli[id_veicolo]
+			# 			if not v.is_valido():
+			# 				da_cancellare.append(a)
+			# 		else:
+			# 			da_cancellare.append(a)
+			# 	for a in da_cancellare:
+			# 		arrivi.remove(a)
+
+
 	def stato(self):
 		"""
 		Restituisce informazioni sullo stato del percorso: fermate, tratti di percorso ecc.
@@ -454,16 +474,76 @@ class RetePercorso(object):
 				'id_palina': t.id_palina,
 				'nome': t.nome,
 				'soppressa': t.soppressa,
-				'nome_ricapitalizzato': t.nome_ricapitalizzato,				
+				'nome_ricapitalizzato': t.nome_ricapitalizzato,
 				'stato_traffico': stato,
 			})
 		return out
 
-		
+	def get_frequenza(self, dt=None):
+		if dt is None:
+			dt = datetime.now()
+		d = Festivita.get_weekday(dt, compatta_feriali=True)
+		t_prog, da, a = self.frequenza[d][dt.hour]
+		# print "Frequenza percorso:", t_prog, da, a
+		if not (da <= dt.minute <= a):
+			return None
+		else:
+			return round(t_prog / 60.0)
+
+
+	def statistiche(self):
+		now = datetime.now()
+		attesa_totale = 0
+		attesa_max = None
+		cnt = 0
+		tempo_totale = 0
+		distanza_totale = 0
+
+		for t in self.tratti_percorso:
+			f = t.t
+			tempo = f.get_primo_arrivo(now)
+			if tempo is not None:
+				tempo = tempo[0]
+				attesa_totale += tempo
+				attesa_max = max(tempo, attesa_max)
+				cnt += 1
+			tp = t.rete_tratto_percorsi
+			if tp.tempo_percorrenza > 0:
+				tempo_totale += tp.tempo_percorrenza
+				distanza_totale += tp.dist
+
+		vic = 0
+		vac = 0
+
+		for id_veicolo in self.veicoli:
+			v = self.veicoli[id_veicolo]
+			if v.a_capolinea:
+				vac += 1
+			else:
+				vic += 1
+
+		freq = self.get_frequenza(now)
+		indice_attesa = None
+		if freq is not None and attesa_max is not None:
+			indice_attesa = attesa_max / (freq * 60.0)
+
+		return {
+			'attesa_media': None if cnt == 0 else int(round(attesa_totale / (60.0 * cnt))),
+			'attesa_max': None if attesa_max is None else int(round(attesa_max / 60.0)),
+			'veicoli_in_corsa': vic,
+			'veicoli_capolinea': vac,
+			'velocita_media': None if distanza_totale == 0 else (3.6 * distanza_totale / tempo_totale),
+			'frequenza_programmata': None if freq is None else int(freq),
+			'indice_attesa': indice_attesa,
+		}
+
+
+
+
 class ReteTrattoPercorsi(object):
 	"""
 	Rappresenta un tratto fra due paline, condiviso fra uno o più percorsi
-	"""	
+	"""
 	def __init__(self, s, t, rete):
 		object.__init__(self)
 		self.s = s
@@ -481,11 +561,11 @@ class ReteTrattoPercorsi(object):
 
 		self.infotp = False
 		self.tratti_percorso = []
-		
-	
+
+
 	def get_id(self):
 		return (self.s.id_palina, self.t.id_palina)
-		
+
 	def serializza_dinamico(self):
 		return {
 			'type': 'ReteTrattoPercorsi',
@@ -493,12 +573,12 @@ class ReteTrattoPercorsi(object):
 			'tempo_percorrenza': self.tempo_percorrenza,
 			'ultimo_aggiornamento': self.ultimo_aggiornamento,
 		}
-		
+
 	def deserializza_dinamico(self, rete, res):
 		self.tempo_percorrenza = res['tempo_percorrenza']
 		self.ultimo_aggiornamento = res['ultimo_aggiornamento']
 
-		
+
 	def serializza(self):
 		return {
 			'id': self.get_id(),
@@ -506,20 +586,20 @@ class ReteTrattoPercorsi(object):
 			'dist': self.dist,
 			'tempo_percorrenza_stat_orari': self.tempo_percorrenza_stat_orari,
 		}
-	
+
 	def deserializza(self, res):
 		self.set_punti(res['punti'])
 		self.set_dist(res['dist'])
 		self.tempo_percorrenza_stat_orari = res['tempo_percorrenza_stat_orari']
-		
+
 	def aggiungi_tratto_percorso(self, tp):
 		self.percorsi[tp.rete_percorso.id_percorso] = tp
 		if tp.rete_percorso.tipo in TIPI_LINEA_INFOTP:
 			self.infotp = True
-			
+
 	def add_tratto_percorso(self, tp):
 		self.tratti_percorso.append(tp)
-			
+
 	def media_tempi_percorrenza(self, logging=False):
 		tot = 0
 		cnt = 0
@@ -551,7 +631,7 @@ class ReteTrattoPercorsi(object):
 					peso=cnt,
 				).save()
 		#print "Calcolato tempo percorrenza:", cnt, self.tempo_percorrenza
-			
+
 	def get_velocita(self):
 		if self.ultimo_aggiornamento is None or datetime.now() - self.ultimo_aggiornamento > VALIDITA_TEMPO_ARCHI:
 			return -1
@@ -559,18 +639,18 @@ class ReteTrattoPercorsi(object):
 			return -1
 		return self.dist / self.tempo_percorrenza
 
-					
+
 	def distanza(self):
 		return self.dist
 		#return self.s.distanza(self.t)
-		
+
 	def linearizza(self, p):
 		"""
 		Restituisce la distanza lineare dal capolinea iniziale della proiezione di p sul tratto
 		"""
-		i, dist_tratto, dist_inizio = self.segmenti.project(p) 
+		i, dist_tratto, dist_inizio = self.segmenti.project(p)
 		return dist_inizio
-		
+
 	def set_dist(self, dist):
 		"""
 		#print "Tratto percorso", self.s.id_palina, self.t.id_palina
@@ -584,27 +664,27 @@ class ReteTrattoPercorsi(object):
 		print "Distanza calcolata: ", nd
 		#dist = nd
 		"""
-		
+
 		if self.dist is not None:
 			print "Distanza duplicata"
-		
+
 		else:
-			if dist is not None:	
+			if dist is not None:
 				self.dist = dist
 				for k in self.percorsi:
 					self.percorsi[k].rete_percorso.dist += dist
-					
+
 	def set_punti(self, punti):
 		self.punti = punti
 		for i in range(1, len(punti)):
 			self.segmenti.add_segment(punti[i-1], punti[i], i)
 		self.segmenti.freeze()
-	
+
 	def sposta_paline_su_percorso(self):
 		self.s.x, self.s.y = self.punti[0][0], self.punti[0][1]
 		self.t.x, self.t.y = self.punti[-1][0], self.punti[-1][1]
-	
-		
+
+
 class ReteFermata(object):
 	"""
 	Rappresenta una fermata di un percorso presso una palina
@@ -616,7 +696,7 @@ class ReteFermata(object):
 		self.rete = rete
 		# Gli arrivi qui sono ordinati per tempo di attesa, e ricalcolati di frequente
 		# a partire dagli arrivi al capolinea di destinazione (vecchio metodo)
-		# oppure direttamente a partire dalla posizione dei veicoli (nuovo metodo) 
+		# oppure direttamente a partire dalla posizione dei veicoli (nuovo metodo)
 		self.arrivi = []
 		self.arrivi_temp = []
 		self.ultimo_aggiornamento = None
@@ -626,6 +706,9 @@ class ReteFermata(object):
 		self.tratto_percorso_precedente = None
 		self.tratto_percorso_successivo = None
 		self.distanza_da_partenza = -1
+
+	def is_valida(self):
+		return self.ultimo_aggiornamento is not None and datetime.now() - self.ultimo_aggiornamento <= TIMEOUT_VALIDITA_VEICOLO
 
 	def serializza_dinamico(self):
 		arr = []
@@ -640,7 +723,7 @@ class ReteFermata(object):
 			'arrivi': arr,
 			'ultimo_aggiornamento': self.ultimo_aggiornamento,
 		}
-	
+
 	def deserializza_dinamico(self, rete, res):
 		self.ultimo_aggiornamento = res['ultimo_aggiornamento']
 		arr = res['arrivi']
@@ -648,11 +731,11 @@ class ReteFermata(object):
 			if 'tratto_percorso' in a:
 				a['tratto_percorso'] = rete.tratti_percorso[a['tratto_percorso']]
 		self.arrivi = arr
-		
+
 	def aggiornabile_infotp(self):
-		return self.rete_percorso.gestore in GESTORI_INFOTP and self.rete_percorso.tipo in TIPI_LINEA_INFOTP		
-		
-		
+		return self.rete_percorso.gestore in GESTORI_INFOTP and self.rete_percorso.tipo in TIPI_LINEA_INFOTP
+
+
 	def propaga_arrivi_indietro(self):
 		tratto = self.tratto_percorso_precedente
 		if tratto is not None:
@@ -683,7 +766,7 @@ class ReteFermata(object):
 			#print "Questi sono i veicoli attuali"
 			#print self.arrivi_temp
 			self.propaga_arrivi_avanti()
-		
+
 	def is_capolinea(self):
 		if self.rete_percorso.is_circolare():
 			t = self.tratto_percorso_successivo
@@ -692,16 +775,16 @@ class ReteFermata(object):
 			return t.t.tratto_percorso_successivo is None
 		else:
 			return self.tratto_percorso_successivo is None
-		
+
 	def is_capolinea_partenza(self):
 		return self.tratto_percorso_precedente is None
-			
+
 	def propaga_arrivi_avanti(self):
 		tratto = self.tratto_percorso_successivo
 		#self.ultimo_aggiornamento = datetime.now()
 		if tratto is not None:
 			rtp = tratto.rete_tratto_percorsi
-			if rtp.ultimo_aggiornamento is not None and datetime.now() - rtp.ultimo_aggiornamento < VALIDITA_TEMPO_ARCHI:			
+			if rtp.ultimo_aggiornamento is not None and datetime.now() - rtp.ultimo_aggiornamento < VALIDITA_TEMPO_ARCHI:
 				t = tratto.rete_tratto_percorsi.tempo_percorrenza
 			else:
 				t = -1
@@ -720,7 +803,7 @@ class ReteFermata(object):
 						if d2 == -1 or d2 == -2:
 							d2 = dist / 2
 						else:
-							d2 += dist						
+							d2 += dist
 						if d2 >= 0 and d2 <= dist:
 							el['tempo'] = t * d2 / dist
 							el['distanza_primo_tratto'] = d2
@@ -733,7 +816,7 @@ class ReteFermata(object):
 										frac = d2 / dp
 										#print "frac = ", frac
 										mp = (op[0] + frac * (p[0] - op[0]), op[1] + frac * (p[1] - op[1]))
-										#print "Posizione: ", mp										
+										#print "Posizione: ", mp
 										break
 									d2 -= dp
 								op = p
@@ -747,7 +830,7 @@ class ReteFermata(object):
 						else:
 							mp = punti[-1]
 							el['distanza_primo_tratto'] = dist
-							el['tempo'] = t						
+							el['tempo'] = t
 						el['in_arrivo'] = True
 					else:
 						# A capolinea
@@ -755,7 +838,7 @@ class ReteFermata(object):
 						el['distanza_primo_tratto'] = dist
 						mp = punti[-1]
 					if t == -1:
-						el['tempo'] = -1				
+						el['tempo'] = -1
 					fermata.arrivi.append(el)
 					dotazioni = {
 						'pedana': el['pedana'],
@@ -775,7 +858,7 @@ class ReteFermata(object):
 				el['in_arrivo'] = False
 				fermata.arrivi.append(el)
 			fermata.propaga_arrivi_avanti()
-			
+
 	def log_arrivi(self):
 		logged = set()
 		for a in self.arrivi_temp:
@@ -789,11 +872,11 @@ class ReteFermata(object):
 					ora=datetime2time(datetime.now()),
 					tempo=t,
 				).save()
-		
+
 	def get_primo_arrivo(self, t, rev=False):
 		"""
 		Restituisce il primo arrivo del bus a partire dal tempo t (secondi), None se non disponibile
-		
+
 		Restituisce una coppia (t, el), dove el è il dizionario con le info sull'arrivo del veicolo
 		"""
 		#TODO: rendere la funzione efficiente con un'opportuna struttura dati!
@@ -811,25 +894,25 @@ class ReteFermata(object):
 					return None
 			old = a
 		return None
-	
+
 	def reset_arrivi(self):
 		self.arrivi = []
 		self.ultimo_aggiornamento = datetime.now()
-		
+
 	def reset_arrivi_temp(self):
 		self.arrivi_temp = []
-		
+
 	def aggiungi_arrivo_temp(self, arrivo):
 		a = copy(arrivo)
 		self.arrivi_temp.append(a)
-		
+
 	def ordina_arrivi_temp(self, aggiorna_fv):
 		n = datetime.now()
 		for d in self.arrivi_temp:
 			if aggiorna_fv and d['distanza'] > 0:
 				self.rete_percorso.fv.add(d['id_veicolo'], n, d['distanza'])
 		self.arrivi_temp.sort(key=lambda x: x['tempo'])
-		
+
 	def add_arrivo(self, veicolo, orario_arrivo, dist_fermate):
 		"""
 		Nuovo metodo per aggiungere gli arrivi
@@ -864,8 +947,8 @@ class ReteFermata(object):
 			'in_arrivo': secondi_attesa < INTERVALLO_IN_ARRIVO,
 		})
 		self.arrivi.sort(key=lambda x: x['tempo'])
-		
-		
+
+
 	def elimina_arrivo(self, veicolo):
 		"""
 		Elimina le previsioni di arrivo per il veicolo passato; restituisce True se erano presenti.
@@ -906,7 +989,7 @@ class ReteTrattoPercorso(object):
 		self.tempo_percorrenza = 0
 		self.weight_tempo_percorrenza = 0
 		self.veicoli = {}
-		
+
 	def get_id(self):
 		return (self.s.id_fermata, self.t.id_fermata)
 
@@ -918,7 +1001,7 @@ class ReteTrattoPercorso(object):
 			'weight_tempo_percorrenza': self.weight_tempo_percorrenza,
 			'veicoli': [id_veicolo for id_veicolo in self.veicoli],
 		}
-		
+
 	def deserializza_dinamico(self, rete, res):
 		self.tempo_percorrenza = res['tempo_percorrenza']
 		self.weight_tempo_percorrenza = res['weight_tempo_percorrenza']
@@ -954,7 +1037,7 @@ class ReteCorsa(object):
 
 		Se il veicolo ha iniziato un'altra corsa, restituisce False
 		"""
-		
+
 
 class ReteVeicolo(object):
 	def __init__(self, id_veicolo, dotazioni=None):
@@ -976,8 +1059,8 @@ class ReteVeicolo(object):
 			}
 		else:
 			self.dotazioni = dotazioni
-	
-			
+
+
 	def serializza_dinamico(self):
 		return {
 			'type': 'ReteVeicolo',
@@ -991,7 +1074,7 @@ class ReteVeicolo(object):
 			'dotazioni': self.dotazioni,
 			'punto': self.punto,
 		}
-		
+
 	def deserializza_dinamico(self, rete, res):
 		self.distanza_capolinea = res['distanza_capolinea']
 		self.distanza_successiva = res['distanza_successiva']
@@ -1001,7 +1084,7 @@ class ReteVeicolo(object):
 		self.a_capolinea = res['a_capolinea']
 		self.dotazioni = res['dotazioni']
 		self.punto = res['punto']
-		
+
 	def aggiorna_posizione(self, distanza_capolinea, distanza_successiva, tratto_percorso, a_capolinea, punto, propaga=True):
 		old_percorso = None
 		percorso = tratto_percorso.rete_percorso
@@ -1009,17 +1092,17 @@ class ReteVeicolo(object):
 			old_percorso = self.tratto_percorso.rete_percorso
 			if percorso != old_percorso:
 				self.reset_fermate()
-				del old_percorso.veicoli[self.id_veicolo]
-		if old_percorso != percorso:
-			percorso.veicoli[self.id_veicolo] = self
+				if self.id_veicolo in old_percorso.veicoli:
+					del old_percorso.veicoli[self.id_veicolo]
+		percorso.veicoli[self.id_veicolo] = self
 		old_tratto = None
 		if self.tratto_percorso is not None:
 			old_tratto = self.tratto_percorso
-			if tratto_percorso != old_tratto:
+			if tratto_percorso != old_tratto and self.id_veicolo in old_tratto.veicoli:
 				del old_tratto.veicoli[self.id_veicolo]
 		if old_tratto != tratto_percorso:
-			tratto_percorso.veicoli[self.id_veicolo] = self			
-			
+			tratto_percorso.veicoli[self.id_veicolo] = self
+
 		self.distanza_capolinea = distanza_capolinea
 		self.distanza_successiva = distanza_successiva
 		self.tratto_percorso = tratto_percorso
@@ -1029,7 +1112,7 @@ class ReteVeicolo(object):
 		self.punto = punto
 		if propaga:
 			self.propaga_su_fermate()
-		
+
 	def aggiorna_posizione_interpolata(self, tratto_percorso, distanza_precedente, ultima_interpolazione):
 		tpi = tratto_percorso.rete_tratto_percorsi
 		self.distanza_successiva = tpi.dist - distanza_precedente
@@ -1040,7 +1123,7 @@ class ReteVeicolo(object):
 			self.tratto_percorso.veicoli[self.id_veicolo] = self
 		self.ultima_interpolazione = ultima_interpolazione
 		self.calcola_punto()
-		
+
 	def calcola_punto(self):
 		"""
 		A partire dalla posizione linearizzata, calcola le coordinate occupate dal veicolo
@@ -1064,11 +1147,11 @@ class ReteVeicolo(object):
 		if mp is None:
 			mp = op
 		self.punto = mp
-		
+
 	def reset_fermate(self, a_fermata=None):
 		"""
 		Cancella gli arrivi del veicolo corrente dal capolinea di partenza fino alla fermata indicata, inclusa.
-		
+
 		Se non è indicata una fermata, cancella su tutto il percorso.
 		"""
 		if a_fermata is None:
@@ -1080,7 +1163,7 @@ class ReteVeicolo(object):
 				a_fermata = tp.s
 			else:
 				a_fermata = None
-						
+
 	def propaga_su_fermate(self):
 		tpo = self.tratto_percorso
 		self.reset_fermate(tpo.s)
@@ -1106,12 +1189,12 @@ class ReteVeicolo(object):
 			fermata.add_arrivo(self, tempo, numero)
 			tpo = fermata.tratto_percorso_successivo
 
-		
+
 	def is_valido(self):
 		if self.ultimo_aggiornamento is None or datetime.now() - self.ultimo_aggiornamento > TIMEOUT_VALIDITA_VEICOLO:
 			return False
 		return True
-		
+
 	def get_arrivi(self):
 		"""
 		Restituisce gli arrivi alle fermate successive
@@ -1135,23 +1218,30 @@ class ReteVeicolo(object):
 					d = t.rete_tratto_percorsi.dist
 			else:
 				d -= v * dt
-				dt = 0		
+				dt = 0
 		# Determino posizioni
 		out = {}
+		i = 1
+		tempo = 0
 		while t is not None:
 			v = t.rete_tratto_percorsi.get_velocita()
 			if v < 0:
 				t = None
 				break
-			new_n = n + timedelta(seconds=d / v)
+			tempo += d / v
+			# Protezione da malfunzionamenti algoritmo previsione causati da dati di input errati:
+			# in caso di tempi anomali, rendi tempo non disponibile
+			if tempo > (10 + 4 * i) * 60:
+				t = None
+				break
 			f = t.t
-			out[f.rete_palina.id_palina] = new_n
-			n = new_n
+			out[f.rete_palina.id_palina] = n + timedelta(seconds=tempo)
 			t = f.tratto_percorso_successivo
+			i += 1
 			if t is not None:
 				d = t.rete_tratto_percorsi.dist
 		return out
-	
+
 	def get_info(self, get_arrivi=True, get_distanza=False):
 		out = {
 			'id_veicolo': self.id_veicolo,
@@ -1169,8 +1259,8 @@ class ReteVeicolo(object):
 def get_parametri_costo_pedonale(a0, a1, exp):
 	c0 = a0
 	c1 = (a1 - c0) / math.pow(1000, exp)
-	return (c0, c1, exp) 
-	
+	return (c0, c1, exp)
+
 class ReteZtl(object):
 	def __init__(self, codice, nome, orari):
 		self.id_ztl = codice
@@ -1191,7 +1281,7 @@ class ReteZtl(object):
 					return (t - o[0]).seconds
 		return None
 
-	
+
 class Rete(object):
 	def __init__(self):
 		object.__init__(self)
@@ -1215,21 +1305,25 @@ class Rete(object):
 		self.linee_equivalenti = {}
 		self.ultimo_aggiornamento = None
 		self.geocoder = None
-		
+		self.random = Random()
+		self.qualita_atac = QualitaAtac()
+
 	def serializza_dinamico_interno(self):
 		return {
 			'type': 'Rete',
 			'id': '',
 			'ultimo_aggiornamento': self.ultimo_aggiornamento,
+			'qualita_atac': self.qualita_atac.serializza_dinamico()
 		}
-		
+
 	def deserializza_dinamico_interno(self, res):
 		self.ultimo_aggiornamento = res['ultimo_aggiornamento']
-		
+		self.qualita_atac.deserializza_dinamico(res['qualita_atac'])
+
 	def serializza_dinamico(self):
 		out = []
 		for id in self.paline:
-			out.append(self.paline[id].serializza_dinamico())	
+			out.append(self.paline[id].serializza_dinamico())
 		for id in self.tratti_percorsi:
 			out.append(self.tratti_percorsi[id].serializza_dinamico())
 		for id in self.fermate:
@@ -1242,18 +1336,8 @@ class Rete(object):
 			out.append(self.tratti_percorso[id].serializza_dinamico())
 		out.append(self.serializza_dinamico_interno())
 		return out
-					
-	def push_serializza_dinamico(self):
-		db.close_connection()
-		cs = Mercury.rpyc_connect_all_static(settings.MERCURY_GIANO)
-		if len(cs) > 0:
-			res = pickle.dumps(self.serializza_dinamico(), 2)
-			for c in cs:
-				try:
-					c.root.deserializza_dinamico(res)
-				except Exception:
-					logging.error(traceback.format_exc())			
-			
+
+
 	def deserializza_dinamico(self, res):
 		for r in res:
 			try:
@@ -1269,28 +1353,28 @@ class Rete(object):
 					self.tratti_percorso[id].deserializza_dinamico(self, r)
 				elif t == 'ReteVeicolo':
 					if not id in self.veicoli:
-						self.veicoli[id] = ReteVeicolo(id)				
+						self.veicoli[id] = ReteVeicolo(id)
 					self.veicoli[id].deserializza_dinamico(self, r)
 				elif t == 'RetePercorso':
-					self.percorsi[id].deserializza_dinamico(self, r)					
+					self.percorsi[id].deserializza_dinamico(self, r)
 				elif t == 'Rete':
 					self.deserializza_dinamico_interno(r)
 				else:
 					print "Tipo %s non riconosciuto" % t
 			except Exception, e:
-				print e	
-			
-		
+				print e
+
+
 	def add_palina(self, id_palina, nome, soppressa=False):
 		p = RetePalina(id_palina, nome, soppressa)
 		self.paline[id_palina] = p
 		return p
-		
+
 	def add_percorso(self, id_percorso, id_linea, tipo, descrizione, soppresso, gestore):
 		p = RetePercorso(id_percorso, id_linea, tipo, descrizione, soppresso, gestore)
 		self.percorsi[id_percorso] = p
 		return p
-		
+
 	def add_fermata(self, id_fermata, id_palina, id_percorso):
 		f = ReteFermata(id_fermata, self.paline[id_palina], self.percorsi[id_percorso], self)
 		if id_fermata in self.fermate:
@@ -1298,7 +1382,7 @@ class Rete(object):
 		self.fermate[id_fermata] = f
 		self.fermate_da_palina[(id_palina,id_percorso)] = f
 		return f
-				
+
 	def add_tratto_percorso(self, id_percorso, id_fermata_s, id_fermata_t):
 		s = self.fermate[id_fermata_s]
 		t = self.fermate[id_fermata_t]
@@ -1325,24 +1409,36 @@ class Rete(object):
 	def add_ztl(self, codice, nome, orari):
 		self.ztl[codice] = ReteZtl(codice, nome, orari)
 
-		
-	def aggiorna_arrivi(self, num_thread=3, calcola_percorrenze=False, logging=False, aggiorna_arrivi=True):
+
+	def aggiorna_arrivi(self, num_thread=3, calcola_percorrenze=False, logging=False, aggiorna_arrivi=True, timeout=TIMEOUT_AGGIORNAMENTO_RETE):
 		if aggiorna_arrivi:
 			print "Aggiornamento arrivi"
-			q = Queue.Queue()
+			self.qualita_atac.start_ciclo()
 			s = self.capilinea
+			l = []
 			for p in s:
 				p = self.paline[p]
 				if p.aggiornabile_infotp():
-					q.put(p)
+					l.append(p)
+			self.random.shuffle(l)
+			q = Queue.Queue()
+			for p in l:
+				q.put((p, MAX_TENTATIVI_INFOTP))
 			print "Aggiorno arrivi"
 			threads = []
 			for i in range(0, num_thread):
 				t = AggiornatoreCarichi(self, q, calcola_percorrenze, logging)
 				t.start()
 				threads.append(t)
+			tstop = datetime.now() + timeout
 			for t in threads:
-				t.join()
+				n = datetime.now()
+				if tstop > n:
+					remaining = (tstop - n).seconds
+					t.join(remaining)
+			for t in threads:
+				t.quit()
+			self.qualita_atac.stop_ciclo()
 			print "Aggiornamento arrivi completato"
 		if calcola_percorrenze:
 			print "Calcolo percorrenze archi"
@@ -1355,18 +1451,12 @@ class Rete(object):
 			self.percorrenze_calcolate = True
 			print "Calcolo percorrenze completato"
 		self.ultimo_aggiornamento = datetime.now()
-		print "Push serializzazione"
-		try:
-			self.push_serializza_dinamico()
-		except Exception:
-			traceback.format_exc()
-		print "Serializzazione completata"
-		
+
 	def aggiorna_posizione_bus(self, id_veicolo, distanza_capolinea, distanza_successiva, tratto, a_capolinea, punto, dotazioni=None, propaga=True):
 		if not id_veicolo in self.veicoli:
 			self.veicoli[id_veicolo] = ReteVeicolo(id_veicolo, dotazioni=dotazioni)
 		self.veicoli[id_veicolo].aggiorna_posizione(distanza_capolinea, distanza_successiva, tratto, a_capolinea, punto, propaga)
-		
+
 	def dati_da_avm_romatpl(self, dati):
 		# Determino distanza linearizzata
 		id_percorso = dati['id_percorso']
@@ -1375,27 +1465,27 @@ class Rete(object):
 		percorso = self.percorsi[id_percorso]
 		tpo = percorso.tratti_percorso[dati['progressiva'] - 1]
 		tpi = tpo.rete_tratto_percorsi
-		
+
 		punto = geomath.wgs84_to_gbfe(dati['lon'], dati['lat'])
 		linear = tpo.linearizza(punto)
-		
+
 		# Aggiungo campione
 		distanza_capolinea_finale = percorso.dist - linear['da_capolinea']
 		percorso.fv.add(id_veicolo, dati['timestamp'], distanza_capolinea_finale)
-		
+
 		dotazioni = {
 			'meb': True,
 			'aria': True,
 			'moby': True,
 			'pedana': True,
 		}
-		
+
 		if id_veicolo.startswith("51") or id_veicolo.startswith("52"):
 			dotazioni['pedana'] = False
-		
+
 		self.aggiorna_posizione_bus(id_veicolo, distanza_capolinea_finale, tpi.dist - linear['da_fermata'], tpo, a_capolinea, punto, dotazioni=dotazioni)
-		
-		
+
+
 	def costruisci_percorso_intersezione(self, id_percorso_1, id_percorso_2, id_percorso, id_linea, tipo, descrizione):
 		p1 = self.percorsi[id_percorso_1]
 		p2 = self.percorsi[id_percorso_2]
@@ -1437,13 +1527,13 @@ class Rete(object):
 				elif of2 == -1:
 					of = of1
 				else:
-					of = max(of1, of2)				
+					of = max(of1, of2)
 				p.frequenza[giorno_settimana][ora_inizio] = (f, oi, of)
 		linee = [id_linea, p1.id_linea, p2.id_linea]
 		for l in linee:
 			self.linee_equivalenti[l] = linee
 
-		
+
 	def costruisci_indice_periodi_aggregazione(self):
 		# Inizializzazione indice
 		ispa = self.indice_stat_periodi_aggregazione
@@ -1453,7 +1543,7 @@ class Rete(object):
 		for spa in spas:
 			ispa[spa.pk] = n
 			n += 1
-		
+
 
 	def carica(self, retina=False, versione=None):
 		"""
@@ -1465,7 +1555,7 @@ class Rete(object):
 			inizio_validita = datetime2compact(versione)
 		path_rete = os.path.join(settings.TROVALINEA_PATH_RETE, inizio_validita)
 		rete_serializzata_file = os.path.join(path_rete, 'rete%s.v3.dat' % ('_mini' if retina else ''))
-		
+
 		try:
 			f = open(rete_serializzata_file, 'rb')
 			res = pickle.loads(f.read())
@@ -1481,7 +1571,7 @@ class Rete(object):
 			self.velocita_medie = res['velocita_medie']
 			self.indice_stat_periodi_aggregazione = res['indice_stat_periodi_aggregazione']
 			f.close()
-			
+
 		except IOError:
 			print "Costruisco rete da database"
 			r = self
@@ -1505,7 +1595,7 @@ class Rete(object):
 				old_f = None
 				fs = Fermata.objects.by_date(versione).filter(percorso=p).order_by('progressiva')
 				for f in fs:
-					id_fermata = "%s|%d" % (p.id_percorso, f.progressiva) 
+					id_fermata = "%s|%d" % (p.id_percorso, f.progressiva)
 					r.add_fermata(id_fermata, f.palina.id_palina, p.id_percorso)
 					ser.append(('fermata', (id_fermata, f.palina.id_palina, p.id_percorso)))
 					if old_f is not None:
@@ -1523,7 +1613,7 @@ class Rete(object):
 				fs = FrequenzaPercorso.objects.filter(id_percorso=p.id_percorso)
 				for f in fs:
 					percorso_rete.frequenza[f.giorno_settimana][f.ora_inizio] = (f.frequenza, f.da_minuto, f.a_minuto)
-			print "Carico coordinate paline" 
+			print "Carico coordinate paline"
 			path_shp = os.path.join(path_rete, 'shp')
 			sf = shapefile.Reader(os.path.join(path_shp, 'Fermate_Percorsi.shp'))
 			rs = sf.shapeRecords()
@@ -1577,7 +1667,7 @@ class Rete(object):
 		db.reset_queries()
 
 
-		
+
 	def valida_distanze(self):
 		"""
 		Verifica che sia definita la distanza su tutti i tratti di percorsi
@@ -1591,7 +1681,7 @@ class Rete(object):
 		if out != "":
 			return "Distanza non definita negli shapefile per i seguenti archi tra paline:\n" + out
 		return ""
-					
+
 	def carica_stat_percorrenze_archi(self):
 		print "Carico statistiche tempi di percorrenza archi"
 		spas = StatPeriodoAggregazione.objects.all()
@@ -1611,7 +1701,7 @@ class Rete(object):
 					tp = self.tratti_percorsi[(ips, ipt)]
 					distanza = tp.dist
 					if distanza is None:
-						tp = None					
+						tp = None
 				except:
 					tp = None
 			if tp is not None and distanza is not None:
@@ -1625,7 +1715,7 @@ class Rete(object):
 			if tempo[i] > 0:
 				#print i, spazio[i] / tempo[i]
 				self.velocita_medie[i] = spazio[i] / tempo[i]
-		
+
 	def carica_stat_attese_bus(self):
 		print "Carico statistiche tempi di attesa bus"
 		spas = StatPeriodoAggregazione.objects.all()
@@ -1657,11 +1747,11 @@ class Rete(object):
 		return veicoli
 		#capolinea = self.percorsi[id_percorso].tratti_percorso[-1].t
 		#return [self.veicoli[x['id_veicolo']] for x in capolinea.arrivi]
-		
+
 	def get_indici_periodi_attivi(self, dt):
 		"""
 		Restituisce una array con gli indici dei periodi di aggregazione attivi nell'orario dt.
-		
+
 		Gli indici sono ordinati in ordine decrescente di granularità.
 		"""
 		wd = Festivita.get_weekday(dt)
@@ -1672,7 +1762,7 @@ class Rete(object):
 			**wdd
 		).order_by('livello')
 		return [self.indice_stat_periodi_aggregazione[spa.pk] for spa in spas]
-	
+
 	def get_opzioni_calcola_percorso(
 		self,
 		metro,
@@ -1690,10 +1780,11 @@ class Rete(object):
 		carsharing=False,
 		ztl=None,
 		tpl=False,
+		bici_sul_tpl=False,
 	):
 		"""
 		Restituisce le opzioni di calcolo del percorso
-		
+
 		metro, bus, fc, fr: boolean
 		piedi: 0 (lento), 1 (medio) o 2 (veloce)
 		dt: data e ora di calcolo
@@ -1709,13 +1800,13 @@ class Rete(object):
 		)
 
 		if teletrasporto:
-			heuristic_speed = 0
+			heuristic_speed = 99999999
 		elif carpooling or auto:
 			heuristic_speed = 33.3
 		else:
 			heuristic_speed = 16.0
-		
-		return {
+
+		opt = {
 			'metro': metro and not auto,
 			'bus': bus and not auto,
 			'fc': fc and not auto,
@@ -1757,11 +1848,14 @@ class Rete(object):
 			'rete': self,
 			'ztl': set() if ztl is None else ztl,
 			'tpl': tpl,
+			'bici_sul_tpl': bici_sul_tpl,
 			'rev': False,
 			'heuristic_speed': heuristic_speed,
 		}
+		return opt
 
-		
+
+
 class AggiornatoreCarichi(Thread):
 	def __init__(self, rete, queue, calcola_percorrenze, logging, aggiorna_arrivi=True):
 		Thread.__init__(self)
@@ -1770,25 +1864,35 @@ class AggiornatoreCarichi(Thread):
 		self.calcola_percorrenze = calcola_percorrenze
 		self.logging = logging
 		self.aggiorna_arrivi = aggiorna_arrivi
-		
+		self.quit_request = False
+
 	def run(self):
 		print "Aggiornatore carichi, inizio thread", str(self)
 		try:
-			while True:
-				p = self.queue.get_nowait()
-				#print p.id_palina
+			while not self.quit_request:
+				p, tentativi_rimasti = self.queue.get_nowait()
 				try:
 					p.aggiorna_arrivi(self.calcola_percorrenze, aggiorna_fv=self.calcola_percorrenze)
 					if self.logging:
 						p.log_arrivi()
 					p.propaga_arrivi_indietro()
+					self.rete.qualita_atac.risposta_ok()
+					self.rete.qualita_atac.percorso_ok()
 				except Exception, e:
+					self.rete.qualita_atac.risposta_ko()
+					if tentativi_rimasti > 1:
+						self.queue.put((p, tentativi_rimasti - 1))
+					else:
+						self.rete.qualita_atac.percorso_ko()
 					logging.error(traceback.format_exc())
 		except Queue.Empty:
 			pass
 		except Exception, e:
 			logging.error(traceback.format_exc())
 		print "Aggiornatore carichi, fine thread", str(self)
+
+	def quit(self):
+		self.quit_request = True
 
 
 
@@ -1836,11 +1940,11 @@ class AggiornatoreUploadFCD(Thread):
 		print "Stoppato"
 
 
-	
+
 class Aggiornatore(Thread):
 	"""
 	Aggiornatore dinamico della rete. Calcola i dati interrogando le paline.
-	"""	
+	"""
 	def __init__(self, rete, intervallo, num_threads=3, cicli_calcolo_percorrenze=4, cicli_logging=24, aggiorna_arrivi=True):
 		Thread.__init__(self)
 		self.rete = rete
@@ -1853,6 +1957,7 @@ class Aggiornatore(Thread):
 		self.cicli_logging = cicli_logging
 		self.ciclo_logging = 0
 		self.aggiorna_arrivi = aggiorna_arrivi
+		self.mercury = Mercury(settings.MERCURY_GIANO)
 
 	def stop(self):
 		self.stopped = True
@@ -1861,22 +1966,24 @@ class Aggiornatore(Thread):
 		while not self.stopped:
 			if self.ultimo_aggiornamento is not None:
 				t1 = self.ultimo_aggiornamento + self.intervallo
-				t2 =  datetime.now()
-				diff = (max(t1, t2) - min(t1, t2)).seconds
-				if diff > 0:
+				t2 = datetime.now()
+				if t1 > t2:
+					diff = (t1 - t2).seconds
 					sleep(diff)
 			self.ultimo_aggiornamento = datetime.now()
 			try:
-				print "Inizio aggiornamento arrivi"	
+				print "Inizio aggiornamento arrivi"
 				self.ciclo_calcolo_percorrenze = (self.ciclo_calcolo_percorrenze + 1) % self.cicli_calcolo_percorrenze
 				self.ciclo_logging = (self.ciclo_logging + 1) % self.cicli_logging
 				self.rete.aggiorna_arrivi(self.num_threads, self.ciclo_calcolo_percorrenze == 0, self.ciclo_logging == 0, aggiorna_arrivi=self.aggiorna_arrivi)
-				print "Fine aggiornamento arrivi"
+				print "Fine aggiornamento arrivi, serializzazione"
+				self.mercury.async_all('deserializza_dinamico', self.rete.serializza_dinamico(), replace=True)
+				print "Serializzazione completata"
 			except Exception, e:
 				logging.error(traceback.format_exc())
 		print "Stoppato"
-		
-		
+
+
 class AggiornatoreDownload(Thread):
 	"""
 	Aggiornatore dinamico della rete. Scarica periodicamente la rete serializzata.
@@ -1908,9 +2015,9 @@ class AggiornatoreDownload(Thread):
 				self.rete.deserializza_dinamico(pickle.loads(res['stato_rete'].data))
 				print "Rete dinamica aggiornata"
 			sleep(self.intervallo.seconds)
-		
 
-	
+
+
 def differenza_datetime_secondi(t1, t2):
 	if t1 > t2:
 		return (t1 - t2).seconds
@@ -1928,26 +2035,26 @@ class NodoRisorsa(Nodo):
 		self.tipo_ris = ris.tipo.nome
 		self.id_ris = id_ris
 		self.x, self.y = ris.geom
-		
+
 	def get_coordinate(self):
 		return [(self.x, self.y)]
-	
+
 	def get_risorsa(self):
 		m = contenttype2model(self.ct_ris)
 		return m.objects.get(pk=self.id_ris)
-	
+
 	def risultati_vicini(self, opz):
 		return (
 			opz['cerca_vicini'] == 'risorse'
 			and self.tipo_id in opz['tipi_ris']
 			and not ('RIS-%s-%s' % (self.ct_ris, self.id_ris) in opz['linee_escluse'])
 		)
-	
+
 	def aggiorna_risultati_vicini(self, risultati, opz):
 		if opz['cerca_vicini'] == 'risorse' and self.tipo_id in opz['tipi_ris']:
 			dist = self.get_vars(opz).get_distanza()
 			risultati.aggiungi_risorsa(self, dist)
-			
+
 	def costruisci_percorso(self, t, opzioni):
 		vars = self.get_vars(opzioni)
 		ris = self.get_risorsa()
@@ -1961,8 +2068,8 @@ class NodoRisorsa(Nodo):
 			ris.nome_luogo,
 			ris.descrizione(),
 			self.get_coordinate(),
-		)			
-		
+		)
+
 
 class NodoPuntoArrivo(geocoder.NodoGeocoder):
 	"""
@@ -1984,10 +2091,10 @@ class NodoPalinaAttesa(Nodo):
 	def __init__(self, rete_palina):
 		Nodo.__init__(self, (1, rete_palina.id_palina))
 		self.rete_palina = rete_palina
-			
+
 	def get_coordinate(self):
 		return [(self.rete_palina.x, self.rete_palina.y)]
-	
+
 	def aggiorna_risultati_vicini(self, risultati, opz):
 		if opz['cerca_vicini'] == 'paline':
 			p = self.rete_palina
@@ -2000,16 +2107,16 @@ class NodoPalinaAttesa(Nodo):
 			if len(linee) > 0:
 				risultati.aggiungi_palina(p.id_palina, dist, p.x, p.y)
 				risultati.aggiungi_linee(linee)
-		
-		
+
+
 class NodoFermata(Nodo):
 	def __init__(self, rete_fermata):
 		Nodo.__init__(self, (2, rete_fermata.id_fermata))
 		self.rete_fermata = rete_fermata
-		
+
 	def get_coordinate(self):
 		return [(self.rete_fermata.rete_palina.x, self.rete_fermata.rete_palina.y)]
-	
+
 
 class NodoInterscambio(Nodo):
 	def __init__(self, nome):
@@ -2020,9 +2127,9 @@ class NodoInterscambio(Nodo):
 class ArcoAttesaBus(Arco):
 	def __init__(self, nodo_palina, nodo_fermata):
 		Arco.__init__(self, nodo_palina, nodo_fermata, (3, nodo_fermata.rete_fermata.id_fermata))
-		
+
 	def get_tempo_vero(self, t, opz):
-		d = get_weekday_caching(t, opz)	
+		d = get_weekday_caching(t, opz)
 		f = self.t.rete_fermata
 		p = f.rete_percorso
 		if p.id_linea in opz['linee_escluse']:
@@ -2044,11 +2151,11 @@ class ArcoAttesaBus(Arco):
 			except Exception:
 				pass
 		return (t_prog / 1.4, 'O')
-		
+
 
 	def get_tempo(self, t, opz):
 		if opz['bus'] == False:
-			return (-1, -1)		
+			return (-1, -1)
 		tempo = self.get_tempo_vero(t + timedelta(seconds=opz['t_sal_bus']), opz)[0]
 		if tempo == -1:
 			return (-1, -1)
@@ -2057,38 +2164,44 @@ class ArcoAttesaBus(Arco):
 		else:
 			tpen = tempo + opz['penalizzazione_bus']
 		return (tpen, tempo)
-	
+
 	def get_coordinate(self):
 		return [(self.s.rete_palina.x, self.s.rete_palina.y)]
-	
+
 	def costruisci_percorso(self, t, opzioni):
 		vars = self.s.get_vars(opzioni)
 		ta, tt = self.get_tempo_vero(vars.time, opzioni)
 		return tratto.TrattoBus(t.parent, vars.time, self.t.rete_fermata, ta - opzioni['t_sal_bus'], tt, opzioni['t_sal_bus'])
-		
+
+def tratto_piedi_o_bici(parent, time, arco, opzioni):
+	if arco.s.get_context(opzioni)['primo_tratto_bici']:
+		return tratto.TrattoBici(parent, time)
+	else:
+		return tratto.TrattoPiedi(parent, time)
+
 class ArcoDiscesaBus(Arco):
-	def __init__(self, nodo_fermata, nodo_palina):	
+	def __init__(self, nodo_fermata, nodo_palina):
 		Arco.__init__(self, nodo_fermata, nodo_palina, (4, nodo_fermata.rete_fermata.id_fermata))
 
 	def get_coordinate(self):
 		return [(self.t.rete_palina.x, self.t.rete_palina.y)]
-		
+
 	def get_tempo(self, t, opz):
 		tempo = opz['t_disc_bus']
 		return (tempo, tempo)
-	
+
 	def costruisci_percorso(self, t, opzioni):
 		vars = self.s.get_vars(opzioni)
 		tratto.TrattoBusDiscesa(t, vars.time, self.s.rete_fermata, opzioni['t_disc_bus'])
-		return tratto.TrattoPiedi(t.parent, vars.time)
+		return tratto_piedi_o_bici(t.parent, vars.time, self, opzioni)
 
 
 
 class ArcoPercorrenzaBus(Arco):
 	def __init__(self, rete_tratto_percorso, nodo_fermata_s, nodo_fermata_t):
-		self.rete_tratto_percorso = rete_tratto_percorso	
+		self.rete_tratto_percorso = rete_tratto_percorso
 		Arco.__init__(self, nodo_fermata_s, nodo_fermata_t, (5, nodo_fermata_s.rete_fermata.id_fermata, nodo_fermata_t.rete_fermata.id_fermata))
-		
+
 	def get_tempo_vero(self, t, opz):
 		rtp = self.rete_tratto_percorso.rete_tratto_percorsi
 		tp = rtp.tempo_percorrenza
@@ -2099,7 +2212,7 @@ class ArcoPercorrenzaBus(Arco):
 			#if rtp.tempo_percorrenza_interpolato > 0:
 			#	return (rtp.tempo_percorrenza_interpolato, 'I')
 		for i in opz['indici_stat']:
-			t = rtp.tempo_percorrenza_stat_orari[i] 
+			t = rtp.tempo_percorrenza_stat_orari[i]
 			if t != -1:
 				return (t, 'S')
 		if rtp.dist > 0:
@@ -2110,17 +2223,17 @@ class ArcoPercorrenzaBus(Arco):
 					break
 			return (rtp.dist / velocita, 'D')
 		return (60, 'DD')
-	
+
 	def get_tempo(self, t, opz):
 		tempo = self.get_tempo_vero(t, opz)[0]
 		return (tempo, tempo)
-	
+
 	def get_distanza(self):
 		return self.rete_tratto_percorso.rete_tratto_percorsi.dist
-	
+
 	def get_coordinate(self):
 		return self.rete_tratto_percorso.rete_tratto_percorsi.punti
-	
+
 	def costruisci_percorso(self, t, opzioni):
 		vars = self.s.get_vars(opzioni)
 		ta, tt = self.get_tempo_vero(vars.time, opzioni)
@@ -2131,10 +2244,10 @@ class ArcoPercorrenzaBus(Arco):
 
 class ArcoAttesaMetro(ArcoAttesaBus):
 	def get_tempo_vero(self, t, opz):
-		d = get_weekday_caching(t, opz)	
+		d = get_weekday_caching(t, opz)
 		p = self.t.rete_fermata.rete_percorso
 		if p.id_linea in opz['linee_escluse']:
-			return (-1, 'Z')		
+			return (-1, 'Z')
 		f = p.frequenza[d][t.hour]
 		t_arr, da, a = f
 		if da <= t.minute <= a:
@@ -2151,53 +2264,53 @@ class ArcoAttesaMetro(ArcoAttesaBus):
 		if self.t.rete_fermata.is_capolinea_partenza():
 			tpen = max(0, tempo + opz['penalizzazione_metro'] - opz['incentivo_capolinea'])
 		else:
-			tpen = tempo + opz['penalizzazione_metro']		
+			tpen = tempo + opz['penalizzazione_metro']
 		return (tpen, tempo)
-			
+
 	def costruisci_percorso(self, t, opzioni):
 		vars = self.s.get_vars(opzioni)
 		ta, tt = self.get_tempo_vero(vars.time, opzioni)
-		return tratto.TrattoMetro(t.parent, vars.time, self.t.rete_fermata, ta, tt, opzioni['t_sal_metro'])	
-	
+		return tratto.TrattoMetro(t.parent, vars.time, self.t.rete_fermata, ta, tt, opzioni['t_sal_metro'])
 
-class ArcoDiscesaMetro(ArcoDiscesaBus):	
+
+class ArcoDiscesaMetro(ArcoDiscesaBus):
 	def get_tempo(self, t, opz):
 		tempo = opz['t_disc_metro']
 		return (tempo, tempo)
-	
+
 	def costruisci_percorso(self, t, opzioni):
 		vars = self.s.get_vars(opzioni)
 		tratto.TrattoMetroDiscesa(t, vars.time, self.s.rete_fermata, opzioni['t_disc_metro'])
-		return tratto.TrattoPiedi(t.parent, vars.time)
-	
-	
-	
-	
+		return tratto_piedi_o_bici(t.parent, vars.time, self, opzioni)
+
+
+
+
 class ArcoDiscesaMetroInterscambio(Arco):
-	def __init__(self, nodo_fermata, nodo_interscambio):	
+	def __init__(self, nodo_fermata, nodo_interscambio):
 		Arco.__init__(self, nodo_fermata, nodo_interscambio, (9, nodo_fermata.rete_fermata.id_fermata))
-		
+
 	def get_tempo(self, t, opz):
 		return (0, 0)
-			
+
 	def get_coordinate(self):
 		return [(self.s.rete_fermata.rete_palina.x, self.s.rete_fermata.rete_palina.y)]
 	def costruisci_percorso(self, t, opzioni):
 		vars = self.s.get_vars(opzioni)
 		tratto.TrattoMetroDiscesa(t, vars.time, self.s.rete_fermata, 0)
-		return t.parent	
-	
-	
-	
+		return t.parent
+
+
+
 class ArcoAttesaMetroInterscambio(Arco):
-	def __init__(self, nodo_interscambio, nodo_fermata):	
+	def __init__(self, nodo_interscambio, nodo_fermata):
 		Arco.__init__(self, nodo_interscambio, nodo_fermata,(20, nodo_fermata.rete_fermata.id_fermata))
-		
+
 	def get_tempo_vero(self, t, opz):
 		d = get_weekday_caching(t, opz)
 		p = self.t.rete_fermata.rete_percorso
 		if p.id_linea in opz['linee_escluse']:
-			return (-1, 'Z')				
+			return (-1, 'Z')
 		f = p.frequenza[d][t.hour]
 		t_arr, da, a = f
 		if da <= t.minute <= a:
@@ -2210,7 +2323,7 @@ class ArcoAttesaMetroInterscambio(Arco):
 			return (-1, -1)
 		return (opz['t_sal_metro'] + tv, tv)
 
-		
+
 	def get_coordinate(self):
 		return [(self.t.rete_fermata.rete_palina.x, self.t.rete_fermata.rete_palina.y)]
 
@@ -2248,28 +2361,32 @@ class ArcoDiscesaInterscambio(Arco):
 	def costruisci_percorso(self, t, opzioni):
 		vars = self.s.get_vars(opzioni)
 		t.set_palina_t(self.t.rete_palina)
-		return tratto.TrattoPiedi(t.parent, vars.time)
-		
+		return tratto_piedi_o_bici(t.parent, vars.time, self, opzioni)
+
 
 class ArcoPercorrenzaMetro(ArcoPercorrenzaBus):
 	def get_tempo(self, t, opz):
+		if self.rete_tratto_percorso.rete_percorso.id_linea == 'MEC':
+			return (106, 106)
 		return (90, 90)
-	
+
 	def get_tempo_vero(self, t, opz=None):
-		return (90, 'D')	
-		
+		if self.rete_tratto_percorso.rete_percorso.id_linea == 'MEC':
+			return (106, 'D')
+		return (90, 'D')
+
 	def costruisci_percorso(self, t, opzioni):
 		vars = self.s.get_vars(opzioni)
 		ta, tt = self.get_tempo_vero(vars.time)
 		tratto.TrattoMetroArcoPercorso(t, vars.time, self.rete_tratto_percorso, ta, tt, self.rete_tratto_percorso.rete_tratto_percorsi.punti)
 		return t
-	
+
 
 # begin teletrasporto
 class ArcoAttesaTeletrasporto(ArcoAttesaBus):
 	def __init__(self, nodo_palina, nodo_fermata):
 		Arco.__init__(self, nodo_palina, nodo_fermata, (97, nodo_fermata.rete_fermata.id_fermata))
-			
+
 	def get_tempo_vero(self, t, opz):
 		return (0, False)
 
@@ -2277,55 +2394,55 @@ class ArcoAttesaTeletrasporto(ArcoAttesaBus):
 		if not opz['teletrasporto']:
 			return (-1, -1)
 		return (0, 0)
-			
+
 	def costruisci_percorso(self, t, opzioni):
 		vars = self.s.get_vars(opzioni)
 		ta, tt = self.get_tempo_vero(vars.time, opzioni)
-		return tratto.TrattoTeletrasporto(t.parent, vars.time, self.t.rete_fermata, ta, tt, 0)	
+		return tratto.TrattoTeletrasporto(t.parent, vars.time, self.t.rete_fermata, ta, tt, 0)
 
-	
+
 class ArcoPercorrenzaTeletrasporto(ArcoPercorrenzaBus):
 	def __init__(self, nodo_fermata_s, nodo_fermata_t):
 		Arco.__init__(self, nodo_fermata_s, nodo_fermata_t, (99, nodo_fermata_s.rete_fermata.id_fermata, nodo_fermata_t.rete_fermata.id_fermata))
-	
-	
+
+
 	def get_tempo(self, t, opz):
 		if not opz['teletrasporto']:
-			return (-1, -1)		
+			return (-1, -1)
 		return (1, 1)
-	
+
 	def get_tempo_vero(self, t, opz=None):
-		return (1, 'D')	
-		
+		return (1, 'D')
+
 	def costruisci_percorso(self, t, opzioni):
 		vars = self.s.get_vars(opzioni)
 		ta, tt = self.get_tempo_vero(vars.time)
 		tratto.TrattoTeletrasportoArcoPercorso(t, vars.time, self.s.rete_fermata.rete_palina, self.t.rete_fermata.rete_palina, ta)
 		return t
-	
-class ArcoDiscesaTeletrasporto(ArcoDiscesaBus):	
-	def __init__(self, nodo_fermata, nodo_palina):	
-		Arco.__init__(self, nodo_fermata, nodo_palina, (98, nodo_fermata.rete_fermata.id_fermata))	
-	
+
+class ArcoDiscesaTeletrasporto(ArcoDiscesaBus):
+	def __init__(self, nodo_fermata, nodo_palina):
+		Arco.__init__(self, nodo_fermata, nodo_palina, (98, nodo_fermata.rete_fermata.id_fermata))
+
 	def get_tempo(self, t, opz):
 		if not opz['teletrasporto']:
-			return (-1, -1)		
+			return (-1, -1)
 		tempo = 0
 		return (tempo, tempo)
-	
+
 	def costruisci_percorso(self, t, opzioni):
 		vars = self.s.get_vars(opzioni)
 		tratto.TrattoTeletrasportoDiscesa(t, vars.time, self.s.rete_fermata, 0)
-		return tratto.TrattoPiedi(t.parent, vars.time)
+		return tratto_piedi_o_bici(t.parent, vars.time, self, opzioni)
 # end teletrasporto
-	
+
 
 class ArcoAttesaFC(ArcoAttesaBus):
 	def get_tempo_vero(self, t, opz):
 		d = get_weekday_caching(t, opz)
 		p = self.t.rete_fermata.rete_percorso
 		if p.id_linea in opz['linee_escluse']:
-			return (-1, 'Z')				
+			return (-1, 'Z')
 		f = p.frequenza[d][t.hour]
 		t_arr, da, a = f
 		if da <= t.minute <= a:
@@ -2342,27 +2459,27 @@ class ArcoAttesaFC(ArcoAttesaBus):
 		if self.t.rete_fermata.is_capolinea_partenza():
 			tpen = max(0, tempo + opz['penalizzazione_fc'] - opz['incentivo_capolinea'])
 		else:
-			tpen = tempo + opz['penalizzazione_fc']		
+			tpen = tempo + opz['penalizzazione_fc']
 		return (tpen, tempo)
-			
+
 	def costruisci_percorso(self, t, opzioni):
 		vars = self.s.get_vars(opzioni)
-		#print "Salgo sul FC"		
+		#print "Salgo sul FC"
 		ta, tt = self.get_tempo_vero(vars.time, opzioni)
-		return tratto.TrattoFC(t.parent, vars.time, self.t.rete_fermata, ta, tt, opzioni['t_sal_fc'])	
-	
+		return tratto.TrattoFC(t.parent, vars.time, self.t.rete_fermata, ta, tt, opzioni['t_sal_fc'])
 
-class ArcoDiscesaFC(ArcoDiscesaBus):	
+
+class ArcoDiscesaFC(ArcoDiscesaBus):
 	def get_tempo(self, t, opz):
 		tempo = opz['t_disc_fc']
 		return (tempo, tempo)
-	
+
 	def costruisci_percorso(self, t, opzioni):
 		vars = self.s.get_vars(opzioni)
 		#print "Scendo dalla FC"
 		tratto.TrattoFCDiscesa(t, vars.time, self.s.rete_fermata, opzioni['t_disc_fc'])
-		return tratto.TrattoPiedi(t.parent, vars.time)
-	
+		return tratto_piedi_o_bici(t.parent, vars.time, self, opzioni)
+
 class ArcoPercorrenzaFC(ArcoPercorrenzaBus):
 	def get_tempo(self, t, opz):
 		p = self.rete_tratto_percorso.rete_percorso
@@ -2384,7 +2501,7 @@ class ArcoPercorrenzaFC(ArcoPercorrenzaBus):
 			'FC2': 185,
 			'FC3': 94,
 		}[idl] * n * self.rete_tratto_percorso.rete_tratto_percorsi.dist / p.dist), 'D'
-		
+
 	def costruisci_percorso(self, t, opzioni):
 		vars = self.s.get_vars(opzioni)
 		ta, tt = self.get_tempo_vero(vars.time, opzioni)
@@ -2397,15 +2514,15 @@ class ArcoAttesaTreno(ArcoAttesaBus):
 		ArcoAttesaBus.__init__(self, nodo_palina, nodo_fermata)
 		self.partenze = [Avl() for i in range(7)]
 		self.ha_partenze = False
-		
+
 	def aggiungi_partenza(self, dt, day=None):
 		"""
 		Aggiunge un orario di partenza
-		
+
 		L'orario di partenza può essere un time o un datetime.
 		Se è un datetime bisogna passare day=None. Se è un time, day deve valere
 		0 (festivo), 5 (sabato) o 6 (domenica)
-		"""		
+		"""
 		self.ha_partenze = True
 		if day is None:
 			d = dt.weekday()
@@ -2416,7 +2533,7 @@ class ArcoAttesaTreno(ArcoAttesaBus):
 		if d < 5:
 			d = 0
 		self.partenze[d].insert(t, None)
-		
+
 	def prossima_partenza(self, t, opz):
 		if not self.ha_partenze:
 			return None
@@ -2428,14 +2545,14 @@ class ArcoAttesaTreno(ArcoAttesaBus):
 			if giorni <= 1:
 				d = get_weekday_caching(data, opz)
 			else:
-				d = Festivita.get_weekday(data, compatta_feriali=True)	
+				d = Festivita.get_weekday(data, compatta_feriali=True)
 			n = self.partenze[d].gt_key(ora)
 			if n is None:
 				ora = time(0, 0)
 				data += timedelta(days=1)
 				giorni += 1
 		return dateandtime2datetime(data, n[0])
-			
+
 	def get_tempo_vero(self, t, opz):
 		if not self.ha_partenze:
 			return (-1, False)
@@ -2457,24 +2574,24 @@ class ArcoAttesaTreno(ArcoAttesaBus):
 		if self.t.rete_fermata.is_capolinea_partenza():
 			tpen = max(0, tempo + opz['penalizzazione_treno'] - opz['incentivo_capolinea'])
 		else:
-			tpen = tempo + opz['penalizzazione_treno']		
+			tpen = tempo + opz['penalizzazione_treno']
 		return (tpen, tempo)
-			
+
 	def costruisci_percorso(self, t, opzioni):
 		vars = self.s.get_vars(opzioni)
 		ta, tt = self.get_tempo_vero(vars.time, opzioni)
-		return tratto.TrattoTreno(t.parent, vars.time, self.t.rete_fermata, ta - opzioni['t_sal_treno'], tt, opzioni['t_sal_treno'])	
-	
+		return tratto.TrattoTreno(t.parent, vars.time, self.t.rete_fermata, ta - opzioni['t_sal_treno'], tt, opzioni['t_sal_treno'])
+
 
 
 class ArcoDiscesaTreno(ArcoDiscesaBus):
 	def get_tempo(self, t, opz):
 		return (opz['t_disc_treno'], opz['t_disc_treno'])
-			
+
 	def costruisci_percorso(self, t, opzioni):
 		vars = self.s.get_vars(opzioni)
 		tratto.TrattoTrenoDiscesa(t, vars.time, self.s.rete_fermata, opzioni['t_disc_treno'])
-		return tratto.TrattoPiedi(t.parent, vars.time)
+		return tratto_piedi_o_bici(t.parent, vars.time, self, opzioni)
 
 
 
@@ -2483,11 +2600,11 @@ class ArcoPercorrenzaTreno(ArcoPercorrenzaBus):
 		ArcoPercorrenzaBus.__init__(self, rete_tratto_percorso, nodo_fermata_s, nodo_fermata_t)
 		self.partenze = [Avl() for i in range(7)]
 		self.ha_partenze = False
-		
+
 	def aggiungi_partenza(self, dt, perc, day=None):
 		"""
 		Aggiunge un orario di partenza e lo associa a un tempo di percorrenza, in secondi
-		
+
 		L'orario di partenza può essere un time o un datetime.
 		Se è un datetime bisogna passare day=None. Se è un time, day deve valere
 		0 (festivo), 5 (sabato) o 6 (domenica)
@@ -2502,7 +2619,7 @@ class ArcoPercorrenzaTreno(ArcoPercorrenzaBus):
 		if d < 5:
 			d = 0
 		self.partenze[d].insert(t, perc)
-		
+
 	def prossima_partenza(self, t, opz):
 		if not self.ha_partenze:
 			return None
@@ -2514,49 +2631,49 @@ class ArcoPercorrenzaTreno(ArcoPercorrenzaBus):
 			if giorni <= 1:
 				d = get_weekday_caching(data, opz)
 			else:
-				d = Festivita.get_weekday(data, compatta_feriali=True)	
+				d = Festivita.get_weekday(data, compatta_feriali=True)
 			n = self.partenze[d].gt_key(ora)
 			if n is None:
 				ora = time(0, 0)
 				data += timedelta(days=1)
 				giorni += 1
 		return (dateandtime2datetime(data, n[0]), n[1])
-	
-	
+
+
 	def get_tempo(self, t, opz):
 		el = self.prossima_partenza(t, opz)
 		if el is None:
 			return (-1, -1)
 		dt, tempo = el
 		return (tempo, tempo)
-	
+
 	def get_tempo_vero(self, t, opz=None):
 		pass
-		#return (90, 'D')	
-		
+		#return (90, 'D')
+
 	def costruisci_percorso(self, t, opzioni):
 		vars = self.s.get_vars(opzioni)
 		ta, x = self.get_tempo(vars.time, opzioni)
 		tt = 'O'
 		tratto.TrattoTrenoArcoPercorso(t, vars.time, self.rete_tratto_percorso, ta, tt, self.rete_tratto_percorso.rete_tratto_percorsi.punti)
 		return t
-	
+
 def registra_classi_grafo(g):
 	classi_nodi = [tomtom.NodoTomTom, geocoder.NodoGeocoder]
 	classi_archi = [tomtom.ArcoTomTom, geocoder.ArcoGeocoder]
 	for cn in classi_nodi:
 		g.registra_tipo_nodi(cn)
 	for ca in classi_archi:
-		g.registra_tipo_archi(ca)			
+		g.registra_tipo_archi(ca)
 
 def carica_rete_su_grafo(r, g, retina=False, versione=None):
 	"""
 	Carica la rete del TPL all'interno del grafo g e aggiorna i link inversi
 	"""
 	print "Carico rete su grafo"
-	
+
 	registra_classi_grafo(g)
-	
+
 	# Paline
 	for k in r.paline:
 		p = r.paline[k]
@@ -2629,8 +2746,8 @@ def carica_rete_su_grafo(r, g, retina=False, versione=None):
 						g.add_arco(ArcoPercorrenzaTeletrasporto(n, fermata_teletrasporto))
 					else:
 						fermata_teletrasporto = n
-				# end teletrasporto					
-				nome = f.rete_palina.nome  
+				# end teletrasporto
+				nome = f.rete_palina.nome
 				if tipo == 'ME' and nome in interscambio:
 					ni = interscambio[nome]
 					a = ArcoAttesaMetroInterscambio(ni, n)
@@ -2658,14 +2775,14 @@ def carica_rete_su_grafo(r, g, retina=False, versione=None):
 				a = ArcoPercorrenzaTeletrasporto(tp, tp.s.nodo_fermata, tp.t.nodo_fermata)
 				tp.arco_tratto_percorso = a
 				g.add_arco(a)
-			"""				
-			# end teletrasporto			
+			"""
+			# end teletrasporto
 	# Archi di distanza fra paline e grafo pedonale (osm)
 	print "Collego la rete del TPL alla rete stradale"
 	if versione is None:
 		inizio_validita = datetime2compact(VersionePaline.attuale().inizio_validita)
 	else:
-		inizio_validita = datetime2compact(versione)			
+		inizio_validita = datetime2compact(versione)
 	path_rete = os.path.join(settings.TROVALINEA_PATH_RETE, inizio_validita)
 	geocoding_file = os.path.join(path_rete, 'archi_geocoding%s.v3.dat' % ('_mini' if retina else ''))
 	r.geocoder = geocoder.Geocoder(g, 12) # 12 e' il tipo degli archi stradali
@@ -2720,15 +2837,15 @@ def carica_rete_su_grafo(r, g, retina=False, versione=None):
 	carica_orari_fr_da_file(r, g, fn)
 
 	db.reset_queries()
-		
-	
+
+
 
 def carica_rete_e_grafo(retina=False, versione=None):
 	rete = Rete()
 	rete.carica(retina, versione)
 	g = Grafo()
 	registra_classi_grafo(g)
-	g.deserialize('%s%s.v3.dat' % (settings.GRAPH, '_mini' if retina else ''))
+	g.deserialize(os.path.join(settings.TROVALINEA_PATH_RETE, '%s%s.v3.dat' % (settings.GRAPH, '_mini' if retina else '')))
 	carica_rete_su_grafo(rete, g, retina, versione)
 	return (rete, g)
 
@@ -2830,14 +2947,14 @@ def calcola_frequenze(percorsi_da_rete=True):
 			if Festivita.get_weekday(d, compatta_feriali=True) == i:
 				return d
 			d += timedelta(days=1)
-			
+
 	giorni = set([0, 5, 6])
 	for gi in giorni:
 		g = cerca_giorno(gi)
 		print g
 		calcola_frequenze_giorno(g, gi, percorsi_da_rete)
 
-		
+
 def elabora_statistiche(data_inizio, data_fine, min_weight=5):
 	with transaction():
 		StatTempoArcoNew.objects.all().delete()
@@ -2865,8 +2982,8 @@ def elabora_statistiche(data_inizio, data_fine, min_weight=5):
 						)
 						sta.save()
 					cnt = 0.0
-					tot = 0.0			
-					ids, idt = ids2, idt2  
+					tot = 0.0
+					ids, idt = ids2, idt2
 				wd = lta.data.weekday()
 				if wds[wd]:
 					tot += lta.peso * lta.tempo
@@ -2884,7 +3001,7 @@ def elabora_statistiche(data_inizio, data_fine, min_weight=5):
 			ltaps = LogTempoAttesaPercorso.objects.filter(data__gte=data_inizio, data__lte=data_fine, ora__gte=s.ora_inizio, ora__lt=s.ora_fine).order_by('id_percorso')
 			cnt = 0
 			tot = 0.0
-			idp = None	
+			idp = None
 			for ltap in batch_qs(ltaps):
 				idp2 = ltap.id_percorso
 				if idp != idp2:
@@ -2896,8 +3013,8 @@ def elabora_statistiche(data_inizio, data_fine, min_weight=5):
 							periodo_aggregazione=s,
 						).save()
 					cnt = 0
-					tot = 0.0					
-					idp = idp2  
+					tot = 0.0
+					idp = idp2
 				wd = ltap.data.weekday()
 				if wds[wd]:
 					tot += ltap.tempo
@@ -2919,11 +3036,11 @@ class Avg(object):
 		self.tot = 0
 		self.min = None
 		self.max = None
-		
+
 	def aggiungi(self, k):
 		self.cnt +=1
 		self.tot += k
-		
+
 	def aggiungi_percentuale(self, a1, a2):
 		print a1, a2
 		diff = float(abs(a1 - a2))
@@ -2932,17 +3049,17 @@ class Avg(object):
 			self.min = diff
 		if self.max is None or diff > self.max:
 			self.max = diff
-		
+
 	def media(self):
 		print self.tot, self.cnt
 		return float(self.tot) / float(self.cnt)
-	
+
 	def media_percentuale(self):
 		return self.media() * 100
-	
+
 	def get_statistiche(self):
 		return "min: %.0f, max: %.0f, media: %.0f%%" % (self.min, self.max, self.media_percentuale())
-	
+
 def organizza_arrivi_ricalcolati(palina):
 	a = {}
 	for k in palina.fermate:
@@ -2975,7 +3092,7 @@ def confronta_arrivi(paline):
 	print "Trovate: %d su %d" % (trov, tot)
 	print "Errore numero femate: %s" % errore_numero.get_statistiche()
 	print "Errore tempi attesa: %s" % errore_tempo.get_statistiche()
-	
+
 def carica_orari_fr_da_file(r, g, filename):
 	def converti_ora_giorno(s, d):
 		h, m = s.split(':')
@@ -2986,8 +3103,8 @@ def carica_orari_fr_da_file(r, g, filename):
 			h -= 24
 			today += timedelta(days=1)
 		t = time(h, int(m))
-		return t, d, dateandtime2datetime(today, t) 
-	
+		return t, d, dateandtime2datetime(today, t)
+
 	print "Carico orari FL"
 	f = open(filename, 'r')
 	for l in f:
@@ -3011,7 +3128,7 @@ def carica_orari_fr_da_file(r, g, filename):
 					f1 = tp.s.id_fermata
 					f2 = tp.t.id_fermata
 					perc = (dt2 - dt1).seconds
-					#print f1, f2, perc					
+					#print f1, f2, perc
 					aat = g.archi[(3, f1)]
 					apt = g.archi[(5, f1, f2)]
 					aat.aggiungi_partenza(t1, d1)
@@ -3019,7 +3136,7 @@ def carica_orari_fr_da_file(r, g, filename):
 					i += 3
 
 def test_ferrovia(r, g):
-	for id_percorso in ['51305', '51306']: 
+	for id_percorso in ['51305', '51306']:
 		perc = r.percorsi[id_percorso]
 		for t in perc.tratti_percorso:
 			f = t.s
@@ -3056,7 +3173,7 @@ def salva_archi_tomtom_su_db(grafo, num=1, den=1):
 				a = grafo.archi[eid]
 				s = a.to_model()
 				s.save()
-			
+
 def analisi_velocita_archi(r, g, opz=None):
 	if opz is None:
 		opz = r.get_opzioni_calcola_percorso(True, True, True, True, 1)
@@ -3080,4 +3197,103 @@ def analisi_velocita_archi(r, g, opz=None):
 					if v > 18:
 						print v, eid, e, e.s.rete_fermata.rete_palina.nome
 	return d
+
+
+class Qualita(object):
+	def __init__(self, id=''):
+		super(Qualita, self).__init__()
+		self.id = id
+		self.ultimo_aggiornamento = None
+		self.ultimo_aggiornamento_completo = None
+		self.durata_ultimo_ciclo = None
+		self.percorsi_ok = None
+		self.percorsi_totali = None
+		self.risposte_ok = None
+		self.risposte_totali = None
+
+	def _get_qualita_derivata(self):
+		now = datetime.now()
+		return {
+			'ritardo_ultimo_aggiornamento_parziale': (
+				now + self.durata_ultimo_ciclo - self.ultimo_aggiornamento
+			) if self.ultimo_aggiornamento is not None else None,
+			'ritardo_ultimo_aggiornamento_completo': (
+				now + self.durata_ultimo_ciclo - self.ultimo_aggiornamento_completo
+			) if self.ultimo_aggiornamento_completo is not None else None,
+			'tasso_errore': (
+				(self.risposte_totali - self.risposte_ok) / float(self.risposte_totali)
+			) if self.risposte_totali is not None else None,
+		}
+
+	def _get_qualita_base(self):
+		return {
+			'ultimo_aggiornamento': self.ultimo_aggiornamento,
+			'ultimo_aggiornamento_completo': self.ultimo_aggiornamento_completo,
+			'durata_ultimo_ciclo': self.durata_ultimo_ciclo,
+			'percorsi_ok': self.percorsi_ok,
+			'percorsi_totali': self.percorsi_totali,
+			'risposte_ok': self.risposte_ok,
+			'risposte_totali': self.risposte_totali,
+		}
+
+	def get_qualita(self):
+		q = self._get_qualita_base()
+		q.update(self._get_qualita_derivata())
+		return q
+
+	def serializza_dinamico(self):
+		q = self._get_qualita_base()
+		q.update({
+			'type': 'Qualita',
+			'id': self.id,
+		})
+		return q
+
+	def deserializza_dinamico(self, res):
+		self.ultimo_aggiornamento = res['ultimo_aggiornamento']
+		self.ultimo_aggiornamento_completo = res['ultimo_aggiornamento_completo']
+		self.durata_ultimo_ciclo = res['durata_ultimo_ciclo']
+		self.percorsi_ok = res['percorsi_ok']
+		self.percorsi_totali = res['percorsi_totali']
+		self.risposte_ok = res['risposte_ok']
+		self.risposte_totali = res['risposte_totali']
+
+
+class QualitaAtac(Qualita):
+	def start_ciclo(self):
+		self.qnew = Qualita()
+		self.qnew.percorsi_totali = 0
+		self.qnew.percorsi_ok = 0
+		self.qnew.risposte_ok = 0
+		self.qnew.risposte_totali = 0
+		self.qnew.ultimo_aggiornamento = datetime.now()
+
+	def stop_ciclo(self):
+		self.risposte_ok = self.qnew.risposte_ok
+		self.risposte_totali = self.qnew.risposte_totali
+		self.percorsi_ok = self.qnew.percorsi_ok
+		self.percorsi_totali = self.qnew.percorsi_totali
+		now = datetime.now()
+		self.durata_ultimo_ciclo = now - self.qnew.ultimo_aggiornamento
+		if self.percorsi_ok > 0:
+			self.ultimo_aggiornamento = now
+		if self.percorsi_ok == self.percorsi_totali:
+			self.ultimo_aggiornamento_completo = now
+
+	def percorso_ok(self):
+		self.qnew.percorsi_ok += 1
+		self.qnew.percorsi_totali += 1
+	
+	def percorso_ko(self):
+		self.qnew.percorsi_totali += 1
+
+	def risposta_ok(self):
+		self.qnew.risposte_ok += 1
+		self.qnew.risposte_totali += 1
+
+	def risposta_ko(self):
+		self.qnew.risposte_totali += 1
+
+
+
 

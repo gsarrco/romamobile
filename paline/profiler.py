@@ -45,25 +45,35 @@ class Profiler(object):
 		self.dp = grafo.DijkstraPool(self.g, 2)
 		
 	def profile(self):
-		if self.retina:
-			s = self.g.nodi[(1, '71502')]
-			t = self.g.nodi[(1, 'BP8')]
-		else:
-			s = self.g.nodi[(1, '91417')]
-			t = self.g.nodi[(1, '90486')]
-		#opz = self.r.get_opzioni_calcola_percorso(True, True, True, False, 1)
-		opz = self.r.get_opzioni_calcola_percorso(False, False, False, False, 1)
-		s.context_i = 0
-		self.d.context[0] = {
+		with self.dp.get_dijkstra() as d:
+			if self.retina:
+				s = self.g.nodi[(1, '71502')]
+				t = self.g.nodi[(1, 'BP8')]
+				# s = self.g.nodi[(1, '90122')]
+				#t = self.g.nodi[(1, '90128')]
+			else:
+				#s = self.g.nodi[(11, 1396215581)]
+				#t = self.g.nodi[(11, 298921845)]
+				s = self.g.nodi[(1, '70221')]
+				t = self.g.nodi[(1, '78272')]
+
+			s_context = {
 			'primo_tratto_bici': False,
 			'max_distanza_bici': 25000,
 			'nome_strada': -1,
 			'distanza_piedi': 0,
-		}
-		s.dijkstra = self.d		
-		cProfile.runctx("self.d.calcola_e_stampa(s, t, opz)", globals(), locals(), "Profile.prof")
-		s = pstats.Stats("Profile.prof")
-		s.strip_dirs().sort_stats("time").print_stats()
+			}
+
+			opz = self.r.get_opzioni_calcola_percorso(True, True, True, False, 1, primo_tratto_bici=False)
+			s_context = {
+				'primo_tratto_bici': False,
+				'max_distanza_bici': 25000,
+				'nome_strada': -1,
+				'distanza_piedi': 0,
+			}
+			cProfile.runctx("d.calcola_e_stampa(s, t, opz, s_context=s_context)", globals(), locals(), "Profile.prof")
+			s = pstats.Stats("Profile.prof")
+			s.strip_dirs().sort_stats("time").print_stats()
 		
 	def test(self):
 		with self.dp.get_dijkstra() as d:

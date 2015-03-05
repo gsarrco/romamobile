@@ -21,6 +21,7 @@
 
 from models import *
 from django.db import models, connections, transaction
+from django.db.models import Q
 from paline.models import IndirizzoAutocompl, ParolaIndirizzoAutocompl, PalinaPreferita
 from percorso.models import IndirizzoPreferito
 from autenticazione.models import TokenApp, TOKEN_APP_LENGTH
@@ -138,8 +139,7 @@ def get_user_groups(request):
 	return [g.name for g in request.user.groups.all()]
 
 
-@jsonrpc_method('servizi_app_init', safe=True)
-def servizi_app_init(request, session_or_token, urlparams):
+def _servizi_app_init(request, session_or_token, urlparams):
 	"""
 	Inizializzazione app: recupera la sessione e restituisce info su utente e parametri.
 
@@ -223,21 +223,49 @@ def servizi_app_init(request, session_or_token, urlparams):
 
 	# print "Output session key:", out['session_key']
 
-	return out
+	return {
+		'res': out,
+		'user': u,
+	}
+
+
+@jsonrpc_method('servizi_app_init', safe=True)
+def servizi_app_init(request, session_or_token, urlparams):
+	risposta = _servizi_app_init(request, session_or_token, urlparams)
+	return risposta['res']
+
 
 @jsonrpc_method('servizi_app_init_2', safe=True)
 def servizi_app_init_2(request, opzioni, urlparams):
 	session_or_token = opzioni['session_or_token']
-	res = servizi_app_init(request, session_or_token, urlparams)
-	v = VersioneApp.objects.get(versione=opzioni['versione'])
+	risposta = _servizi_app_init(request, session_or_token, urlparams)
+	res = risposta['res']
+	if 'os' in opzioni:
+		os = opzioni['os']
+	else:
+		os = None
+	try:
+		v = VersioneApp.objects.get(versione=opzioni['versione'], os=os)
+	except VersioneApp.DoesNotExist:
+		v = VersioneApp.objects.get(versione=opzioni['versione'], os=None)
 	res['deprecata'] = False
 	res['aggiornamento'] = False
 	res['messaggio_custom'] = v.messaggio_custom
 	n = datetime.now()
 	if v.orario_deprecata is not None and v.orario_deprecata <= n:
 		res['deprecata'] = True
-	elif len(VersioneApp.objects.filter(beta=False, orario_rilascio__gt=v.orario_rilascio, orario_rilascio__lt=n)) > 0:
+	elif len(VersioneApp.objects.filter(Q(os=None) | Q(os=os), beta=False, orario_rilascio__gt=v.orario_rilascio, orario_rilascio__lt=n)) > 0:
 		res['aggiornamento'] = True
+	u = risposta['user']
+	if not u.is_authenticated():
+		u = None
+	l = LogAppInit(
+		orario=n,
+		versione=v,
+		session_key=res['session_key'],
+		user=u,
+	)
+	# l.save()
 	return res
 
 
