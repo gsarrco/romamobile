@@ -62,7 +62,7 @@ from map import MapPanel, Layer, LayerPanel, Marker
 from globals import make_absolute, base_url
 
 from DissolvingPopup import DissolvingPopup
-from util import JsonHandler, redirect
+from util import JsonHandler, JsonInteractiveHandler, redirect
 
 
 client = JSONProxy(base_url + '/json/', ['risorse_lista_tipi', 'servizi_autocompleta_indirizzo'])

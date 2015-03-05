@@ -109,6 +109,32 @@ def azimuth_deg(p1, p2):
 		a += 180
 	return a
 
+def piede_perpendicolare(A, B, P):
+	Ax, Ay = A
+	Bx, By = B
+	Px, Py = P
+	# Retta parallela all'asse x
+	if Ax == Bx:
+		return Ax, Py
+	# Retta parallela all'asse y
+	if Ay == By:
+		return Px, By
+	# Altri casi
+	m = (By - Ay) / (Bx - Ax) # Coeff. angolare retta
+	q = (Ax * By - Ay * Bx) / (Ax - Bx)
+	mp = -1 / m # Coeff. angolare perpendicolare
+	norm = sqrt(1 + m * m)
+	d = abs(m * Px - Py + q) / norm # Distanza punto-retta
+	# Posizione di P rispetto alla retta: se k e m sono concordi, P sta "a sinistra" della retta
+	# e quindi mi avvicino alla retta seguendo il versore; altrimenti devo andare
+	# in verso opposto
+	k = m * Px - Py + q
+	kv = -1 if k * m > 0 else 1
+	# versore = (1, mp) / normp, restituisco P + d * versore:
+	normp = sqrt(1 + mp * mp)
+	q = (Px + kv * d / normp, Py + kv * mp * d / normp)
+	return q
+
 
 class SegmentRepo(object):
 	def __init__(self):

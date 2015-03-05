@@ -56,7 +56,7 @@ from pyjamas.ui.MenuBar import MenuBar
 from pyjamas.ui.MenuItem import MenuItem
 from pyjamas.ui.Widget import Widget
 from pyjamas.ui.Hyperlink import Hyperlink
-from pyjamas import Window, History
+from pyjamas import Window, History, DOM
 from pyjamas.Timer import Timer
 from datetime import date, time, datetime, timedelta
 from DissolvingPopup import DissolvingPopup
@@ -81,7 +81,6 @@ class JsonHandler():
 				self.callback(res, self.data)
 
 	def onRemoteError(self, text, code):
-		wait_stop()
 		if self.callback_error is not None:
 			if self.data is None:
 				self.callback_error(text, code)
@@ -90,11 +89,86 @@ class JsonHandler():
 		else:
 			prnt(text)
 			prnt(code)
-			
+
+class JsonInteractiveHandler(JsonHandler):
+	def __init__(self, callback, callback_error=None, data=None, waiting_handler=None, error_popup=None):
+		JsonHandler.__init__(self, callback, callback_error, data)
+		self.waiting_handler = waiting_handler
+		if self.waiting_handler is not None:
+			self.waiting_handler.start()
+		self.error_popup = _("Impossibile scaricare i dati, riprova") if error_popup is None else error_popup
+
+	def onRemoteResponse(self, res):
+		if self.waiting_handler is not None:
+			self.waiting_handler.stop()
+		wait_stop()
+		return JsonHandler.onRemoteResponse(self, res)
+
+	def onRemoteError(self, text, code):
+		if self.waiting_handler is not None:
+			self.waiting_handler.stop()
+		wait_stop()
+		if self.error_popup is not None:
+			DissolvingPopup(self.error_popup, error=True)
+		return JsonHandler.onRemoteError(self, text, code)
+
+class WaitingHandler(object):
+	def __init__(self,
+		els=None,
+		el_ids=None,
+		widgets=None,
+		custom_style='waiting-for-connection',
+		custom_start_callbacks=None,
+		custom_stop_callbacks=None,
+	):
+		object.__init__(self)
+		if els is None:
+			self.els = []
+		else:
+			self.els = els
+		if el_ids is not None:
+			self.addElementsById(el_ids)
+		if widgets is not None:
+			self.addWidgets(widgets)
+		self.custom_style = custom_style
+		self.custom_start_callbacks = custom_start_callbacks if custom_start_callbacks is not None else []
+		self.custom_stop_callbacks = custom_stop_callbacks if custom_stop_callbacks is not None else []
+
+	def start(self):
+		for el in self.els:
+			el.className += " " + self.custom_style
+		for s in self.custom_start_callbacks:
+			s()
+
+	def stop(self):
+		for el in self.els:
+			styles = el.className.split(" ")
+			el.className = " ".join([x for x in styles if x != self.custom_style])
+		for s in self.custom_stop_callbacks:
+			s()
+
+	def addElementsById(self, el_ids):
+		for i in el_ids:
+			self.els.append(DOM.getElementById(i))
+
+	def addElements(self, els):
+		for el in els:
+			self.els.append(el)
+
+	def addWidgets(self, ws):
+		for w in ws:
+			self.els.append(w.getElement())
+
+	def addStartCallbacks(self, cbs):
+		self.custom_start_callbacks.extend(cbs)
+
+	def addStopCallbacks(self, cbs):
+		self.custom_stop_callbacks.extend(cbs)
+
+
 class MyKeyboardHandler(KeyboardHandler):
 	def __init__(self, callback):
 		self.callback = callback
-	
 	def onKeyDown(self, res):
 		self.callback()
 
@@ -635,9 +709,18 @@ class TimeBox(HorizontalPanel):
 		self.image.addClickListener(self.onImageClick)
 		self.add(self.image)
 		self.enabled = True
+		self.change_listeners = []
+		self.tb.addChangeListener(self.onChange)
 
 	def getTextBox(self):
 		return self.tb
+
+	def onChange(self):
+		for l in self.change_listeners:
+			l()
+
+	def addChangeListener(self, l):
+		self.change_listeners.append(l)
 
 	def onImageClick(self):
 		if self.enabled:
@@ -653,6 +736,7 @@ class TimeBox(HorizontalPanel):
 
 	def onTimePicker(self, time):
 		self.tb.setText(time)
+		self.onChange()
 
 	def setText(self, time):
 		self.tb.setText(time)
@@ -710,8 +794,11 @@ class HTMLFlowPanel(FlowPanel):
 		self.setInl(w)
 		FlowPanel.add(self, w)
 		
-	def addHtml(self, html):
-		self.add(HTML(html))
+	def addHtml(self, html, style=None):
+		h = HTML(html)
+		if style is not None:
+			h.addStyleName(style)
+		self.add(h)
 		
 	def addBr(self):
 		FlowPanel.add(self, HTML(''))
@@ -951,6 +1038,44 @@ def get_checked_radio(base, name, values):
 			return v
 	return None
 
+class GPh(HTML):
+	def __init__(self, owner, column_count, row_id_prefix=None, table_class=None):
+		HTML.__init__(self)
+		self.setWidth('100%')
+		self.ncol = column_count
+		self.rows = []
+		self.current_row = []
+		self.row_id_prefix = row_id_prefix
+		self.table_class = table_class
+
+	def add(self, html='', td_class='', td_id=''):
+		self.current_row.append((html, td_class, td_id))
+		if len(self.current_row) == self.ncol:
+			self.rows.append(self.current_row)
+			self.current_row = []
+
+	def render(self):
+		if self.table_class is None:
+			html = '<table>'
+		else:
+			html = '<table class="%s">' % self.table_class
+		rcount = 0
+		for r in self.rows:
+			row_id = ''
+			if self.row_id_prefix is not None:
+				row_id = ' id="%s%d"' % (self.row_id_prefix, rcount)
+			rcount += 1
+			html += '<tr%s>' % row_id
+			for col in r:
+				h, c, i = col
+				hh = '&nbsp;' if h == '' else h
+				cc = '' if c == '' else (' class="%s"' % c)
+				ii = '' if i == '' else (' id="%s"' % i)
+				html += '<td%s%s>%s</td>' % (cc, ii, hh)
+			html += '</tr>'
+		html += '</table>'
+		self.setHTML(html)
+
 
 class ValidationErrorRemover(KeyboardHandler):
 	def __init__(self, widget):
@@ -983,9 +1108,10 @@ class LoadingButton(Button):
 
 class MenuCmd:
 	def __init__(self, handler):
-	  self.handler = handler
+		self.handler = handler
+
 	def execute(self):
-	  self.handler()
+		self.handler()
 
 # ToggleImage
 class ToggleImage(Image):
@@ -1029,35 +1155,45 @@ class ToggleImage(Image):
 # SearchBox
 
 class SearchPopup(PopupPanel, KeyboardHandler):
-	def __init__(self, els, callback, textbox=None):
+	def __init__(self, callback, textbox=None):
 		PopupPanel.__init__(self, False, modal=False)
 		self.sp = ScrollPanel()
 		self.sp.setSize('100%', '400px')
 		self.add(self.sp)
 		self.callback = callback
-		self.list = MenuPanel(None, [], None)
+		self.list = HTML()
 		self.sp.addStyleName('big-list')
-		self.els = els
 		self.names = {}
-		for el in els:
-			pk, name = el
-			self.list.addItem(pk, name, self.onList)
-			self.names[pk] = name
 		self.sp.add(self.list)
 		self.textbox = textbox
 		self.addStyleName('search-popup')
 
+	def onListElFactory(self, pk, text):
+		def f():
+			self.callback(pk, text)
+		return f
+
 	def update(self, els):
-		self.list.clear()
+		self.els = els
+		html = '<table>'
+		i = 0
 		self.names = {}
 		for el in els:
 			pk, name = el
-			self.list.addItem(pk, name, self.onList)
 			self.names[pk] = name
-	
-	def onList(self, mpi):
-		self.callback(mpi.id, mpi.text)
-		
+			html += '<tr id="search-popup-%d"><td>%s</td></tr>' % (i, name)
+			i += 1
+		html += '</table>'
+		i = 0
+		self.list.setHTML(html)
+		for el in els:
+			pk, name = el
+			DOM.getElementById('search-popup-%d' % i).onclick = self.onListElFactory(pk, name)
+			i += 1
+
+
+
+
 	def setFocus(self, focus=True):
 		self.list.setFocus(focus)
 
@@ -1137,12 +1273,11 @@ class SearchBox(TextBox, KeyboardHandler, FocusListener):
 	def onMethodDone(self, res):
 		if self.timer_enabled and res['cerca'] == self.getText() and len(res['risultati']) > 0:
 			res = res['risultati']
-			if self.popup is not None:
-				self.popup.update(res)
-			else:
-				self.popup = SearchPopup(res, self.onSearchPopupSelected, self)
+			if self.popup is None:
+				self.popup = SearchPopup(self.onSearchPopupSelected, self)
 			self.popup.setPopupPosition(self.getAbsoluteLeft(), self.getAbsoluteTop() + self.getClientHeight())
 			self.popup.show()
+			self.popup.update(res)
 		elif self.popup is not None:
 			self.popup.hide()
 
@@ -1154,12 +1289,12 @@ class SearchBox(TextBox, KeyboardHandler, FocusListener):
 		"""
 		self.stop_timer()
 		self.setFocus()
-		if self.popup is not None:
-			self.popup.update(elems)
-		else:
-			self.popup = SearchPopup(elems, self.onSearchPopupSelected, self)
+		if self.popup is  None:
+			self.popup = SearchPopup(self.onSearchPopupSelected, self)
 		self.popup.setPopupPosition(self.getAbsoluteLeft(), self.getAbsoluteTop() + self.getClientHeight())
 		self.popup.show()
+		self.popup.update(elems)
+
 
 	def onFocus(self):
 		self.selectAll()
@@ -2286,3 +2421,6 @@ class ButtonsPanel(HorizontalPanel):
 				self.add(HTML('&nbsp;'))
 			self.buttons.append(b)
 
+def addClickListener(el_id, listener):
+	el = DOM.getElementById(el_id)
+	JS("""el.onclick = listener;""")

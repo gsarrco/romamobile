@@ -272,6 +272,7 @@
 	{% if opzioni_bnr %}
 		<h3>{% trans "Bike and ride:" %}</h3>
 		<p>
+			{{ form.av_bici_sul_tpl }} {% trans "Porta la bici sui mezzi pubblici" %}<br />
 			{% blocktrans with mdb=form.av_max_distanza_bici %}
 			Massima percorrenza in bici: {{ mdb }} km
 			{% endblocktrans %}

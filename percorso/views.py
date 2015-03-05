@@ -48,7 +48,6 @@ from django.http import HttpResponse
 from django.core.cache import cache
 from carpooling.models import get_vincoli
 from servizi import infopoint
-import rpyc
 import settings
 from copy import deepcopy, copy
 import cPickle as pickle
@@ -57,10 +56,11 @@ from paline import models as palinemodels
 from pprint import pprint
 from parcheggi import models as parcheggi
 import re
-import urllib
+import urllib, urllib2
 from hashlib import md5
 import traceback
 from servizi.views import sostituisci_preferiti
+import requests
 
 percorso1 = ServerVersione("percorso", 1)
 percorso2 = ServerVersione("percorso", 2)
@@ -175,8 +175,8 @@ def cerca(
 			'versione': getdef(opzioni, 'versione', 2),
 			'hl': lang,
 			'cerca_punti': cerca_punti,
+			'bici_sul_tpl': getdef(opzioni, 'bici_sul_tpl', False),
 		}
-
 		return calcola_percorso_dinamico(request, True)
 
 
@@ -235,6 +235,7 @@ def infopoint_to_get_params(infopoint, da=True):
 		'tipi_ris': ','.join([str(x) for x in infopoint['tipi_ris']]),
 		'linee_escluse': ','.join(["%s:%s" % (k, infopoint['linee_escluse'][k]) for k in infopoint['linee_escluse']]) if len(infopoint['linee_escluse']) > 0 else '-',
 		'ztl': ','.join(infopoint['ztl']) if 'ztl' in infopoint else '',
+		'bici_sul_tpl': 1 if getdef(infopoint, 'bici_sul_tpl', False) else 0,
 		'hl': getdef(infopoint, 'hl', 'it'),
 	}
 	if da:
@@ -342,6 +343,7 @@ def calcola_percorso_dinamico(request, webservice=False, ctx=None):
 	ck = infopoint_to_cache_key(infopoint)
 	tr = cache.get(ck)
 	att = 0
+
 	while att < 8 and tr == 'WAIT':
 		att += 1
 		sleep(2)
@@ -365,8 +367,6 @@ def calcola_percorso_dinamico(request, webservice=False, ctx=None):
 
 def formatta_calcola_percorso(request, webservice, ctx, tr, opzioni=None, mail=None):
 	infopoint = request.session['infopoint']
-
-
 	punti = infopoint['punti']
 	versione = getdef(infopoint, 'versione', 2)
 	if opzioni is None:
@@ -383,6 +383,7 @@ def formatta_calcola_percorso(request, webservice, ctx, tr, opzioni=None, mail=N
 	#tr.stampa()
 	tratto.formatta_percorso(tr, 'indicazioni_icona', indicazioni_icona, opzioni)
 	ctx['indicazioni_icona'] = indicazioni_icona.indicazioni
+	# pprint(indicazioni_icona.indicazioni)
 	ctx['numero_ultimo_nodo'] = indicazioni_icona.numero_nodi - 1
 	ctx['tempo_reale'] = data < datetime.now() + timedelta(hours=1)
 	
@@ -446,6 +447,7 @@ def formatta_calcola_percorso(request, webservice, ctx, tr, opzioni=None, mail=N
 			av_metro=infopoint['metro'],
 			av_ferro=infopoint['ferro'],
 			av_wd=data.weekday(),
+			av_bici_sul_tpl=getdef(infopoint, 'bici_sul_tpl', False),
 			av_max_distanza_bici=infopoint['max_distanza_bici'] / 1000,
 			av_hour="%d" % data.hour,
 			av_minute="%d" % ((data.minute / 10) * 10),
@@ -524,6 +526,7 @@ def avanzate(request):
 		av_bus=infopoint['bus'],
 		av_metro=infopoint['metro'],
 		av_ferro=infopoint['ferro'],
+		av_bici_sul_tpl=getdef(infopoint, 'bici_sul_tpl', False),
 		av_max_distanza_bici=infopoint['max_distanza_bici'] / 1000,
 		av_wd=data.weekday(),
 		av_hour="%d" % data.hour,
@@ -551,6 +554,7 @@ def avanzate(request):
 		except Exception:
 			error_messages.append(_("distanza massima in bici (errata)"))
 			error_fields.extend(['av_max_distanza_bici'])
+		infopoint['bici_sul_tpl'] = True if 'av_bici_sul_tpl' in cd else False
 		if len(error_fields) > 0:
 			f.set_error(error_fields)
 		else:
@@ -749,7 +753,8 @@ class OpzioniAvanzateForm(forms.Form):
 	)
 	av_hour = forms.TypedChoiceField(choices=[(i, "%02d" % i) for i in range(24)])
 	av_minute = forms.TypedChoiceField(choices=[(i, "%02d" % i) for i in range(0, 60, 10)])
-		
+
+	av_bici_sul_tpl = forms.BooleanField()
 	av_max_distanza_bici = forms.FloatField(widget=forms.TextInput(attrs={'size':'3'}))
 	av_bus = forms.BooleanField()
 	av_metro = forms.BooleanField()

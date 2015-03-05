@@ -29,6 +29,7 @@ from django.contrib.auth.models import User, Group
 import cPickle as pickle
 import hashlib
 from django.core.cache import cache
+from contextlib import contextmanager
 import random
 
 
@@ -702,3 +703,71 @@ class VersioneApp(models.Model):
 	orario_deprecata = models.DateTimeField(null=True, blank=True, default=None)
 	beta = models.BooleanField(blank=True, default=False)
 	messaggio_custom = models.CharField(max_length=2047, blank=True, null=True)
+	os = models.CharField(max_length=31, blank=True, null=True, default=None)
+
+class LogAppInit(models.Model):
+	orario = models.DateTimeField(db_index=True)
+	versione = models.ForeignKey(VersioneApp)
+	session_key = models.CharField(max_length=40, db_index=True)
+	user = models.ForeignKey(User, null=True, default=None)
+
+
+
+
+
+# Registro processamenti
+
+class StatoProcessamento(models.Model):
+	nome = models.CharField(max_length=63, db_index=True)
+	orario_inizio_esecuzione = models.DateTimeField(default=None, null=True, blank=True)
+	orario_fine_esecuzione = models.DateTimeField(default=None, null=True, blank=True)
+	orario_ultimo_elemento = models.DateTimeField(default=None, null=True, blank=True)
+	id_ultimo_elemento = models.IntegerField(default=None, null=True, blank=True)
+
+	def __unicode__(self):
+		return self.nome
+
+	class Meta:
+		verbose_name = u'Stato processamento'
+		verbose_name_plural = u'Stati processamento'
+
+@contextmanager
+def processa_prossimo_lotto(nome, queryset, field, limit=200, by_id=False):
+	sp = StatoProcessamento.objects.get_or_create(nome=nome)[0]
+	sp.orario_inizio_esecuzione = datetime.now()
+	sp.save()
+	if not by_id:
+		attr = 'orario_ultimo_elemento'
+	else:
+		attr = 'id_ultimo_elemento'
+	if getattr(sp, attr) is not None:
+		lookup = "%s__gt" % field
+		queryset = queryset.filter(**{lookup: getattr(sp, attr)}).order_by(field)
+	else:
+		queryset = queryset.all().order_by(field)
+	if limit > 0:
+		queryset = queryset[:limit]
+	instances = list(queryset)
+	yield instances
+	sp.orario_fine_esecuzione = datetime.now()
+	if len(instances) > 0:
+		oue = getattr(instances[-1], field)
+		setattr(sp, attr, oue)
+	sp.save()
+
+
+def processa_lotti(nome, queryset, field, limit=200, by_id=False):
+	esci = False
+	while not esci:
+		with processa_prossimo_lotto(nome, queryset, field, limit, by_id) as els:
+			if len(els) > 0:
+				yield els
+			else:
+				esci = True
+
+
+def processamento_in_corso(nome, intervallo_guardia=timedelta(minutes=1)):
+	sp = StatoProcessamento.objects.get_or_create(nome=nome)[0]
+	if sp.orario_inizio_esecuzione is None:
+		return False
+	return sp.orario_inizio_esecuzione >= datetime.now() - intervallo_guardia

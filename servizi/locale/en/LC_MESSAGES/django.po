@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2014-09-17 11:34+0200\n"
-"PO-Revision-Date: 2014-09-17 11:34+0100\n"
+"POT-Creation-Date: 2014-12-03 09:42+0100\n"
+"PO-Revision-Date: 2014-12-03 09:42+0100\n"
 "Last-Translator: \n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
@@ -30,127 +30,127 @@ msgstr "Point on map <punto:(%s,%s)>"
 msgid "ita"
 msgstr "eng"
 
-#: .\utils.py:206
+#: .\utils.py:205
 msgid "Lu"
 msgstr "Mon"
 
-#: .\utils.py:206
+#: .\utils.py:205
 msgid "Ma"
 msgstr "Tue"
 
-#: .\utils.py:206
+#: .\utils.py:205
 msgid "Me"
 msgstr "Wed"
 
-#: .\utils.py:206
+#: .\utils.py:205
 msgid "Gi"
 msgstr "Thu"
 
-#: .\utils.py:206
+#: .\utils.py:205
 msgid "Ve"
 msgstr "Fri"
 
-#: .\utils.py:206
+#: .\utils.py:205
 msgid "Sa"
 msgstr "Sat"
 
-#: .\utils.py:206
+#: .\utils.py:205
 msgid "Do"
 msgstr "Sun"
 
-#: .\utils.py:208
+#: .\utils.py:207
 msgid "lu"
 msgstr "mo"
 
-#: .\utils.py:208
+#: .\utils.py:207
 msgid "ma"
 msgstr "tu"
 
-#: .\utils.py:208
+#: .\utils.py:207
 msgid "me"
 msgstr "we"
 
-#: .\utils.py:208
+#: .\utils.py:207
 msgid "gi"
 msgstr "th"
 
-#: .\utils.py:208
+#: .\utils.py:207
 msgid "ve"
 msgstr "fr"
 
-#: .\utils.py:208
+#: .\utils.py:207
 msgid "sa"
 msgstr "sa"
 
-#: .\utils.py:208
+#: .\utils.py:207
 msgid "do"
 msgstr "su"
 
-#: .\utils.py:210
+#: .\utils.py:209
 msgid "Lunedì"
 msgstr "Monday"
 
-#: .\utils.py:210
+#: .\utils.py:209
 msgid "Martedì"
 msgstr "Tuesday"
 
-#: .\utils.py:210
+#: .\utils.py:209
 msgid "Mercoledì"
 msgstr "Wednesday"
 
-#: .\utils.py:210
+#: .\utils.py:209
 msgid "Giovedì"
 msgstr "Thursday"
 
-#: .\utils.py:210
+#: .\utils.py:209
 msgid "Venerdì"
 msgstr "Friday"
 
-#: .\utils.py:210
+#: .\utils.py:209
 msgid "Sabato"
 msgstr "Saturday"
 
-#: .\utils.py:210
+#: .\utils.py:209
 msgid "Domenica"
 msgstr "Sunday"
 
-#: .\utils.py:212
+#: .\utils.py:211
 msgid "lunedì"
 msgstr "monday"
 
-#: .\utils.py:212
+#: .\utils.py:211
 msgid "martedì"
 msgstr "tuesday"
 
-#: .\utils.py:212
+#: .\utils.py:211
 msgid "mercoledì"
 msgstr "wednesday"
 
-#: .\utils.py:212
+#: .\utils.py:211
 msgid "giovedì"
 msgstr "thursday"
 
-#: .\utils.py:212
+#: .\utils.py:211
 msgid "venerdì"
 msgstr "friday"
 
-#: .\utils.py:212
+#: .\utils.py:211
 msgid "sabato"
 msgstr "saturday"
 
-#: .\utils.py:212
+#: .\utils.py:211
 msgid "domenica"
 msgstr "sunday"
 
-#: .\utils.py:235
+#: .\utils.py:234
 msgid "H:i"
 msgstr "h:i A"
 
-#: .\utils.py:398
+#: .\utils.py:397
 msgid "Conferma"
 msgstr "Ok"
 
-#: .\utils.py:399
+#: .\utils.py:398
 msgid "Annulla"
 msgstr "Cancel"
 
@@ -296,6 +296,10 @@ msgstr "Private transport"
 #: .\templates\servizi_new.html.py:78
 msgid "Altro"
 msgstr "Other"
+
+#: .\templates\servizi_new.html.py:97
+msgid "Scarica l'app Chiama Taxi"
+msgstr "Download Chiama Taxi app"
 
 #~ msgid "Percorsi e tempi di attesa bus"
 #~ msgstr "Bus routes and waiting times"

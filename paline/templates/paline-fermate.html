@@ -53,19 +53,19 @@
 	<p>
 		<img src="http://maps.googleapis.com/maps/api/staticmap?{{mappa}}" alt="Mappa"/><br/>
 			{% if zoom_down %}
-				<a href="{% nohist %}/paline/mappa/static/{{id_percorso}}/{{zoom_down}}/{{center_x}}/{{center_y}}{% endnohist %}" class="nound">[-]</a>
+				<a href="{% nohist %}/paline/mappa/static/o{% endnohist %}" class="nound">[-]</a>
 			{% else %}
 				<span class="disabled">[-]</span>
 			{% endif %}
 			{% if zoom_up %}
-				<a href="{% nohist %}/paline/mappa/static/{{id_percorso}}/{{zoom_up}}/{{center_x}}/{{center_y}}{% endnohist %}" class="nound">[+]</a>
+				<a href="{% nohist %}/paline/mappa/static/i{% endnohist %}" class="nound">[+]</a>
 			{% else %}
 				<span class="disabled">[+]</span>
 			{% endif %}<br />
-			<a href="{% nohist %}/paline/mappa/static/{{id_percorso}}/{{zoom}}/{{center_x}}/{{up}}{% endnohist %}" class="nound">^</a><br />
-			<a href="{% nohist %}/paline/mappa/static/{{id_percorso}}/{{zoom}}/{{left}}/{{center_y}}{% endnohist %}" class="nound">&lt;</a> +
-			<a href="{% nohist %}/paline/mappa/static/{{id_percorso}}/{{zoom}}/{{right}}/{{center_y}}{% endnohist %}" class="nound">&gt;</a><br />
-			<a href="{% nohist %}/paline/mappa/static/{{id_percorso}}/{{zoom}}/{{center_x}}/{{down}}{% endnohist %}" class="nound">v</a>
+			<a href="{% nohist %}/paline/mappa/static/n{% endnohist %}" class="nound">^</a><br />
+			<a href="{% nohist %}/paline/mappa/static/w{% endnohist %}" class="nound">&lt;</a> +
+			<a href="{% nohist %}/paline/mappa/static/e{% endnohist %}" class="nound">&gt;</a><br />
+			<a href="{% nohist %}/paline/mappa/static/s{% endnohist %}" class="nound">v</a>
 	</p>
 	</div>
 	<p>
@@ -75,7 +75,7 @@
 {% else %}
 	<p>
 		<img class="dot" width="13" height="7" src="/news/s/img/right_bullet.gif" alt="*" />
-		<a href="{% nohist %}/paline/mappa/static/{{percorso.id_percorso}}{% endnohist %}">{% trans "Mappa base" %}</a><br />
+		<a href="{% nohist %}/paline/mappa/static{% endnohist %}">{% trans "Mappa base" %}</a><br />
 		<img class="dot" width="13" height="7" src="/news/s/img/right_bullet.gif" alt="*" />
 		<a href="/percorso/js/?hl={{ lingua.codice }}&amp;id_percorso={{ percorso.id_percorso }}&amp;lf=0" target="_blank">{% trans "Mappa interattiva" %}</a>
 	</p>

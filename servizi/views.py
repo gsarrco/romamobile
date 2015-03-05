@@ -178,7 +178,7 @@ def app_login_by_token(request, token):
 	Questa vista restituisce una pagina web, con il solo obiettivo di impostare il cookie di sessione
 	"""
 	t = TokenApp.objects.get(token_app=token)
-	t.ultimo_accesso = datetime.now()
+	t.ultimo_accesso = datetime.datetime.now()
 	t.user.backend='django.contrib.auth.backends.ModelBackend'
 	login(request, t.user)
 	return messaggio(request, _('Bentornato, %(nome)s') % {'nome': t.user.first_name})

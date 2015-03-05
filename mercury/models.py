@@ -24,7 +24,7 @@ from django.db import models
 import rpyc
 from rpyc.utils.server import ThreadedServer
 from threading import Thread
-from Queue import Queue
+from Queue import Queue, Empty
 import cPickle as pickle
 from django.db.models import Q, F
 from time import sleep
@@ -53,7 +53,7 @@ Esempio 2: creazione di un servizio Operazioni; registrazione demone e watchdog
 	
 	operazioni = PeerType.objects.get(name='operazioni')
 	operazioni_daemon = Daemon.get_process_daemon('operazioni_daemon')
-	m = Mercury(somma, OperazioniListener, watchdog_daemon=operazioni_daemon)
+	m = Mercury(operazioni, OperazioniListener, watchdog_daemon=operazioni_daemon)
 	operazioni_daemon.set_ready()
 
 
@@ -82,6 +82,8 @@ config = {
 class PeerType(models.Model):
 	name = models.CharField(max_length=31)
 	max_queue_length = models.IntegerField(default=-1)
+	min_port = models.IntegerField(blank=True, null=True, default=None)
+	max_port = models.IntegerField(blank=True, null=True, default=None)
 	
 	def __unicode__(self):
 		return self.name
@@ -155,7 +157,9 @@ class Peer(models.Model):
 		random.shuffle(ss)
 		for s in ss:
 			try:
-				return rpyc.connect(s.host, s.port, config=config)
+				c = rpyc.connect(s.host, s.port, config=config)
+				c.peer = s
+				return c
 			except Exception:
 				#s.bloccato = datetime.now()
 				#s.save()
@@ -181,7 +185,9 @@ class Peer(models.Model):
 		random.shuffle(ss)
 		for s in ss:
 			try:
-				return rpyc.connect(s.host, s.port, config=config)
+				c = rpyc.connect(s.host, s.port, config=config)
+				c.peer = s
+				return c
 			except Exception:
 				#s.bloccato = datetime.now()
 				#s.save()
@@ -194,7 +200,9 @@ class Peer(models.Model):
 		cs = []
 		for s in ss:
 			try:
-				cs.append(rpyc.connect(s.host, s.port, config=config))
+				c = rpyc.connect(s.host, s.port, config=config)
+				c.peer = s
+				cs.append(c)
 			except Exception:
 				s.bloccato = datetime.now()
 				s.save()
@@ -206,7 +214,9 @@ class Peer(models.Model):
 		cs = []
 		for s in ss:
 			try:
-				cs.append(rpyc.connect(s.host, s.port, config=config))
+				c = rpyc.connect(s.host, s.port, config=config)
+				c.peer = s
+				cs.append(c)
 			except Exception:
 				s.bloccato = datetime.now()
 				s.save()
@@ -276,16 +286,23 @@ class Watchdog(Thread):
 					print "Restart scheduled"
 
 class Mercury(Thread):
-	def __init__(self, type, listener, nworkers=3, daemon=None, watchdog_daemon=None):
+	def __init__(self, type, listener=None, nworkers=3, daemon=None, watchdog_daemon=None):
 		Thread.__init__(self)
 		self.queue = Queue()
 		self.workers = [MercuryWorker(self) for i in range(nworkers)]
 		if not isinstance(type, PeerType):
 			type = PeerType.objects.get(name=type)
+		port = 0
+		if type.min_port is not None and type.max_port is not None:
+			ports = set(range(type.min_port, type.max_port + 1))
+			used_ports = set([p.port for p in Peer.objects.filter(type=type)])
+			avail_ports = ports - used_ports
+			r = random.Random()
+			port = r.choice(list(avail_ports))
 		self.type = type
 		self.listener = listener
 		if listener is not None:
-			self.server = ThreadedServer(listener, port=0, protocol_config=config)
+			self.server = ThreadedServer(listener, port=port, protocol_config=config)
 			self.peer = Peer(
 				type=type,
 				host=settings.LOCAL_IP,
@@ -303,16 +320,49 @@ class Mercury(Thread):
 
 		
 	# API
-	def async_all(self, method, param):
+	def async_all(self, method, param, replace=False):
+		"""
+		Call method asyncrouly on all receivers. Return immediately
+
+		method: method name
+		param: method parameter (only one parameter is allowed)
+		replace: if True, cancel pending invocations of the same method, ad give priority of new invocations to clients
+			for which pending invocations have been cancelled
+		"""
 		if self.peer is not None:
 			cs = self.peer.connect_all()
 		else:
 			cs = Peer.connect_all_static(self.type.name)
+		if replace:
+			peers = {}
+			for c in cs:
+				peers[c.peer] = c
+			prio = []
+			q_new = []
+			try:
+				while True:
+					el = self.queue.get(False)
+					peer = el['connection'].peer
+					if peer in peers and el['method'] == method:
+						prio.append(peer)
+					else:
+						q_new.append(el)
+			except Empty:
+				pass
+			cs = []
+			for p in prio:
+				cs.append(peers[p])
+				del peers[p]
+			for p in peers:
+				cs.append(peers[p])
+			for el in q_new:
+				self.queue.put(el)
+		dumped_param = pickle.dumps(param, protocol=2)
 		for c in cs:
 			self.queue.put({
 				'connection': c,
 				'method': method,
-				'param': pickle.dumps(param, protocol=2),
+				'param': dumped_param,
 			})
 	
 	def sync_any(self, method, param, by_queue=False):

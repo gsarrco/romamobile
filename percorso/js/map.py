@@ -102,6 +102,7 @@ class MapPanel(SimplePanel, DeferrablePanel):
 		popup = ContextMenuPopupPanel(menu)
 		popup.showAt(x + mx, y + my)
 
+
 	def create_map(self):
 		mapquestAttrib = """Tiles Courtesy of <a href="http://www.mapquest.com/" target="_blank">MapQuest</a>
 		<img src="http://developer.mapquest.com/content/osm/mq_logo.png">,
@@ -142,6 +143,7 @@ class MapPanel(SimplePanel, DeferrablePanel):
 				func(e.latlng.lat, e.latlng.lng, e.containerPoint.x, e.containerPoint.y)
 			});
 		""")
+
 
 	def relayout(self):
 		JS("""self.map.invalidateSize();""")
@@ -257,13 +259,13 @@ class InfoPanel(PaginatedPanelPage, ScrollPanel):
 		if self.onClicCallback is not None:
 			self.onClicCallback()
 
-	
-		
-class Layer:
+
+class Layer(object):
 	def __init__(self, name, label, map_panel, owner=None):
 		self.name = name
 		self.label = label
 		self.map_panel = map_panel
+		self.owner = owner
 		self.features = []
 		self.visible = True
 		self.sub = []
@@ -319,7 +321,7 @@ class Layer:
 			
 	def onRefresh(self):
 		client.mappa_layer(self.name, get_lang(), JsonHandler(self.onMappaLayerDone))
-			 
+
 	def setVisible(self, visible=True):
 		self.visible = visible
 		if self.owner is None:
@@ -349,12 +351,6 @@ class Layer:
 		map = self.map_panel.map
 		n = len(self.features)
 		animate = self.map_panel.animation_enabled
-		"""
-		for f in self.features:
-			if isinstance(f, Marker):
-				n += 1
-				m = f.point
-		"""
 		if n > 0:
 			if n == 1:
 				JS("""
@@ -363,6 +359,19 @@ class Layer:
 				""")
 			else:
 				JS("""map.fitBounds(self.group.getBounds(), {animate: animate});""")
+
+	def addGeoJson(self, data):
+		"""
+		Sets layer geojson data.
+
+		data is a geojson string
+		"""
+		map = self.map_panel.map
+		JS("""
+			self.geojson = $wnd['L'].geoJson(JSON.parse(data));
+			self.geojson.addTo(map);
+		""")
+
 
 class LayerPanel(VerticalPanel):
 	def __init__(self, map):
@@ -414,7 +423,29 @@ class LayerPanel(VerticalPanel):
 		if name in self.names:
 			cb = self.names[name]
 			cb.setChecked(checked)
-			
+
+
+class GeoJson:
+	def __init__(self, layer, data, visible=True):
+		self.layer = layer
+		self.visible = False
+		JS("""
+			self.geojson = $wnd['L'].geoJson(JSON.parse(data));
+			layer.group.addLayer(self.geojson);
+		""")
+		self.layer.features.append(self)
+		if visible:
+			self.setVisible(True)
+
+	def setVisible(self, visible):
+		self.visible = visible
+		map = self.layer.getMap()
+		if visible:
+			self.geojson.addTo(map)
+		else:
+			map.removeLayer(self.geojson)
+
+
 
 class Marker:
 	def __init__(
