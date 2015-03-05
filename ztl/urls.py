@@ -28,4 +28,5 @@ urlpatterns = patterns('',
 	url(r'^varchi/dettaglio/(?P<codice>\w+)/$', views.varchi_dettaglio),
 	url(r'^giorno/(?P<giorno>\d)/$', views.giorno),
 	url(r'^ztl/(?P<codice>\w+)/$', views.ztl),
+	url(r'^per_sito$', views.per_sito),
 )

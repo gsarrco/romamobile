@@ -76,6 +76,10 @@ def scarica_rete():
 def carica_rete_auto():
 	try:
 		versione = carica_rete()
+		if versione is None:
+			# Nessuna rete nuova da caricare, in quanto l'ultima rete uploadata ha lo stesso orario di inizio validità
+			# di una rete già caricata. Esco senza mandare messaggi per email
+			return
 		#self.scheduler.insert(versione, self.on_aggiorna_versione)
 		subj = u"Rete caricata con successo"
 		msg = u"Buone notizie: la rete è stata caricata con successo su muoversiaroma.it\n"
@@ -92,7 +96,8 @@ def carica_rete(no_load=False, no_validate=False):
 	transaction.managed(True)
 	if not no_load:
 		if len(VersionePaline.objects.filter(inizio_validita=versione)) > 0:
-			raise Exception(u"Esiste gia' una rete con l'inizio di validita' indicato")
+			# raise Exception(u"Esiste gia' una rete con l'inizio di validita' indicato")
+			return None
 		base = os.path.join(settings.TROVALINEA_PATH_RETE, '%s/rete' % datetime2compact(versione))
 		path = lambda f: os.path.join(base, f)
 		generaRete(versione)
@@ -119,7 +124,7 @@ def carica_rete(no_load=False, no_validate=False):
 			g = graph.Grafo()
 			tpl.registra_classi_grafo(g)
 			#tomtom.load_from_shp(g, 'C:\\Users\\allulll\\Desktop\\grafo\\cpd\\RM_nw%s' % ('_mini' if retina else ''))
-			g.deserialize('%s.v3.dat' % settings.GRAPH)
+			g.deserialize(os.path.join(settings.TROVALINEA_PATH_RETE, '%s.v3.dat' % settings.GRAPH))
 			tpl.carica_rete_su_grafo(r, g, False, versione=versione)
 		
 		except Exception, e:

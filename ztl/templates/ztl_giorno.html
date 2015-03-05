@@ -20,55 +20,58 @@
 {% for o in orari %}
 
 	<h3>{{ o.toponimo }}</h3>
+	{% if o.modificato %}
+		<span class="b">{% trans "Orario ordinario" %}</span>
+	{% endif %}
 	{% if o.fasce|length > 0 %}
 		{% for f in o.fasce %}
 			<p>
 				<img class="dot" src="/xhtml/s/img/red_bullet.gif" height="5" width="13" alt="*" /><span>
-					{% if o.modificato %}
-						{% if not f.attiva %}
-							{% blocktrans %}Non attiva{% endblocktrans %}
-						{% else %}
-							{% if f.inizio_ieri %}
-								{% blocktrans with ora_inizio=f.ora_inizio nome_giorno_prec=nome_giorno_prec %}Dalle {{ ora_inizio  }} di {{ nome_giorno_prec }}{% endblocktrans %}
-							{% else %}
-								{% blocktrans with ora_inizio=f.ora_inizio %}Dalle {{ ora_inizio  }}{% endblocktrans %}
-							{% endif %}
-							{% if f.fine_domani %}
-								{% blocktrans with ora_fine=f.ora_fine nome_giorno_succ=nome_giorno_succ %}alle {{ ora_fine }} di {{nome_giorno_succ}}{% endblocktrans %}
-							{% else %}
-								{% blocktrans with ora_fine=f.ora_fine %}alle {{ ora_fine }}{% endblocktrans %}
-							{% endif %}
-						{% endif %}
-						(*)
+					{% if f.inizio_ieri %}
+						{% blocktrans with ora_inizio=f.ora_inizio nome_giorno_prec=nome_giorno_prec %}Dalle {{ ora_inizio  }} di {{ nome_giorno_prec }}{% endblocktrans %}
 					{% else %}
-						{% if f.inizio_ieri %}
-							{% blocktrans with ora_inizio=f.ora_inizio nome_giorno_prec=nome_giorno_prec %}Dalle {{ ora_inizio  }} di {{ nome_giorno_prec }}{% endblocktrans %}
-						{% else %}
-							{% blocktrans with ora_inizio=f.ora_inizio %}Dalle {{ ora_inizio  }}{% endblocktrans %}
-						{% endif %}
-						{% if f.fine_domani %}
-							{% blocktrans with ora_fine=f.ora_fine nome_giorno_succ=nome_giorno_succ %}alle {{ ora_fine }} di {{nome_giorno_succ}}{% endblocktrans %}
-						{% else %}
-							{% blocktrans with ora_fine=f.ora_fine %}alle {{ ora_fine }}{% endblocktrans %}
-						{% endif %}									
+						{% blocktrans with ora_inizio=f.ora_inizio %}Dalle {{ ora_inizio  }}{% endblocktrans %}
+					{% endif %}
+					{% if f.fine_domani %}
+						{% blocktrans with ora_fine=f.ora_fine nome_giorno_succ=nome_giorno_succ %}alle {{ ora_fine }} di {{nome_giorno_succ}}{% endblocktrans %}
+					{% else %}
+						{% blocktrans with ora_fine=f.ora_fine %}alle {{ ora_fine }}{% endblocktrans %}
 					{% endif %}
 				</span></span></p>
 			</p>
-			
 		{% endfor %}
-		
 	{% else %}
-	<p>
-		<img class="dot" src="/xhtml/s/img/red_bullet.gif" height="5" width="13" alt="*" /><span><span class="i">{% trans "Non attiva" %}</span></span></p>
-	</p>
+		<p>
+			<img class="dot" src="/xhtml/s/img/red_bullet.gif" height="5" width="13" alt="*" /><span>
+				{% trans "Non attiva" %}
+			</span></span></p>
+		</p>
 	{% endif %}
-	
+	{% if o.modificato %}
+		<span class="b">{% trans "Modifica straordinaria" %} {{ nome_giorno }}</span>
+		{% for f in o.fasce_mod %}
+			<p>
+				<img class="dot" src="/xhtml/s/img/red_bullet.gif" height="5" width="13" alt="*" /><span>
+				{% if not f.attiva %}
+					{% blocktrans %}Non attiva{% endblocktrans %}
+				{% else %}
+					{% if f.inizio_ieri %}
+						{% blocktrans with ora_inizio=f.ora_inizio nome_giorno_prec=nome_giorno_prec %}Dalle {{ ora_inizio  }} di {{ nome_giorno_prec }}{% endblocktrans %}
+					{% else %}
+						{% blocktrans with ora_inizio=f.ora_inizio %}Dalle {{ ora_inizio  }}{% endblocktrans %}
+					{% endif %}
+					{% if f.fine_domani %}
+						{% blocktrans with ora_fine=f.ora_fine nome_giorno_succ=nome_giorno_succ %}alle {{ ora_fine }} di {{nome_giorno_succ}}{% endblocktrans %}
+					{% else %}
+						{% blocktrans with ora_fine=f.ora_fine %}alle {{ ora_fine }}{% endblocktrans %}
+					{% endif %}
+				{% endif %}
+			</span></span></p>
+		</p>
+		{% endfor %}
+	{% endif %}
 
 {% endfor %}
-
-{% if modificato_globale %}
-	<p>(*) Modifiche straordinarie</p>
-{% endif %}
 
 <h2 class="vskip">{% trans "Altri giorni:" %}</h2>
 <p>

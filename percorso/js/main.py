@@ -63,7 +63,7 @@ from util import storage_get, storage_set, ScrollAdaptivePanel, QuestionDialogBo
 from util import get_checked_radio, HidingPanel, MyAnchor, LoadingButton, SearchBox, setAttribute
 from util import wait_init, wait_start, wait_stop, _, set_lang, get_lang, MenuPanel, GeneralMenuPanel
 from util import PaginatedPanel, MenuPanelItem, pause_all_timers, resume_all_timers, PaginatedPanelPage
-from util import PausableTimer, ImageTextButton
+from util import PausableTimer, ImageTextButton, MessageDialog
 from datetime import date, time, datetime, timedelta
 from Calendar import Calendar, DateField, TimeField
 from map import MapPanel, Layer, LayerPanel, get_location
@@ -75,7 +75,7 @@ from globals import base_url, make_absolute, flavor, set_user, set_control, ios,
 from __pyjamas__ import JS
 
 from DissolvingPopup import DissolvingPopup
-from util import JsonHandler, redirect
+from util import JsonHandler, JsonInteractiveHandler, WaitingHandler, redirect
 
 client = JSONProxy(base_url + '/json/', [
 	'paline_percorso',
@@ -171,11 +171,11 @@ class SearchMapPanel(VerticalPanel, KeyboardHandler, FocusHandler, DeferrablePan
 									'vertical_alignment': HasAlignment.ALIGN_MIDDLE,
 								},
 								{
-										'class': SearchBox,
-										'name': 'query',
-										'call_addKeyboardListener': ([self], {}),
-										'args': [client.servizi_autocompleta_indirizzo, None, 0, 100, False],
-										'style': 'over-map',
+									'class': SearchBox,
+									'name': 'query',
+									'call_addKeyboardListener': ([self], {}),
+									'args': [client.servizi_autocompleta_indirizzo, self.onCerca, 0, 100, False],
+									'style': 'over-map',
 								},
 								{
 									'class': HP,
@@ -188,23 +188,23 @@ class SearchMapPanel(VerticalPanel, KeyboardHandler, FocusHandler, DeferrablePan
 											'width': '100%',
 											'style': 'over-map',
 										},
-										{
-											'class': Button,
-											'args': ['X', self.onChiudiQuery],
-											'width': '40px',
-											'style': 'over-map close-button',
-										},
 									]
+								},
+								{
+								'class': Button,
+								'args': ['X', self.onChiudiQuery],
+								'width': '40px',
+								'style': 'over-map close-button',
 								},
 							],
 						},
-						{
-							'class': LoadingButton,
-							'args': [_('Cerca'), self.onCerca],
-							'width': '30%',
-							'name': 'button',
-							'style': 'over-map',
-						},
+						# {
+						# 	'class': LoadingButton,
+						# 	'args': [_('Cerca'), self.onCerca],
+						# 	'width': '30%',
+						# 	'name': 'button',
+						# 	'style': 'over-map',
+						# },
 					]
 				},
 			],
@@ -301,7 +301,7 @@ class SearchMapPanel(VerticalPanel, KeyboardHandler, FocusHandler, DeferrablePan
 		self.cercaLinea(s)
 
 	def onCercaDone(self, res):
-		self.base.by_name('button').stop()
+		# self.base.by_name('button').stop()
 		if res['errore']:
 			self.onCercaErrore(res)
 			return
@@ -313,8 +313,11 @@ class SearchMapPanel(VerticalPanel, KeyboardHandler, FocusHandler, DeferrablePan
 		self.owner.cerca_linea.onCercaDone(res, True)
 
 	def cercaLinea(self, query):
-		self.base.by_name('button').start()
-		client.paline_smart_search(query, get_lang(), JsonHandler(self.onCercaDone))
+		# sb = self.base.by_name('button')
+		# sb.start()
+		# wh = WaitingHandler(custom_stop_callbacks=sb.stop)
+		wait_start()
+		client.paline_smart_search(query, get_lang(), JsonInteractiveHandler(self.onCercaDone))
 
 	def onCercaErrore(self, el):
 		x, x_list, x_holder = self.getWidgets()
@@ -333,6 +336,8 @@ class SearchMapPanel(VerticalPanel, KeyboardHandler, FocusHandler, DeferrablePan
 		x, x_list, x_holder = self.getWidgets()
 		x_holder.setVisible(False)
 		x.setVisible(True)
+		x.setText('')
+		x.setFocus()
 
 	def onChange(self, el):
 		el.removeStyleName('validation-error')
@@ -349,6 +354,7 @@ class SearchMapPanel(VerticalPanel, KeyboardHandler, FocusHandler, DeferrablePan
 		self.base.setWidth('100%')
 		self.base.removeStyleName('search-floating')
 		self.base.addStyleName('search-fixed')
+		# self.base.by_name('button').setVisible(False)
 		if self.bottom_widget is not None:
 			self.popup.remove(self.bottom_widget)
 			self.bottom.setWidget(self.bottom_widget)
@@ -359,6 +365,7 @@ class SearchMapPanel(VerticalPanel, KeyboardHandler, FocusHandler, DeferrablePan
 		self.base.setWidth('460px')
 		self.base.removeStyleName('search-fixed')
 		self.base.addStyleName('search-floating')
+		# self.base.by_name('button').setVisible(True)
 		if self.bottom_widget is not None:
 			self.bottom.clear()
 			self.openPopup()
@@ -533,7 +540,8 @@ class ControlPanel(GeneralMenuPanel):
 		self.preferiti_tab_image = Image(_('toolbar/preferiti.png'), Width='48px', Height='48px')
 		self.tab.add(self.preferiti_tab, self.preferiti_tab_image)
 
-		self.old_width = self.tab.getClientWidth()
+		self.old_width = Window.getClientWidth()
+		self.old_height = Window.getClientHeight()
 		self.waiting = wait_init(self.tab_holder)
 		self.mp = MenuPanel(self, [
 			{
@@ -629,18 +637,24 @@ class ControlPanel(GeneralMenuPanel):
 		self.setBottomWidget(pp, close_callback)
 		return pp
 
+	def showSidePanel(self):
+		if not self.small:
+			self.owner.hide(False)
+
 	def relayout(self):
-		width = self.tab.getClientWidth()
-		if (flavor != 'app') or (width != self.old_width):
-			self.old_width = width
+		width = Window.getClientWidth()
+		height = Window.getClientHeight()
+		if width != self.old_width or height > self.old_height:
 			self.cerca_percorso.do_or_defer(self.cerca_percorso.relayout)
 			self.cerca_linea.do_or_defer(self.cerca_linea.relayout)
 			self.cerca_luogo.do_or_defer(self.cerca_luogo.relayout)
-			# self.preferiti_tab.do_or_defer(self.preferiti_tab.relayout)
-			if self.small:
-				self.map_tab.do_or_defer(self.map.relayout)
-			else:
-				self.map.relayout()
+		# self.preferiti_tab.do_or_defer(self.preferiti_tab.relayout)
+		self.old_width = width
+		self.old_height = height
+		if self.small:
+			self.map_tab.do_or_defer(self.map.relayout)
+		else:
+			self.map.relayout()
 
 	def aggiungiNotifica(self, id, titolo, edit_callback, delete_callback):
 		"""
@@ -730,6 +744,7 @@ class ControlPanel(GeneralMenuPanel):
 		cp_params = self.cerca_percorso.availableParams()
 		for p in cp_params:
 			if p in params:
+				print "Trovato"
 				self.cerca_percorso.setParam(p, params[p])
 		cl_params = self.cerca_linea.availableParams()
 		for p in cl_params:
@@ -836,7 +851,7 @@ class ControlPanel(GeneralMenuPanel):
 					self.erroreGeolocalizzazione()
 				else:
 					self.geolocation_status = 3
-					client.paline_smart_search(self.posizione, get_lang(), JsonHandler(self.onWaitingTimesDone))
+					client.paline_smart_search(self.posizione, get_lang(), JsonInteractiveHandler(self.onWaitingTimesDone))
 				# Else, geolocation_status in [2, 3]. We are already getting location or waiting times, nothing to do.
 
 	def onWaitingTimesDone(self, res):
@@ -870,7 +885,7 @@ class ControlPanel(GeneralMenuPanel):
 		elif self.geolocation_status == 2:
 			# waiting for waiting times
 			self.geolocation_status = 3
-			client.paline_smart_search(self.posizione, get_lang(), JsonHandler(self.onWaitingTimesDone))
+			client.paline_smart_search(self.posizione, get_lang(), JsonInteractiveHandler(self.onWaitingTimesDone))
 		else:
 			self.map_tab.onLocationStop()
 
@@ -1178,7 +1193,27 @@ class GeneralPanel(VerticalPanel):
 		self.setSize('100%', '100%')
 
 	def onAppInit(self, res):
+		# if datetime.now() < datetime(2015, 2, 17):
+		# 	msg = """
+		# 		<p>
+		# 			Nella giornata di Marted&igrave; 17 febbraio il servizio non sar&agrave; disponibile
+		# 			a causa di un intervento di manutenzione straordinaria dell'infrastruttura server.
+		# 		</p>
+		# 	"""
+		# 	MessageDialog(msg, "Avviso")
 		self.control.onAppInit(res)
+
+	def onAppInitError(self, text, code):
+		return
+		if datetime.now() < datetime(2015, 2, 18):
+			msg = """
+				<p>
+					Siamo spiacenti, il servizio momentaneamente non &egrave; disponibile.<br /><br />
+					<b>Nella giornata di Marted&igrave; 17 febbraio il servizio non sar&agrave; disponibile
+					a causa di un intervento di manutenzione straordinaria dell'infrastruttura server.</b>
+				</p>
+			"""
+			MessageDialog(msg, "Servizio non disponibile")
 
 	def setSmallLayout(self):
 		if not self.small:
@@ -1205,8 +1240,8 @@ class GeneralPanel(VerticalPanel):
 				self.insert(self.header, 0)
 				self.setCellHeight(self.header, '58px')
 			self.relayout()
-		
-	def onWindowResized(self):
+
+	def doResize(self):
 		if int(self.getClientWidth()) < 800:
 			self.setSmallLayout()
 		else:
@@ -1214,6 +1249,9 @@ class GeneralPanel(VerticalPanel):
 		if self.llp is not None:
 			self.llp.updateSplitter()
 		self.relayout()
+		
+	def onWindowResized(self):
+		self.doResize()
 
 	def createMap(self):
 		self.control.map.create_map()

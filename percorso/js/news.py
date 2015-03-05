@@ -46,7 +46,7 @@ from globals import base_url, make_absolute
 
 
 from DissolvingPopup import DissolvingPopup
-from util import JsonHandler, redirect
+from util import JsonHandler, JsonInteractiveHandler, redirect
 
 
 client = JSONProxy(base_url + '/json/', [
@@ -96,7 +96,7 @@ class NewsPanel(VerticalPanel):
 		self.add(self.sp)
 		self.setCellHeight(self.sp, '100%')
 		wait_start()
-		client.news_tutte(get_lang(), JsonHandler(self.onNewsTutte))
+		client.news_tutte(get_lang(), JsonInteractiveHandler(self.onNewsTutte))
 		self.setSize('100%', '100%')
 
 	def onNewsTutte(self, cs):

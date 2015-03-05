@@ -30,7 +30,9 @@ from xhtml.views import ga as google_analytics, ping
 import django.views.static
 import servizi.views
 import django
-	
+
+# Attualmente non usato
+
 # Uncomment the next two lines to enable the admin:
 from django.contrib import admin
 admin.autodiscover()
@@ -44,10 +46,6 @@ def url_xhtml(servizi):
 
 def url_servizi(servizi):
 	return [url('^ws/xml/%s/' % s, include('%s.wsurls' % s)) for s in servizi]
-
-url_opendata = [
-		url(r'opendata/retetpl', django.views.static.serve, {'path': 'opendata/rete_tpl.zip', 'document_root': settings.TROVALINEA_PATH_RETE})
-]
 
 pattern_list = [
 	url(r'^static/admin/(?P<path>.*)$', django.views.static.serve, {'document_root': os.path.join(os.path.dirname(__file__),'admin_media').replace('\\','/')}),
@@ -79,7 +77,7 @@ pattern_list = [
 ] + [
 	url(r'^%s/s/(?P<path>.*)$' % x, 'django.views.static.serve',
 		{'document_root': os.path.join(os.path.dirname(__file__), '%s/static' % x).replace('\\','/')}) for x in settings.LOCAL_APPS
-] + url_servizi(settings.WS_APPS) + url_xhtml(settings.XHTML_APPS) + url_opendata
+] + url_servizi(settings.WS_APPS) + url_xhtml(settings.XHTML_APPS)
 
 urlpatterns = patterns('', *pattern_list)
 

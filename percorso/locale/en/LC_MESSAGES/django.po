@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2014-02-18 14:31+0100\n"
-"PO-Revision-Date: 2014-09-17 09:34+0100\n"
+"POT-Creation-Date: 2014-12-16 15:35+0100\n"
+"PO-Revision-Date: 2014-12-16 15:39+0100\n"
 "Last-Translator: \n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
@@ -16,534 +16,663 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "X-Generator: Poedit 1.5.4\n"
 
-#: .\views.py:339
+#: .\views.py:341
 msgid ""
 "Il servizio temporaneamente non &egrave; disponibile, riprova pi&ugrave; "
 "tardi."
 msgstr "Service is temporarily unavailable, please try again later."
 
-#: .\views.py:537
+#: .\views.py:562
 msgid "distanza massima in bici (errata)"
 msgstr "max cycling distance (wrong)"
 
-#: .\views.py:639
+#: .\views.py:665
 msgid "partenza"
 msgstr "starting"
 
-#: .\views.py:639
+#: .\views.py:665
 msgid "arrivo"
 msgstr "destination"
 
-#: .\views.py:649
+#: .\views.py:675
 #, python-format
 msgid "fermata di %s (non esiste)"
 msgstr "%s bus stop (does not exist)"
 
-#: .\views.py:663
+#: .\views.py:689
 #, python-format
 msgid "indirizzo di %s (manca)"
 msgstr "%s address (empty)"
 
-#: .\views.py:668
+#: .\views.py:694
 #, python-format
 msgid "indirizzo di %s (molti trovati)"
 msgstr "%s address (choose one)"
 
-#: .\views.py:672
+#: .\views.py:698
 #, python-format
 msgid "indirizzo di %s (errato)"
 msgstr "%s address (wrong)"
 
-#: .\views.py:684 .\templates\percorso-dinamico.html.py:37
+#: .\views.py:710 .\templates\percorso-dinamico.html.py:37
 #: .\templates\percorso-dinamico.html.py:53
 msgid "Mezzo privato"
 msgstr "Private transport"
 
-#: .\views.py:685
+#: .\views.py:711
 msgid "Mezzi pubblici"
 msgstr "Public transport"
 
-#: .\views.py:686 .\js\cerca_percorso.py:259
+#: .\views.py:712 .\js\cerca_percorso.py:538
 #: .\templates\percorso-dinamico.html.py:41
 #: .\templates\percorso-dinamico.html.py:54
 msgid "Park and ride"
 msgstr "Park and ride"
 
-#: .\views.py:687 .\js\cerca_percorso.py:238
+#: .\views.py:713 .\js\cerca_percorso.py:513
 #: .\templates\percorso-dinamico.html.py:43
 #: .\templates\percorso-dinamico.html.py:51
 msgid "Bike and ride"
 msgstr "Bike and ride"
 
-#: .\views.py:688 .\js\cerca_percorso.py:245 .\js\cerca_percorso.py:1138
+#: .\views.py:714 .\js\cerca_percorso.py:546 .\js\cerca_percorso.py:1059
 #: .\templates\percorso-dinamico.html.py:45
 #: .\templates\percorso-dinamico.html.py:52
 #: .\templates\percorso-dinamico.html.py:194
 msgid "Car sharing"
 msgstr "Car sharing"
 
-#: .\views.py:694 .\views.py:724
+#: .\views.py:720 .\views.py:750
 msgid "Adesso (dati in tempo reale)"
 msgstr "Now (real time data)"
 
-#: .\views.py:695 .\views.py:725
+#: .\views.py:721 .\views.py:751
 msgid "Fra 5 minuti (dati in tempo reale)"
 msgstr "In 5 minutes (real time data)"
 
-#: .\views.py:696
+#: .\views.py:722
 msgid "Scegli orario di partenza:"
 msgstr "Select departure time:"
 
-#: .\views.py:697
+#: .\views.py:723
 msgid "Scegli orario di arrivo:"
 msgstr "Select arrival time:"
 
-#: .\views.py:716 .\js\cerca_percorso.py:329
+#: .\views.py:742 .\js\cerca_percorso.py:619
 msgid "Bassa (camminatore lento)"
 msgstr "Low (slow walker)"
 
-#: .\views.py:717 .\js\cerca_percorso.py:334
+#: .\views.py:743 .\js\cerca_percorso.py:624
 msgid "Media"
 msgstr "Medium"
 
-#: .\views.py:718 .\js\cerca_percorso.py:340
+#: .\views.py:744 .\js\cerca_percorso.py:630
 msgid "Alta (camminatore veloce)"
 msgstr "High (fast walker)"
 
-#: .\views.py:726
+#: .\views.py:752
 msgid "Scegli orario partenza:"
 msgstr "Select departure time:"
 
-#: .\views.py:727
+#: .\views.py:753
 msgid "Scegli orario arrivo:"
 msgstr "Select arrival time:"
 
-#: .\views.py:877
+#: .\views.py:904
 msgid "Confermi di voler eliminare l'indirizzo?"
 msgstr "Delete address: are you sure?"
 
-#: .\views.py:918
+#: .\views.py:945
 msgid "Luogo aggiunto ai preferiti"
 msgstr "Place added to favorites"
 
-#: .\js\cerca_linea.py:85
+#: .\js\cerca_linea.py:100
 #, python-format
 msgid "&nbsp;Direz. %s"
 msgstr "&nbsp;Dest. %s"
 
-#: .\js\cerca_linea.py:91
+#: .\js\cerca_linea.py:106
 msgid "Altre linee:&nbsp;"
 msgstr ""
 
-#: .\js\cerca_linea.py:115
+#: .\js\cerca_linea.py:160
+#, fuzzy
+msgid "<b>Direzioni:</b> "
+msgstr "Walking distance"
+
+#: .\js\cerca_linea.py:190
+#, fuzzy
+msgid "Non disp."
+msgstr "Not available"
+
+#: .\js\cerca_linea.py:192
+#, fuzzy
+msgid "Non monitor."
+msgstr "Not monitored"
+
+#: .\js\cerca_linea.py:194
+#, fuzzy
+msgid "Nessun bus"
+msgstr "No buses"
+
+#: .\js\cerca_linea.py:199
+#, fuzzy, python-format
+msgid " (p. %s)"
+msgstr "starting"
+
+#: .\js\cerca_linea.py:229
+msgid "Dettagli fermata"
+msgstr ""
+
+#: .\js\cerca_linea.py:234
+#, fuzzy
+msgid "Parti da questa fermata"
+msgstr "Bus stop lines"
+
+#: .\js\cerca_linea.py:239
+msgid "Arriva a questa fermata"
+msgstr ""
+
+#: .\js\cerca_linea.py:244
+#, fuzzy
+msgid "Cerca luoghi vicini"
+msgstr "Places nearby"
+
+#: .\js\cerca_linea.py:261
 #, python-format
 msgid "%s %s Direz. %s"
 msgstr ""
 
-#: .\js\cerca_linea.py:142
+#: .\js\cerca_linea.py:290
 #, python-format
 msgid "<b>%s:</b> %s"
 msgstr ""
 
-#: .\js\cerca_linea.py:149
-msgid ""
-"Siamo spiacenti, non sono disponibili gli orari di partenza dal capolinea "
-"per il percorso selezionato."
-msgstr "We apologize, timetable is not available for selected route."
-
-#: .\js\cerca_linea.py:151
+#: .\js\cerca_linea.py:296
 msgid "Nella giornata selezionata il percorso non &egrave; attivo."
 msgstr "On this day, route is not active"
 
-#: .\js\cerca_linea.py:171
+#: .\js\cerca_linea.py:311
+msgid "<b>Prossime partenze</b>: "
+msgstr ""
+
+#: .\js\cerca_linea.py:313
+msgid "Tutte le partenze"
+msgstr ""
+
+#: .\js\cerca_linea.py:347
 msgid "Fermata, linea o indirizzo"
 msgstr "Bus stop, line or address"
 
-#: .\js\cerca_linea.py:211 .\js\cerca_luogo.py:108 .\js\cerca_percorso.py:198
-#: .\templates\percorso-dinamico.html.py:296 .\templates\percorso.html.py:29
+#: .\js\cerca_linea.py:386 .\js\cerca_luogo.py:112 .\js\cerca_percorso.py:468
+#: .\js\cerca_percorso.py:792 .\js\main.py:184
+#: .\templates\percorso-dinamico.html.py:297 .\templates\percorso.html.py:29
 #: .\templates\percorso.html.py:62
 msgid "Cerca"
 msgstr "Find"
 
-#: .\js\cerca_linea.py:274
+#: .\js\cerca_linea.py:455
 msgid "Fermate vicine"
 msgstr "Bus stops nearby"
 
-#: .\js\cerca_linea.py:320 .\js\cerca_linea.py:739
+#: .\js\cerca_linea.py:513 .\js\cerca_linea.py:1068
 msgid "Fermate trovate"
 msgstr "Found bus stops"
 
-#: .\js\cerca_linea.py:366
+#: .\js\cerca_linea.py:599
 msgid "Linee della fermata"
 msgstr "Bus stop lines"
 
-#: .\js\cerca_linea.py:378
+#: .\js\cerca_linea.py:611
 msgid "Tutti gli arrivi"
 msgstr "All arrivals"
 
-#: .\js\cerca_linea.py:391 .\js\cerca_luogo.py:224
+#: .\js\cerca_linea.py:624 .\js\cerca_linea.py:829 .\js\cerca_linea.py:1057
 msgid "Risultati"
 msgstr "Found items"
 
-#: .\js\cerca_linea.py:413
+#: .\js\cerca_linea.py:649
 msgid "Non disponibile"
 msgstr "Not available"
 
-#: .\js\cerca_linea.py:415
+#: .\js\cerca_linea.py:651
 msgid "Non monitorata"
 msgstr "Not monitored"
 
-#: .\js\cerca_linea.py:417
+#: .\js\cerca_linea.py:653
 msgid "Nessun autobus"
 msgstr "No buses"
 
-#: .\js\cerca_linea.py:422 .\js\cerca_linea.py:448
+#: .\js\cerca_linea.py:658 .\js\cerca_linea.py:684
 #, fuzzy, python-format
 msgid " (partenza %s)"
 msgstr "starting"
 
-#: .\js\cerca_linea.py:509
+#: .\js\cerca_linea.py:742
 #, python-format
 msgid "%(id_linea)s %(carteggio_dec)s direz. %(arrivo)s"
 msgstr ""
 
-#: .\js\cerca_linea.py:515
+#: .\js\cerca_linea.py:772
 msgid "Partenze da capolinea"
 msgstr "Departures from terminus"
 
-#: .\js\cerca_linea.py:526
+#: .\js\cerca_linea.py:783
 msgid "Fermate"
 msgstr "Bus stops"
 
-#: .\js\cerca_linea.py:532
-msgid ""
-"Seleziona una fermata, oppure un veicolo per conoscerne gli orari di arrivo."
-msgstr "Select a bus stop, or a vehicle, to get arrivals."
+#: .\js\cerca_linea.py:789
+msgid "<b>Veicolo: </b>Seleziona un bus"
+msgstr ""
 
-#: .\js\cerca_linea.py:545
+#: .\js\cerca_linea.py:804
 msgid "Altri percorsi della linea"
 msgstr ""
 
-#: .\js\cerca_linea.py:557
+#: .\js\cerca_linea.py:816
 msgid "Gestore"
 msgstr "Operator"
 
-#: .\js\cerca_linea.py:606
+#: .\js\cerca_linea.py:866
 #, python-format
 msgid "La linea %s &egrave; gestita da %s."
 msgstr "Line %s is operated by %s."
 
-#: .\js\cerca_linea.py:774
+#: .\js\cerca_linea.py:1150
 msgid "Linee trovate"
 msgstr "Found lines"
 
-#: .\js\cerca_linea.py:787
+#: .\js\cerca_linea.py:1163
 msgid ""
 "Alcune fermate sono state nascoste perch&eacute; non vi transitano altre "
 "linee bus.&nbsp"
 msgstr ""
 
-#: .\js\cerca_linea.py:788
+#: .\js\cerca_linea.py:1164
 msgid "Mostra tutte le fermate"
 msgstr "Show all stops"
 
-#: .\js\cerca_linea.py:817
-#, python-format
-msgid ""
-"\n"
-"\t\t\t\t\t<b>%(ricerca)s</b><br /><br />\n"
-"\t\t\t\t\t<a id=\"link-cpa\" href=\"#\">Cerca percorso fino a qui</a>\n"
-"\t\t\t\t\t<a id=\"link-cpda\" href=\"#\">Cerca percorso da qui</a>\n"
-"\t\t\t\t\t<a id=\"link-cl\" href=\"#\">Cerca fermate vicine</a>\n"
-"\t\t\t\t\t<a id=\"link-cr\" href=\"#\">Cerca luoghi vicini</a>\n"
-"\t\t\t\t"
+#: .\js\cerca_linea.py:1197
+msgid "Imposta notifica"
 msgstr ""
 
-#: .\js\cerca_luogo.py:68
+#: .\js\cerca_linea.py:1203
+msgid "Notifica quando un veicolo sar&agrave; in arrivo tra circa&nbsp;"
+msgstr ""
+
+#: .\js\cerca_linea.py:1219
+#, fuzzy
+msgid "&nbsp;minuti"
+msgstr "&nbsp;km"
+
+#: .\js\cerca_linea.py:1227
+#, fuzzy
+msgid "Linee:"
+msgstr "Line"
+
+#: .\js\cerca_linea.py:1238 .\js\util.py:2181 .\js\util.py:2226
+msgid "Notifica"
+msgstr ""
+
+#: .\js\cerca_linea.py:1239 .\js\cerca_percorso.py:1923 .\js\util.py:568
+#: .\js\util.py:1748
+msgid "Annulla"
+msgstr ""
+
+#: .\js\cerca_linea.py:1263
+#, python-format
+msgid "Linea %s in arrivo tra circa %d minuti"
+msgstr ""
+
+#: .\js\cerca_linea.py:1264
+#, fuzzy
+msgid "Veicolo in arrivo"
+msgstr "Select arrival time:"
+
+#: .\js\cerca_linea.py:1296
+#, python-format
+msgid "Notifica fermata %s"
+msgstr ""
+
+#: .\js\cerca_linea.py:1301
+msgid ""
+"Non chiudere l'app. Puoi porla in background e bloccare lo schermo, se lo "
+"desideri."
+msgstr ""
+
+#: .\js\cerca_linea.py:1302
+msgid "Notifica impostata"
+msgstr ""
+
+#: .\js\cerca_luogo.py:73
 msgid "Indirizzo"
 msgstr "Address"
 
-#: .\js\cerca_luogo.py:142
+#: .\js\cerca_luogo.py:139
 #, fuzzy
 msgid "Cerca luogo lungo un percorso"
 msgstr "Offer a lift on this route"
 
-#: .\js\cerca_luogo.py:189
+#: .\js\cerca_luogo.py:186
 msgid "Luoghi vicini"
 msgstr "Places nearby"
 
-#: .\js\cerca_luogo.py:243
-msgid "Luoghi trovati"
-msgstr "Places found"
+#: .\js\cerca_percorso.py:149
+msgid "<b>Esclusioni:</b>&nbsp;"
+msgstr ""
 
-#: .\js\cerca_percorso.py:112 .\templates\percorso.html.py:15
+#: .\js\cerca_percorso.py:162 .\js\cerca_percorso.py:340
+#, fuzzy
+msgid "Opzioni di viaggio"
+msgstr "Route type:"
+
+#: .\js\cerca_percorso.py:167 .\js\cerca_percorso.py:345
+#, fuzzy
+msgid "Cerca ritorno"
+msgstr "Way back"
+
+#: .\js\cerca_percorso.py:172 .\js\cerca_percorso.py:350
+msgid "Ricalcola da posizione attuale"
+msgstr ""
+
+#: .\js\cerca_percorso.py:177 .\js\cerca_percorso.py:355
+msgid "Invia per email"
+msgstr ""
+
+#: .\js\cerca_percorso.py:182 .\js\cerca_percorso.py:360
+#, fuzzy
+msgid "Link al percorso"
+msgstr "Link to complete journey:"
+
+#: .\js\cerca_percorso.py:238 .\js\cerca_percorso.py:1743
+msgid "Fermata&nbsp;"
+msgstr "Bus stop&nbsp;"
+
+#: .\js\cerca_percorso.py:247
+#, fuzzy
+msgid "Tempi di attesa della fermata"
+msgstr "Bus stop lines"
+
+#: .\js\cerca_percorso.py:313
+msgid "Escludi questa linea"
+msgstr ""
+
+#: .\js\cerca_percorso.py:335
+msgid "Sintesi del percorso"
+msgstr ""
+
+#: .\js\cerca_percorso.py:384 .\templates\percorso.html.py:15
 msgid "Dove"
 msgstr "Where"
 
-#: .\js\cerca_percorso.py:123
+#: .\js\cerca_percorso.py:395
 msgid "Da: "
 msgstr "From:"
 
-#: .\js\cerca_percorso.py:158
+#: .\js\cerca_percorso.py:429
 #, fuzzy
 msgid "A: "
 msgstr "To:"
 
-#: .\js\cerca_percorso.py:209 .\templates\percorso.html.py:30
+#: .\js\cerca_percorso.py:479 .\js\cerca_percorso.py:803
+#: .\templates\percorso.html.py:30
 msgid "Ritorno"
 msgstr "Way back"
 
-#: .\js\cerca_percorso.py:217
+#: .\js\cerca_percorso.py:487
 #, fuzzy
 msgid "Come: Trasporto pubblico"
 msgstr "Private and public transport"
 
-#: .\js\cerca_percorso.py:231 .\js\cerca_percorso.py:552
+#: .\js\cerca_percorso.py:505 .\js\cerca_percorso.py:920
 msgid "Trasporto pubblico"
 msgstr "Public transport"
 
-#: .\js\cerca_percorso.py:252 .\js\cerca_percorso.py:552
+#: .\js\cerca_percorso.py:521 .\js\cerca_percorso.py:1054
+#: .\templates\percorso-dinamico.html.py:196
+msgid "Car pooling"
+msgstr "Car pooling"
+
+#: .\js\cerca_percorso.py:530 .\js\cerca_percorso.py:920
 msgid "Trasporto privato"
 msgstr "Private transport"
 
-#: .\js\cerca_percorso.py:268 .\templates\percorso-dinamico.html.py:58
+#: .\js\cerca_percorso.py:558 .\templates\percorso-dinamico.html.py:58
 #: .\templates\percorso-dinamico.html.py:254
 msgid "Opzioni avanzate"
 msgstr "Advanced options"
 
-#: .\js\cerca_percorso.py:275
+#: .\js\cerca_percorso.py:565
 msgid "Opzioni"
 msgstr "Advanced options"
 
-#: .\js\cerca_percorso.py:281
+#: .\js\cerca_percorso.py:571
 #, fuzzy
 msgid "Cerca un luogo lungo il percorso"
 msgstr "Offer a lift on this route"
 
-#: .\js\cerca_percorso.py:301
+#: .\js\cerca_percorso.py:591
 msgid "Permessi di accesso ZTL"
 msgstr "ZTL permits"
 
-#: .\js\cerca_percorso.py:324
+#: .\js\cerca_percorso.py:614
 msgid "Propensione spostamenti a piedi"
 msgstr "Propensity for walking and biking"
 
-#: .\js\cerca_percorso.py:345
+#: .\js\cerca_percorso.py:635
 msgid "Mezzi pubblici da utilizzare"
 msgstr "Public means of transport"
 
-#: .\js\cerca_percorso.py:350 .\templates\percorso-dinamico.html.py:264
+#: .\js\cerca_percorso.py:640 .\templates\percorso-dinamico.html.py:264
 msgid "Autobus e tram"
 msgstr "Bus and tram"
 
-#: .\js\cerca_percorso.py:356 .\templates\percorso-dinamico.html.py:265
+#: .\js\cerca_percorso.py:646 .\templates\percorso-dinamico.html.py:265
 msgid "Metropolitana"
 msgstr "Underground"
 
-#: .\js\cerca_percorso.py:362 .\templates\percorso-dinamico.html.py:266
+#: .\js\cerca_percorso.py:652 .\templates\percorso-dinamico.html.py:266
 msgid "Ferrovie urbane"
 msgstr "Urban railways"
 
-#: .\js\cerca_percorso.py:368 .\templates\percorso-dinamico.html.py:170
+#: .\js\cerca_percorso.py:658 .\templates\percorso-dinamico.html.py:170
 #: .\templates\percorso-dinamico.html.py:268
 msgid "Teletrasporto"
 msgstr "Teleportation"
 
-#: .\js\cerca_percorso.py:383
+#: .\js\cerca_percorso.py:672 .\templates\percorso-dinamico.html.py:275
+msgid "Porta la bici sui mezzi pubblici"
+msgstr "Bring bike on board"
+
+#: .\js\cerca_percorso.py:681
 msgid "Max distanza in bici:&nbsp;"
 msgstr "Max biking distance:&nbsp;"
 
-#: .\js\cerca_percorso.py:395
+#: .\js\cerca_percorso.py:693
 msgid "&nbsp;km"
 msgstr "&nbsp;km"
 
-#: .\js\cerca_percorso.py:407
+#: .\js\cerca_percorso.py:707
 msgid "Parcheggi Park and Ride"
 msgstr "Parking lots"
 
-#: .\js\cerca_percorso.py:412 .\templates\percorso-dinamico.html.py:283
+#: .\js\cerca_percorso.py:712 .\templates\percorso-dinamico.html.py:284
 msgid "Parcheggi di scambio"
 msgstr "Car parks"
 
-#: .\js\cerca_percorso.py:418 .\templates\percorso-dinamico.html.py:284
+#: .\js\cerca_percorso.py:718 .\templates\percorso-dinamico.html.py:285
 msgid "Autorimesse private"
 msgstr "Garages"
 
-#: .\js\cerca_percorso.py:426 .\templates\percorso-dinamico.html.py:288
+#: .\js\cerca_percorso.py:726 .\templates\percorso-dinamico.html.py:289
 #: .\templates\percorso.html.py:54
 msgid "Quando"
 msgstr "When"
 
-#: .\js\cerca_percorso.py:432
+#: .\js\cerca_percorso.py:732
 msgid "Adesso"
 msgstr ""
 
-#: .\js\cerca_percorso.py:439
+#: .\js\cerca_percorso.py:739
 msgid "Fra 5 minuti"
 msgstr "In 5 minutes"
 
-#: .\js\cerca_percorso.py:449
+#: .\js\cerca_percorso.py:749
 msgid "Parti alle:&nbsp;"
 msgstr "Departure at:&nbsp;"
 
-#: .\js\cerca_percorso.py:456
+#: .\js\cerca_percorso.py:756
 msgid "Arriva alle:&nbsp;"
 msgstr ""
 
-#: .\js\cerca_percorso.py:476
+#: .\js\cerca_percorso.py:776
 msgid "&nbsp;&nbsp;Ore:&nbsp;"
 msgstr "&nbsp;&nbsp;Hour:&nbsp;"
 
-#: .\js\cerca_percorso.py:491
+#: .\js\cerca_percorso.py:821
+#, python-format
 msgid ""
 "\n"
-"\t\t\t\t\t\t\t\t\t<p>\n"
-"\t\t\t\t\t\t\t\t\t\tQuesto servizio calcola il miglior percorso con i mezzi\n"
-"\t\t\t\t\t\t\t\t\t\tAtac, Roma TPL e le ferrovie regionali Trenitalia.\n"
-"\t\t\t\t\t\t\t\t\t\tUsa i dati in tempo reale per tener conto dello stato\n"
-"\t\t\t\t\t\t\t\t\t\tdel traffico e della posizione degli autobus.\n"
-"\t\t\t\t\t\t\t\t\t<p>\n"
-"\t\t\t\t\t\t\t\t\t</p>\n"
-"\t\t\t\t\t\t\t\t\t\tIl software, sviluppato dall'Agenzia per la "
-"Mobilit&agrave;\n"
-"\t\t\t\t\t\t\t\t\t\tdi Roma, &egrave; <a href=\"http://www.agenziamobilita."
-"roma.it/servizi/open-data/codice-sorgente.html\" target=\"_blank"
-"\">rilasciato\n"
-"\t\t\t\t\t\t\t\t\t\tcon licenza open source.</a>\n"
-"\t\t\t\t\t\t\t\t\t</p>\n"
-"\t\t\t\t\t\t\t\t\t"
+"\t\t\t\t\t\t<p>\n"
+"\t\t\t\t\t\t\tQuesto servizio calcola il miglior percorso con i mezzi\n"
+"\t\t\t\t\t\t\tAtac, Roma TPL e le ferrovie regionali Trenitalia.\n"
+"\t\t\t\t\t\t\tUsa i dati in tempo reale per tener conto dello stato\n"
+"\t\t\t\t\t\t\tdel traffico e della posizione degli autobus.\n"
+"\t\t\t\t\t\t<p>\n"
+"\t\t\t\t\t\t</p>\n"
+"\t\t\t\t\t\t\tIl software, sviluppato dall'Agenzia per la Mobilit&agrave;\n"
+"\t\t\t\t\t\t\tdi Roma, &egrave; <a href=\"http://www.agenziamobilita.roma.it/"
+"servizi/open-data/codice-sorgente.html\" target=\"_blank\">rilasciato\n"
+"\t\t\t\t\t\t\tcon licenza open source.</a>\n"
+"\t\t\t\t\t\t</p>\n"
+"\t\t\t\t\t\t<p>\n"
+"\t\t\t\t\t\t\t&copy; %d\n"
+"\t\t\t\t\t\t\t<a class=\"inl\" href=\"http://www.agenziamobilita.roma.it"
+"\">Roma servizi per la mobilit&agrave; s.r.l.</a>\n"
+"\t\t\t\t\t\t</p>\n"
+"\t\t\t\t\t\t"
 msgstr ""
 
-#: .\js\cerca_percorso.py:522
+#: .\js\cerca_percorso.py:849
 msgid "Seleziona tutte"
 msgstr "Select all"
 
-#: .\js\cerca_percorso.py:552
+#: .\js\cerca_percorso.py:920
 msgid "Park and Ride"
 msgstr "Park and ride"
 
-#: .\js\cerca_percorso.py:552
+#: .\js\cerca_percorso.py:920
 #, fuzzy
 msgid "Bike and Ride"
 msgstr "Bike and ride"
 
-#: .\js\cerca_percorso.py:552
+#: .\js\cerca_percorso.py:920
 #, fuzzy
 msgid "Car Sharing"
 msgstr "Car sharing"
 
-#: .\js\cerca_percorso.py:584
+#: .\js\cerca_percorso.py:920
+#, fuzzy
+msgid "Car Pooling"
+msgstr "Car pooling"
+
+#: .\js\cerca_percorso.py:955
 #, python-format
 msgid "Come: %s"
 msgstr "How: %s"
 
-#: .\js\cerca_percorso.py:721
-msgid "Cerca percorso da qui"
-msgstr ""
-
-#: .\js\cerca_percorso.py:722
-msgid "Cerca percorso fino a qui"
-msgstr ""
-
-#: .\js\cerca_percorso.py:797 .\js\cerca_percorso.py:1085
-msgid "Percorso trovato"
-msgstr "Route"
-
-#: .\js\cerca_percorso.py:1024
-msgid "Riepilogo"
-msgstr "Overview"
-
-#: .\js\cerca_percorso.py:1054 .\templates\percorso-dinamico.html.py:240
-msgid "Esclusioni"
-msgstr "Exclude"
-
-#: .\js\cerca_percorso.py:1066 .\templates\percorso-dinamico.html.py:100
-msgid "Indicazioni"
-msgstr "Directions"
-
-#: .\js\cerca_percorso.py:1078
-#, python-format
-msgid ""
-"&copy; %d\n"
-"\t\t\t\t\t\t\t\t<a class=\"inl\" href=\"http://www.agenziamobilita.roma.it"
-"\">Roma servizi per la mobilit&agrave; s.r.l.</a>"
-msgstr ""
-
-#: .\js\cerca_percorso.py:1095
-#, fuzzy, python-format
-msgid "<b>Durata spostamento:</b> %s"
-msgstr "Travel time"
-
-#: .\js\cerca_percorso.py:1096
-#, fuzzy, python-format
-msgid "<b>Distanza percorsa:</b> %s<br />"
-msgstr "Total distance"
-
-#: .\js\cerca_percorso.py:1097
-#, fuzzy, python-format
-msgid "<b>Di cui a piedi:</b> %s"
-msgstr "Walking distance"
-
-#: .\js\cerca_percorso.py:1126 .\templates\percorso-dinamico.html.py:172
+#: .\js\cerca_percorso.py:1046 .\templates\percorso-dinamico.html.py:172
 msgid "Cambia linea"
 msgstr "Interchange"
 
-#: .\js\cerca_percorso.py:1130 .\templates\percorso-dinamico.html.py:188
+#: .\js\cerca_percorso.py:1050 .\templates\percorso-dinamico.html.py:188
 msgid "A piedi"
 msgstr "Walk"
 
-#: .\js\cerca_percorso.py:1132
+#: .\js\cerca_percorso.py:1052
 msgid "In bici"
 msgstr "By bike"
 
-#: .\js\cerca_percorso.py:1134 .\templates\percorso-dinamico.html.py:196
-msgid "Car pooling"
-msgstr "Car pooling"
-
-#: .\js\cerca_percorso.py:1136 .\templates\percorso-dinamico.html.py:192
+#: .\js\cerca_percorso.py:1057 .\templates\percorso-dinamico.html.py:192
 msgid "In automobile"
 msgstr "By car"
 
-#: .\js\cerca_percorso.py:1141
+#: .\js\cerca_percorso.py:1063
 #, fuzzy
 msgid "Apertura ZTL ore&nbsp;"
 msgstr "LTZ opens at"
 
-#: .\js\cerca_percorso.py:1145
+#: .\js\cerca_percorso.py:1069
 msgid "Linea&nbsp;"
 msgstr "Line&nbsp;"
 
-#: .\js\cerca_percorso.py:1150
+#: .\js\cerca_percorso.py:1074
 msgid "&nbsp;direz. "
 msgstr "&nbsp;dest."
 
-#: .\js\cerca_percorso.py:1158
+#: .\js\cerca_percorso.py:1083
 #, fuzzy
 msgid "Partenza ore&nbsp;"
 msgstr "Departure time"
 
-#: .\js\cerca_percorso.py:1160
+#: .\js\cerca_percorso.py:1085
 #, fuzzy
 msgid "Attesa circa&nbsp;"
 msgstr "Approx. waiting time"
 
-#: .\js\cerca_percorso.py:1162
+#: .\js\cerca_percorso.py:1087
 msgid "In arrivo fra&nbsp;"
 msgstr "Arriving in&nbsp;"
 
-#: .\js\cerca_percorso.py:1164
+#: .\js\cerca_percorso.py:1089
 msgid "In arrivo dopo&nbsp;"
 msgstr "Arriving after&nbsp;"
 
-#: .\js\cerca_percorso.py:1212
-msgid "Fermata&nbsp;"
-msgstr "Bus stop&nbsp;"
+#: .\js\cerca_percorso.py:1197
+msgid "Cerca percorso da qui"
+msgstr ""
 
-#: .\js\cerca_percorso.py:1261
+#: .\js\cerca_percorso.py:1198
+msgid "Cerca percorso fino a qui"
+msgstr ""
+
+#: .\js\cerca_percorso.py:1275 .\js\cerca_percorso.py:1508
+#: .\js\cerca_percorso.py:1627
+msgid "Percorso trovato"
+msgstr "Route"
+
+#: .\js\cerca_percorso.py:1572
+msgid "Riepilogo"
+msgstr "Overview"
+
+#: .\js\cerca_percorso.py:1602 .\templates\percorso-dinamico.html.py:240
+msgid "Esclusioni"
+msgstr "Exclude"
+
+#: .\js\cerca_percorso.py:1614 .\templates\percorso-dinamico.html.py:100
+msgid "Indicazioni"
+msgstr "Directions"
+
+#: .\js\cerca_percorso.py:1637
+#, fuzzy, python-format
+msgid "<b>Durata spostamento:</b> %s"
+msgstr "Travel time"
+
+#: .\js\cerca_percorso.py:1638
+#, fuzzy, python-format
+msgid "<b>Distanza percorsa:</b> %s<br />"
+msgstr "Total distance"
+
+#: .\js\cerca_percorso.py:1639
+#, fuzzy, python-format
+msgid "<b>Di cui a piedi:</b> %s"
+msgstr "Walking distance"
+
+#: .\js\cerca_percorso.py:1827
 msgid "Link al percorso completo:"
 msgstr "Link to complete journey:"
 
-#: .\js\cerca_percorso.py:1267
+#: .\js\cerca_percorso.py:1833
 #, python-format
 msgid ""
 "\n"
@@ -553,12 +682,12 @@ msgid ""
 "\t\t\t\t\t"
 msgstr ""
 
-#: .\js\cerca_percorso.py:1282
+#: .\js\cerca_percorso.py:1848
 #, python-format
 msgid "Link al cerca percorso fino a %s:"
 msgstr "Link to find a journey to %s:"
 
-#: .\js\cerca_percorso.py:1288
+#: .\js\cerca_percorso.py:1854
 #, python-format
 msgid ""
 "\n"
@@ -568,70 +697,355 @@ msgid ""
 "\t\t\t\t\t"
 msgstr ""
 
-#: .\js\cerca_percorso.py:1338
+#: .\js\cerca_percorso.py:1868 .\js\cerca_percorso.py:2053
+#: .\js\cerca_percorso.py:2102 .\js\util.py:1972
+msgid "Chiudi"
+msgstr ""
+
+#: .\js\cerca_percorso.py:1904
 msgid "Indirizzo email del destinatario:"
 msgstr "Recipient email address:"
 
-#: .\js\cerca_percorso.py:1352
+#: .\js\cerca_percorso.py:1918
 msgid "Invia"
 msgstr "Send"
 
-#: .\js\cerca_percorso.py:1357
-msgid "Annulla"
+#: .\js\cerca_percorso.py:1965
+msgid "Trovato un passaggio in car pooling"
 msgstr ""
 
-#: .\js\main.py:72
+#: .\js\cerca_percorso.py:1971
+msgid ""
+"Trovata un'offerta di passaggio in car pooling compatibile con il tuo "
+"spostamento."
+msgstr ""
+
+#: .\js\cerca_percorso.py:1980 .\templates\percorso-dinamico.html.py:197
+msgid "Chiedi un passaggio"
+msgstr "Request a lift"
+
+#: .\js\cerca_percorso.py:1985
+#, fuzzy
+msgid "Cerca un altro passaggio"
+msgstr "Request a lift"
+
+#: .\js\cerca_percorso.py:2035
+msgid "Richiesta effettuata"
+msgstr ""
+
+#: .\js\cerca_percorso.py:2041
 msgid ""
 "\n"
-"\t\t\t\t\t\t\t\t<b>Una ricerca, tanti servizi</b><br />\n"
-"\t\t\t\t\t\t\t\tPer i tempi di attesa bus, il cerca linea e il cerca "
-"percorso usa la casella qui sotto.\n"
-"\t\t\t\t\t\t\t\tInserisci il numero di fermata, la linea bus o l'indirizzo, "
-"oppure tocca la mappa.\n"
-"\t\t\t\t\t\t\t"
+"\t\t\t\t\t\tLa tua richiesta di passaggio &egrave; stata inviata. Riceverai "
+"una notifica con ulteriori dettagli\n"
+"\t\t\t\t\t\tquando l'offerente avr&agrave; accettato o rifiutato la "
+"richiesta.\n"
+"\t\t\t\t\t"
+msgstr ""
+
+#: .\js\cerca_percorso.py:2078
+#, fuzzy
+msgid "Nessun passaggio trovato"
+msgstr "Request a lift"
+
+#: .\js\cerca_percorso.py:2084
+msgid ""
+"\n"
+"\t\t\t\t\t\tNessun'offerta di passaggio soddisfa la tua richiesta. Ti "
+"proponiamo un percorso con i soli mezzi\n"
+"\t\t\t\t\t\tpubblici. In alternativa prova a modificare l'orario della "
+"ricerca, oppure\n"
+"\t\t\t\t\t\toffri tu stesso un passaggio in car pooling!\n"
+"\t\t\t\t\t"
+msgstr ""
+
+#: .\js\cerca_percorso.py:2097 .\js\cerca_percorso.py:2151
+#, fuzzy
+msgid "Offri un passaggio"
+msgstr "Request a lift"
+
+#: .\js\cerca_percorso.py:2131
+msgid "Condividi il tuo viaggio"
+msgstr ""
+
+#: .\js\cerca_percorso.py:2137
+msgid ""
+"\n"
+"\t\t\t\t\t\tFai car pooling, offri un passaggio! Se vuoi condividere il tuo "
+"viaggio, Muoversi a Roma lo proporr&agrave;\n"
+"\t\t\t\t\t\tad altri utenti che cercano un percorso, proprio come se la tua "
+"auto diventasse un autobus.\n"
+"\t\t\t\t\t\tPotrai anche accordarti con le persone a cui offri un passaggio "
+"per ricevere un contributo\n"
+"\t\t\t\t\t\talle spese di viaggio, suggerito da Muoversi a Roma.\n"
+"\t\t\t\t\t"
+msgstr ""
+
+#: .\js\cerca_percorso.py:2156
+msgid "No, grazie"
+msgstr ""
+
+#: .\js\main.py:81
+msgid "Muoversi a Roma"
 msgstr ""
 
 #: .\js\main.py:86
-msgid "Chiudi suggerimento"
+#, python-format
+msgid ""
+"\n"
+"\t\t\t<p><b>Muoversi a Roma %(version)s</b><br />\n"
+"\t\t\t&copy; %(year)d Roma servizi per la mobilit&agrave; s.r.l.</p>\n"
+"\t\t\t<p>\n"
+"\t\t\t\tMuoversi a Roma &egrave; un progetto open source sviluppato da Roma "
+"Servizi per la Mobilit&agrave;,\n"
+"\t\t\t\tAgenzia per la Mobilit&agrave;\n"
+"\t\t\t\tdi Roma Capitale. I dati che alimentano il servizio sono liberamente "
+"disponibili come open data.\n"
+"\t\t\t</p>\n"
+"\t\t"
 msgstr ""
 
-#: .\js\main.py:92
-msgid "Non mostrare pi&ugrave;"
-msgstr "Got it"
+#: .\js\main.py:196
+msgid ""
+"\n"
+"\t\t\tTocca per usare la posizione corrente. Altrimenti cerca una linea, una "
+"fermata\n"
+"\t\t\t(per nome o codice), oppure un indirizzo.\n"
+"\t\t"
+msgstr ""
 
-#: .\js\main.py:266
-msgid "Percorso"
-msgstr "Route"
+#: .\js\main.py:199
+msgid "Capito, grazie."
+msgstr ""
 
-#: .\js\main.py:271 .\templates\percorso-dinamico.html.py:176
-msgid "Linea"
-msgstr "Line"
+#: .\js\main.py:214
+#, fuzzy
+msgid "Linea, fermata o indirizzo"
+msgstr "Bus stop, line or address"
 
-#: .\js\main.py:275
-msgid "Luogo"
-msgstr "Place"
+#: .\js\main.py:215
+msgid "Imposta posizione corrente"
+msgstr ""
 
-#: .\js\main.py:413
+#: .\js\main.py:382
+msgid "Versione app non supportata"
+msgstr ""
+
+#: .\js\main.py:388
+msgid ""
+"\n"
+"\t\t\t\t\t\tLa versione della tua app &egrave; troppo vecchia. Per "
+"continuare,\n"
+"\t\t\t\t\t\tdevi effettuare un aggiornamento.\n"
+"\t\t\t\t\t"
+msgstr ""
+
+#: .\js\main.py:400
+msgid "Aggiorna"
+msgstr ""
+
+#: .\js\main.py:474
+#, fuzzy
+msgid "Conferma"
+msgstr "Find"
+
+#: .\js\main.py:474
+msgid "Vuoi cancellare il preferito?"
+msgstr ""
+
+#: .\js\main.py:474
+msgid "S&igrave;"
+msgstr ""
+
+#: .\js\main.py:474
+msgid "No"
+msgstr ""
+
+#: .\js\main.py:501
+msgid "toolbar/percorso.png"
+msgstr ""
+
+#: .\js\main.py:506
+msgid "toolbar/linea.png"
+msgstr ""
+
+#: .\js\main.py:510
+msgid "toolbar/luogo.png"
+msgstr ""
+
+#: .\js\main.py:514 .\js\main.py:642
+msgid "toolbar/preferiti.png"
+msgstr ""
+
+#: .\js\main.py:522
+msgid "Caricamento account utente"
+msgstr ""
+
+#: .\js\main.py:527 .\js\news.py:89
+msgid "News"
+msgstr ""
+
+#: .\js\main.py:532
+msgid "Versione precedente"
+msgstr ""
+
+#: .\js\main.py:537
+msgid "Invia il tuo feedback"
+msgstr ""
+
+#: .\js\main.py:542
+msgid "Language"
+msgstr ""
+
+#: .\js\main.py:547
+#, fuzzy
+msgid "Esci"
+msgstr "Exclude"
+
+#: .\js\main.py:552
+msgid "Informazioni su Muoversi a Roma"
+msgstr ""
+
+#: .\js\main.py:596 .\js\main.py:885
+msgid "toolbar/mappa.png"
+msgstr ""
+
+#: .\js\main.py:636
+msgid "toolbar/preferiti_not.png"
+msgstr ""
+
+#: .\js\main.py:666
+#, python-format
+msgid "Ciao, %s (Gestisci account)"
+msgstr ""
+
+#: .\js\main.py:671 .\js\util.py:1747
+#, fuzzy
+msgid "Accedi"
+msgstr "Walk"
+
+#: .\js\main.py:688
+msgid "E' disponibile un aggiornamento"
+msgstr ""
+
+#: .\js\main.py:694
+msgid "Bentornato!"
+msgstr ""
+
+#: .\js\main.py:835
+msgid "Impossibile determinare la posizione"
+msgstr ""
+
+#: .\js\main.py:846
 #, python-format
 msgid "Posizione attuale <punto:(%f,%f)>"
 msgstr "Current position <punto:(%f,%f)>"
 
-#: .\js\main.py:444 .\templates\percorso-dinamico.html.py:62
-#: .\templates\percorso-dinamico.html.py:145
-msgid "Mappa"
-msgstr "Map"
+#: .\js\main.py:966
+msgid "Italiano"
+msgstr ""
 
-#: .\js\main.py:481
+#: .\js\main.py:971
+msgid "English"
+msgstr ""
+
+#: .\js\main.py:1061
 msgid "Ora presenti sulla mappa"
 msgstr "Layers on map"
 
-#: .\js\main.py:541
+#: .\js\main.py:1115
 msgid "Pannelli VMS"
 msgstr "Variable Message Signs"
 
-#: .\js\map.py:320
+#: .\js\main.py:1236
+msgid "sulla nostra pagina Facebook"
+msgstr ""
+
+#: .\js\main.py:1240
+msgid "sulla nostra Community Google+"
+msgstr ""
+
+#: .\js\main.py:1250
+msgid "Aiutaci con il tuo feedback"
+msgstr ""
+
+#: .\js\main.py:1256
+#, python-format
+msgid ""
+"\n"
+"\t\t\t\t\t\t<p>L'app ti &egrave; utile? Supporta lo sviluppo con la tua "
+"valutazione.\n"
+"\t\t\t\t\t\tPer inviare proposte e suggerimenti sull'app, scrivici %s. "
+"Grazie!</p>\n"
+"\t\t\t\t\t"
+msgstr ""
+
+#: .\js\main.py:1269
+msgid "Vota"
+msgstr ""
+
+#: .\js\main.py:1274
+#, fuzzy
+msgid "Non ora"
+msgstr "Not monitored"
+
+#: .\js\main.py:1279
+msgid "Scrivici"
+msgstr ""
+
+#: .\js\main.py:1284 .\js\util.py:248
+msgid "Non mostrare pi&ugrave;"
+msgstr "Got it"
+
+#: .\js\map.py:293
+msgid " a "
+msgstr ""
+
+#: .\js\map.py:367
 msgid "Cerca un percorso, una linea o una fermata per mostrarla sulla mappa."
 msgstr ""
+
+#: .\js\map.py:497
+msgid "<br/>Caricamento..."
+msgstr ""
+
+#: .\js\util.py:208 .\js\util.py:247 .\js\util.py:566
+msgid "OK"
+msgstr ""
+
+#: .\js\util.py:544
+msgid "Ore"
+msgstr ""
+
+#: .\js\util.py:556
+msgid "Min"
+msgstr ""
+
+#: .\js\util.py:1744
+msgid "Accesso richiesto"
+msgstr ""
+
+#: .\js\util.py:1745
+msgid "Per continuare devi effettuare l'accesso."
+msgstr ""
+
+#: .\js\util.py:2088
+msgid "Percorso<br />da qui"
+msgstr ""
+
+#: .\js\util.py:2100
+#, fuzzy
+msgid "Fermate<br />vicine"
+msgstr "Bus stops nearby"
+
+#: .\js\util.py:2112
+msgid "Percorso<br />fino a qui"
+msgstr ""
+
+#: .\js\util.py:2124
+#, fuzzy
+msgid "Luoghi<br />vicini"
+msgstr "Places nearby"
 
 #: .\templates\percorso-dinamico.html.py:9 .\templates\percorso.html.py:8
 msgid "Correggi le seguenti informazioni:"
@@ -680,6 +1094,11 @@ msgstr "How:"
 msgid "Mezzo pubblico"
 msgstr "Public transport"
 
+#: .\templates\percorso-dinamico.html.py:62
+#: .\templates\percorso-dinamico.html.py:145
+msgid "Mappa"
+msgstr "Map"
+
 #: .\templates\percorso-dinamico.html.py:86
 #: .\templates\percorso-dinamico.html.py:93
 msgid "Mappa interattiva"
@@ -727,6 +1146,10 @@ msgstr "By bike"
 msgid "Parti a piedi"
 msgstr "On foot"
 
+#: .\templates\percorso-dinamico.html.py:176
+msgid "Linea"
+msgstr "Line"
+
 #: .\templates\percorso-dinamico.html.py:180
 #: .\templates\percorso-dinamico.html.py:183
 msgid "direz."
@@ -735,10 +1158,6 @@ msgstr "dest."
 #: .\templates\percorso-dinamico.html.py:190
 msgid "In bicicletta"
 msgstr "By bike"
-
-#: .\templates\percorso-dinamico.html.py:197
-msgid "Chiedi un passaggio"
-msgstr "Request a lift"
 
 #: .\templates\percorso-dinamico.html.py:203
 msgid "Partenza ore"
@@ -784,7 +1203,7 @@ msgstr "Public means of transport:"
 msgid "Bike and ride:"
 msgstr "Bike and ride:"
 
-#: .\templates\percorso-dinamico.html.py:275
+#: .\templates\percorso-dinamico.html.py:276
 #, python-format
 msgid ""
 "\n"
@@ -795,11 +1214,11 @@ msgstr ""
 "\t\t\tMax biking distance: %(mdb)s km\n"
 "\t\t\t"
 
-#: .\templates\percorso-dinamico.html.py:281
+#: .\templates\percorso-dinamico.html.py:282
 msgid "Park and ride:"
 msgstr "Park and ride:"
 
-#: .\templates\percorso-dinamico.html.py:293 .\templates\percorso.html.py:59
+#: .\templates\percorso-dinamico.html.py:294 .\templates\percorso.html.py:59
 msgid "alle"
 msgstr "at"
 
@@ -861,6 +1280,25 @@ msgstr ""
 "trackers, in order to determine traffic status and waiting times at bus "
 "stops. Thus, it is able to find the quickest route on board of Atac and Roma "
 "TPL buses, the underground and urban railways.\t\t\t\t\t\t"
+
+#~ msgid ""
+#~ "Siamo spiacenti, non sono disponibili gli orari di partenza dal capolinea "
+#~ "per il percorso selezionato."
+#~ msgstr "We apologize, timetable is not available for selected route."
+
+#~ msgid ""
+#~ "Seleziona una fermata, oppure un veicolo per conoscerne gli orari di "
+#~ "arrivo."
+#~ msgstr "Select a bus stop, or a vehicle, to get arrivals."
+
+#~ msgid "Luoghi trovati"
+#~ msgstr "Places found"
+
+#~ msgid "Percorso"
+#~ msgstr "Route"
+
+#~ msgid "Luogo"
+#~ msgstr "Place"
 
 #~ msgid "Nel giorno selezionato:"
 #~ msgstr "On selected day:"
@@ -958,9 +1396,6 @@ msgstr ""
 #~ msgid "Data e ora (GG-MM-AA HH:MM):"
 #~ msgstr "Date and time (DD-MM-YY HH:MM (24hr)):"
 
-#~ msgid "Preferenze di viaggio con i mezzi pubblici"
-#~ msgstr "Public transport trip preferences"
-
 #~ msgid "Calcola"
 #~ msgstr "Get directions"
 
@@ -975,9 +1410,6 @@ msgstr ""
 
 #~ msgid "Con pochi trasbordi"
 #~ msgstr "With the fewest changes"
-
-#~ msgid "Opzioni di calcolo:"
-#~ msgstr "Route type:"
 
 #~ msgid "Palina"
 #~ msgstr "Bus stop"

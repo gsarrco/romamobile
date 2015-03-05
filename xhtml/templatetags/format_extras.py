@@ -23,6 +23,7 @@ from django import template
 from django.utils.translation import ugettext as _
 
 register = template.Library()
+from django.template.defaultfilters import floatformat
 
 def sec2min(secs):
 	return int(round(secs/60.0))
@@ -42,6 +43,11 @@ def arrotonda_distanza(n):
 		return _("%.1f km") % (k / 1000.0)
 	return _("%.0f metri") % k
 
+@register.filter
+def percent(value):
+  if value is None:
+    return None
+  return floatformat(value * 100.0, 2) + '%'
 
 register.filter('sec2min', sec2min)
 register.filter('sec2min_lab', sec2min_lab)

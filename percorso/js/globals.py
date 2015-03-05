@@ -4,7 +4,7 @@ flavors = ['app', 'web']
 flavor_id = JS("""$wnd.flavor_id""")
 flavor = flavors[flavor_id]
 
-version = '2.6.0'
+version = '2.7.0'
 
 base_url = ['http://muovi.roma.it', ''][flavor_id]
 

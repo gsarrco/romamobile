@@ -30,7 +30,7 @@ from django.http import HttpResponse
 from django.template.defaultfilters import time as timefilter
 from django.template.defaultfilters import date as datefilter
 from django.utils.translation import ugettext as _
-from servizi.utils import dow2string, dateandtime2datetime
+from servizi.utils import dow2string, dateandtime2datetime, date2mysql
 from collections import defaultdict
 from pprint import pprint
 
@@ -303,7 +303,7 @@ def ModifichePerZTL(request, token, codice, data, intervallo):
 	
 	for i in range(0, intervallo+1):
 	
-		data_corrente = data_inizio + timedelta(i)
+		data_corrente = data_inizio + timedelta(days=i)
 		
 		fasce = []
 		
@@ -409,7 +409,7 @@ def ListaAccessi(request, token, codice):
 		'lista_varchi': varchi,
 	}
 	
-	#return ret
+	return ret
 ListaAccessiWS = ztl4.metodo("ListaAccessi")(ListaAccessi)
 
 def giorni_settimana(escludi=0):
@@ -428,9 +428,74 @@ def giorni_settimana(escludi=0):
 			})
 	return gs
 
+def giorni_prossima_settimana(escludi=0):
+	# costruisce una lista di giorni internazionalizzati della prossima settimana, 1=domenica
+	gs = []
+	# prendo un sabato
+	dt = date.today()
+	wd = (dt.weekday() + 2) % 7
+	for i in range(7):
+		wd_mod = 7 if wd == 0 else wd
+		if wd_mod != escludi:
+			gs.append({
+				'codice': wd_mod,
+				'nome': formatta_giorno(dt)
+			})
+		dt += timedelta(days=1)
+		wd = (wd + 1) % 7
+	return gs
+
+def per_sito(request):
+	orari = Orari(None, "", True, date.today().strftime("%Y-%m-%d"))
+	curtime = datetime.today().time()
+	modificato = False
+	# internazionalizzo gli orari e trovo se ci sono modifiche straordinarie
+	for o in orari:
+		modificato = modificato or o['modificato']
+		fasce_filtrate = []
+		for f in o['fasce']:
+			# il campo "stato" viene aggiunto e puo' avere 3 valorizzazioni
+			# attiva: la ztl e' attiva in questo momento
+			# passata: l'orario di fine e' precedente all'orario corrente
+			# futura: l'orario di inizio e' successivo all'orario corrente
+			if o['modificato']:
+				if f['attiva']:
+					f['stato'] = "attiva"
+				else:
+					f['stato'] = "passata"
+			else:
+				if f['inizio_ieri']:
+					if f['ora_fine'] >= curtime:
+						f['stato'] = "attiva"
+					else:
+						f['stato'] = "passata"
+				if f['fine_domani']:
+					if f['ora_inizio'] > curtime:
+						f['stato'] = "futura"
+					else:
+						f['stato'] = "attiva"
+
+				if not(f['inizio_ieri']) and not(f['fine_domani']):
+					if f['ora_inizio'] <= curtime and f['ora_fine'] >= curtime:
+						f['stato'] = "attiva"
+					elif f['ora_inizio'] > curtime:
+						f['stato'] = "futura"
+					elif f['ora_fine'] < curtime:
+						f['stato'] = "passata"
+			#else:
+			#	f['stato'] = "passata"
+			f['ora_inizio'] = timefilter(f['ora_inizio'], _("H:i"))
+			f['ora_fine'] = timefilter(f['ora_fine'], _("H:i"))
+			if not f['stato'] == "passata":
+				fasce_filtrate.append(f)
+		o['fasce'] = fasce_filtrate
+
+	ctx = {'orari': orari, 'modificato': modificato}
+	return TemplateResponse(request, 'ztl_per_sito.html', ctx)
+
+
 def default(request):
 	orari = Orari(None, "", True, date.today().strftime("%Y-%m-%d"))
-	print orari
 	curtime = datetime.today().time()
 	ztl = ZTL.objects.all()
 	modificato = False
@@ -475,7 +540,7 @@ def default(request):
 				fasce_filtrate.append(f)
 		o['fasce'] = fasce_filtrate	
 	
-	gs = giorni_settimana()
+	gs = giorni_prossima_settimana()
 	
 	ctx = {'orari': orari, 'modificato': modificato, 'ztl': ztl, 'gs': gs}
 	return TemplateResponse(request, 'ztl.html', ctx)
@@ -487,17 +552,31 @@ def varchi_menu(request):
 	return TemplateResponse(request, 'ztl_varchi_menu.html', ctx)
 
 def varchi_dettaglio(request, codice):
-
 	accessi = ListaAccessi(None, '', codice)
 	altre_ztl = ZTL.objects.exclude(codice=codice)
 	ztl = ZTL.objects.get(codice=codice)
 	
-	ctx = {'accessi': accessi, 'altre_ztl': altre_ztl, 'ztl': ztl}
-	#return TemplateResponse(request, 'ztl_varchi_dettaglio.html', ctx)
-	return TemplateResponse(request, 'mapviewer.html', ctx)
+	ctx = {'accessi': accessi, 'altre_ztl': altre_ztl}
+	return TemplateResponse(request, 'ztl_varchi_dettaglio.html', ctx)
 
 def info(request):
 	return TemplateResponse(request, 'ztl_info.html', None)
+
+def prossimo_giorno(dow):
+	"""
+	Restituisce, come data, il prossimo giorno avente dow come giorno della settimana
+	"""
+	dow = (dow - 2) % 7
+	dt = date.today()
+	while dt.weekday() != dow:
+		dt = dt + timedelta(days=1)
+	return dt
+
+def formatta_giorno(dt):
+	"""
+	Formatta internazionalmente la data dt nel formato Giorno_settimana Numero (es. Domenica 14)
+	"""
+	return datefilter(dt, _("l j")).capitalize()
 
 def giorno(request, giorno):
 	
@@ -509,17 +588,12 @@ def giorno(request, giorno):
 	
 	# nome del giorno selezionato, internazionalizzato
 	dow = int(giorno)
-	dow_succ = dow+1
-	if dow_succ > 7:
-		dow_succ = 1
-	dow_prec = dow-1
-	if dow_prec < 1:
-		dow_prec = 7
-	nome_giorno = dow2string(dow).capitalize()
-	nome_giorno_prec = dow2string(dow_prec).capitalize()
-	nome_giorno_succ = dow2string(dow_succ).capitalize()
+	dt = prossimo_giorno(dow)
+	nome_giorno = formatta_giorno(dt)
+	nome_giorno_prec = formatta_giorno(dt - timedelta(days=1))
+	nome_giorno_succ = formatta_giorno(dt + timedelta(days=1))
 	
-	gs = giorni_settimana(escludi=int(giorno))
+	gs = giorni_prossima_settimana(escludi=int(giorno))
 	
 	# recupero le modifiche straordinarie
 	mods = ModifichePerGiornoSettimana(None, '', int(giorno), date.today().strftime("%Y-%m-%d"), 1)
@@ -527,6 +601,7 @@ def giorno(request, giorno):
 	for z in ztl:
 	
 		fasce = []
+		fasce_mod = []
 		
 		modificato = False
 		
@@ -534,11 +609,10 @@ def giorno(request, giorno):
 		for m in mods:
 			if m['id_ztl'] == z.codice:
 				for f in m['fasce']:
-					print f
 					# esistono modifiche straordinarie
 					modificato = True
 					modificato_globale = True
-					fasce.append({
+					fasce_mod.append({
 						'ora_inizio': timefilter(f['ora_inizio'], _("H:i")),
 						'ora_fine': timefilter(f['ora_fine'], _("H:i")),
 						'inizio_ieri': f['inizio_ieri'],
@@ -547,36 +621,36 @@ def giorno(request, giorno):
 					})
 				
 				
-		if not modificato:
-			# verifico ztl iniziate ieri e finite oggi
-			giorno_prec = int(giorno) - 1
-			if giorno_prec < 1:
-				giorno_prec = 7
-			cal = Calendario.objects.select_related().filter(ztl=z, giorno__codice=giorno_prec, fine_domani=True)
-			for c in cal:
-				fasce.append({
-					'ora_inizio': timefilter(c.ora_inizio, _("H:i")),
-					'ora_fine': timefilter(c.ora_fine, _("H:i")),
-					'inizio_ieri': True,
-					'fine_domani': False,
-					})
-			
-			# verifico ztl per oggi
-			cal = Calendario.objects.select_related().filter(ztl=z, giorno__codice=giorno)
-			for c in cal:
-				# la ztl finisce il giorno dopo, inizio_ieri=0, fine_domani=1
-				fasce.append({
-					'ora_inizio': timefilter(c.ora_inizio, _("H:i")),
-					'ora_fine': timefilter(c.ora_fine, _("H:i")),
-					'inizio_ieri': False,
-					'fine_domani': c.fine_domani,
-					})
+		# verifico ztl iniziate ieri e finite oggi
+		giorno_prec = int(giorno) - 1
+		if giorno_prec < 1:
+			giorno_prec = 7
+		cal = Calendario.objects.select_related().filter(ztl=z, giorno__codice=giorno_prec, fine_domani=True)
+		for c in cal:
+			fasce.append({
+				'ora_inizio': timefilter(c.ora_inizio, _("H:i")),
+				'ora_fine': timefilter(c.ora_fine, _("H:i")),
+				'inizio_ieri': True,
+				'fine_domani': False,
+				})
+
+		# verifico ztl per oggi
+		cal = Calendario.objects.select_related().filter(ztl=z, giorno__codice=giorno)
+		for c in cal:
+			# la ztl finisce il giorno dopo, inizio_ieri=0, fine_domani=1
+			fasce.append({
+				'ora_inizio': timefilter(c.ora_inizio, _("H:i")),
+				'ora_fine': timefilter(c.ora_fine, _("H:i")),
+				'inizio_ieri': False,
+				'fine_domani': c.fine_domani,
+				})
 		
 		orari.append({
 			'id_ztl': z.codice,
 			'toponimo': z.descrizione,
 			'modificato': modificato,
-			'fasce': fasce
+			'fasce': fasce,
+			'fasce_mod': fasce_mod,
 		})
 		
 		
@@ -590,35 +664,31 @@ def ztl(request, codice):
 	
 	# recupero il calendario della settimana per la ztl ed internazionalizzo
 	cal = CalendarioZTL(None, '', codice)
+
+	# recupero le modifiche per la prossima settimana ed internazionalizzo
+	mods = ModifichePerZTL(None, '', codice, date.today().strftime("%Y-%m-%d"), 7)
+	mods = {m['data']: m for m in mods}
+
 	for c in cal:
 		# nome del giorno selezionato, internazionalizzato
 		dow = int(c['giorno_settimana'])
-		dow_succ = dow+1
-		if dow_succ > 7:
-			dow_succ = 1
-		dow_prec = dow-1
-		if dow_prec < 1:
-			dow_prec = 7
-		c['giorno_settimana'] = dow2string(dow).capitalize()
-		c['giorno_succ'] = dow2string(dow_succ).capitalize()
-		c['giorno_prec'] = dow2string(dow_prec).capitalize()
+		dt = prossimo_giorno(dow)
+		c['giorno_settimana'] = formatta_giorno(dt).capitalize()
+		c['giorno_succ'] = formatta_giorno(dt + timedelta(days=1)).capitalize()
+		c['giorno_prec'] = formatta_giorno(dt - timedelta(days=1)).capitalize()
 		for f in c['fasce']:
 			f['ora_inizio'] = timefilter(f['ora_inizio'], _("H:i"))
 			f['ora_fine'] = timefilter(f['ora_fine'], _("H:i"))
-	
-	modifiche = False
-	# recupero le modifiche per la prossima settimana ed internazionalizzo
-	mods = ModifichePerZTL(None, '', codice, date.today().strftime("%Y-%m-%d"), 7)
-	
-	for m in mods:
-		m['data'] = datefilter(timestamp2date(m['data']), _("l"))
+		m = mods[date2mysql(dt)]
+		c['modificato'] = len(m['fasce']) > 0
 		for f in m['fasce']:
-			# se ci entra almeno una volta, esiste una fascia
-			modifiche = True
 			f['ora_inizio'] = timefilter(f['ora_inizio'], _("H:i"))
 			f['ora_fine'] = timefilter(f['ora_fine'], _("H:i"))
+		c['fasce_mod'] = m['fasce']
 	
-	ctx = {'cal': cal, 'mods': mods, 'ztl': ztl, 'altre_ztl': altre_ztl, 'modifiche': modifiche}
+
+
+	ctx = {'cal': cal, 'ztl': ztl, 'altre_ztl': altre_ztl}
 	return TemplateResponse(request, 'ztl_cal.html', ctx)
 	
 def modifiche(request):
@@ -631,7 +701,7 @@ def modifiche(request):
 		for f in m['fasce']:
 			f['ora_inizio'] = timefilter(f['ora_inizio'], _("H:i"))
 			f['ora_fine'] = timefilter(f['ora_fine'], _("H:i"))
-	gs = giorni_settimana()
+	gs = giorni_prossima_settimana()
 	ztl = ZTL.objects.all()
 	ctx = {'mods': mods, 'gs': gs, 'ztl': ztl}
 	return TemplateResponse(request, 'ztl_modifiche.html', ctx)
