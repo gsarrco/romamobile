@@ -53,6 +53,7 @@ from django import db
 from ztl.models import ZTL
 from pprint import pprint
 from paline.models import LogAvm, Gestore
+import os, os.path
 
 
 PERCORSI_INTERSEZIONE = [
@@ -182,7 +183,7 @@ def TrovalineaFactory(
 			if calcola_percorso:
 				g = graph.Grafo()
 				tpl.registra_classi_grafo(g)
-				g.deserialize('%s%s.v3.dat' % (settings.GRAPH, '_mini' if retina else ''))
+				g.deserialize(os.path.join(settings.TROVALINEA_PATH_RETE, '%s%s.v3.dat' % (settings.GRAPH, '_mini' if retina else '')))
 				tpl.carica_rete_su_grafo(r, g, retina, versione=v)
 				# print "Inizializzo geocoder"
 				# gcd = geocoder.Geocoder(g)
@@ -219,7 +220,7 @@ def TrovalineaFactory(
 				cls.gc = cls.rete.geocoder
 			if tempo_reale:
 				cls.aggiorna_arrivi = aggiorna_arrivi
-						
+
 		@classmethod
 		def init_scheduler(cls):
 			vs = paline.VersionePaline.objects.filter(inizio_validita__gt=datetime.now())
@@ -525,154 +526,7 @@ def TrovalineaFactory(
 			id_ris = param['id_ris']
 			self._elimina_nodo_risorsa(ct_ris, id_ris)
 			self._carica_nodo_risorsa(ct_ris, id_ris)
-			
-			
-		def exposed_calcola_percorso(
-			self,
-			punti,
-			piedi,
-			bus,
-			metro,
-			fc,
-			fr,
-			pickled_date,
-			bici=False,
-			max_distanza_bici=5000,
-			linee_escluse=None,
-			auto=0,
-			carpooling=0,
-			carpooling_vincoli=None,
-			teletrasporto=False,
-			rev=False,
-			tipi_ris=[],
-			ztl=[]
-		):
-			peer = Peer.objects.filter(daemon=daemon)[0]
-			with peer.get_queue():
-				data = pickle.loads(pickled_date)
-				print "Calcolo il percorso"
-				le = set()
-				linee_escluse = pickle.loads(pickle.dumps(linee_escluse))
-				punti = pickle.loads(pickle.dumps(punti))
-				tipi_ris = [int(t) for t in tipi_ris]
-				if linee_escluse is not None:
-					for l in linee_escluse:
-						if l in self.rete.linee_equivalenti:
-							le.update(self.rete.linee_equivalenti[l])
-						else:
-							le.add(l)
-				# modi = ['modo_auto', 'modo_tpl', 'modo_pnr', 'modo_bnr', 'modo_carsharing', 'modo_carpooling']
-				if auto == 4:
-					ztl = [z.codice for z in ZTL.objects.all()]
-				ztl = set(ztl)
-				if auto < 2 or auto == 5:
-					opzioni_cp = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, True if auto==0 else False, carpooling, carpooling_vincoli, teletrasporto, ztl=ztl)
-				elif auto == 2:
-					opzioni_cp1 = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, True, carpooling, carpooling_vincoli, teletrasporto, ztl=ztl)
-					opzioni_cp2 = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, False, carpooling, carpooling_vincoli, teletrasporto, ztl=ztl)
-				elif auto == 4:
-					opzioni_cp1 = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, False, carpooling, carpooling_vincoli, teletrasporto, ztl=ztl, tpl=True)
-					opzioni_cp2 = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, True, carpooling, carpooling_vincoli, teletrasporto, True, ztl=ztl, tpl=True)
 
-				nodi_geo = []
-				nodi_del = []
-
-				try:
-					for p in punti:
-						s, a = self.get_nodi_from_infopoint(p)
-						nodi_geo.append(s)
-						if len(a) > 0:
-							nodi_del.append(s)
-					s = nodi_geo[0]
-					s_context = {
-						'primo_tratto_bici': bici,
-						'max_distanza_bici': max_distanza_bici,
-						'nome_strada': -1,
-						'carpooling_usato': -1,
-						'distanza_piedi': 0.0,
-					}
-					percorso = None
-					pas = carpoolingmodels.PercorsoAutoSalvato(self.grafo)
-					orario_inizio = datetime.now()
-					data_partenza = data
-					for i in range(1, len(nodi_geo)):
-						t = nodi_geo[i]
-
-						if auto not in [2, 4] and len(tipi_ris) == 0:
-							with self.dijkstra_queue.get_dijkstra() as d:
-								percorso, data = d.calcola_e_stampa(s, t, opzioni_cp, data, percorso, s_context=s_context, rev=rev)
-						else:
-							with self.dijkstra_queue.get_dijkstra(2) as d:
-								d1, d2 = d
-								if auto == 2 or auto == 4:
-									opzioni_cp1['cerca_vicini'] = 'risorse'
-									opzioni_cp1['tipi_ris'] = tipi_ris
-									opzioni_cp2['cerca_vicini'] = 'risorse'
-									opzioni_cp2['tipi_ris'] = tipi_ris
-									percorso, data = graph.calcola_e_stampa_vicini_tragitto(d1, d2, s, t, opt=opzioni_cp1, dep_time=data, tr=percorso, s_context=s_context, opt2=opzioni_cp2, mandatory=False)
-								else:
-									opzioni_cp['cerca_vicini'] = 'risorse'
-									opzioni_cp['tipi_ris'] = tipi_ris
-									percorso, data = graph.calcola_e_stampa_vicini_tragitto(d1, d2, s, t, opt=opzioni_cp, dep_time=data, tr=percorso, s_context=s_context)
-
-						percorso.partenza = {}
-						percorso.arrivo = {}
-						tratto.formatta_percorso(percorso, 'auto_salvato', pas, {'flessibilita': timedelta(0)})
-						s = t
-						tempo_calcolo = datetime.now() - orario_inizio
-						paline.LogCercaPercorso(
-							orario_richiesta=orario_inizio,
-							orario_partenza=data_partenza,
-							da=punti[i - 1]['ricerca'],
-							a=punti[i]['ricerca'],
-							piedi=piedi,
-							max_bici=-1 if not bici else max_distanza_bici,
-							tempo_calcolo=tempo_calcolo.seconds + tempo_calcolo.microseconds / 1000000.0,
-							bus=bus,
-							metro=metro,
-							fc=fc,
-							fr=fr,
-							auto=auto,
-							carpooling=carpooling,
-							linee_escluse=",".join(list(linee_escluse))
-						).save()
-
-
-					start = punti[0]
-					stop = punti[-1]
-
-					if 'palina' in start:
-						percorso.partenza['nome_palina'] = self.rete.paline[start['palina']].nome
-						percorso.partenza['id_palina'] = start['palina']
-					else:
-						percorso.partenza['address'] = start['address']
-					if 'palina' in stop:
-						percorso.arrivo['nome_palina'] = self.rete.paline[stop['palina']].nome
-						percorso.arrivo['id_palina'] = stop['palina']
-					else:
-						percorso.arrivo['address'] = stop['address']
-
-				except Exception:
-					print "Errore nel calcola percorso"
-					logging.error(traceback.format_exc())
-
-				for n in nodi_del:
-					self.dijkstra_queue.rm_nodo(n)
-
-				db.reset_queries()
-				if auto < 2 or auto == 5:
-					del opzioni_cp['dijkstra']
-				else:
-					del opzioni_cp1['dijkstra']
-					del opzioni_cp2['dijkstra']
-
-				#percorso.attualizza(datetime.now() + timedelta(hours=12), self.rete, self.grafo, opzioni_cp)
-
-				return pickle.dumps({
-					'percorso': percorso,
-					'percorso_auto_salvato': pas.serialize(),
-					#'opzioni': opzioni_cp, # Servirà per la profilazione. Bug con opzioni_cp['tipi_luogo'], non riesce a serializzarlo
-				})
 
 		@autopickle
 		def exposed_cerca_percorso(self, infopoint):
@@ -694,6 +548,7 @@ def TrovalineaFactory(
 			quando = getdef(infopoint, 'quando', 0)
 			carpooling_vincoli = getdef(infopoint, 'carpooling_vincoli', None)
 			ztl = getdef(infopoint, 'ztl', [])
+			bici_sul_tpl = getdef(infopoint, 'bici_sul_tpl', False)
 			cerca_punti = getdef(infopoint, 'cerca_punti', False)
 			# End parameters
 
@@ -721,13 +576,13 @@ def TrovalineaFactory(
 					ztl = [z.codice for z in ZTL.objects.all()]
 				ztl = set(ztl)
 				if auto < 2 or auto == 5:
-					opzioni_cp = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, True if auto==0 else False, carpooling, carpooling_vincoli, teletrasporto, ztl=ztl)
+					opzioni_cp = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, True if auto==0 else False, carpooling, carpooling_vincoli, teletrasporto, ztl=ztl, bici_sul_tpl=bici_sul_tpl)
 				elif auto == 2:
-					opzioni_cp1 = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, True, carpooling, carpooling_vincoli, teletrasporto, ztl=ztl)
-					opzioni_cp2 = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, False, carpooling, carpooling_vincoli, teletrasporto, ztl=ztl)
+					opzioni_cp1 = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, True, carpooling, carpooling_vincoli, teletrasporto, ztl=ztl, bici_sul_tpl=bici_sul_tpl)
+					opzioni_cp2 = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, False, carpooling, carpooling_vincoli, teletrasporto, ztl=ztl, bici_sul_tpl=bici_sul_tpl)
 				elif auto == 4:
-					opzioni_cp1 = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, False, carpooling, carpooling_vincoli, teletrasporto, ztl=ztl, tpl=True)
-					opzioni_cp2 = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, True, carpooling, carpooling_vincoli, teletrasporto, True, ztl=ztl, tpl=True)
+					opzioni_cp1 = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, False, carpooling, carpooling_vincoli, teletrasporto, ztl=ztl, tpl=True, bici_sul_tpl=bici_sul_tpl)
+					opzioni_cp2 = self.rete.get_opzioni_calcola_percorso(metro, bus, fc, fr, piedi, data, bici, le, True, carpooling, carpooling_vincoli, teletrasporto, True, ztl=ztl, tpl=True, bici_sul_tpl=bici_sul_tpl)
 
 				nodi_geo = []
 				nodi_del = []
@@ -767,7 +622,6 @@ def TrovalineaFactory(
 						rv = PuntiVicini(num_ris, ds)
 						opzioni_cp['cerca_vicini'] = 'punti'
 						with self.dijkstra_queue.get_dijkstra() as d:
-							pprint(opzioni_cp)
 							d.cerca_vicini(s, rv, max_distanza, dep_time=data, opt=opzioni_cp, s_context=s_context, solo_pedonale=False)
 
 						out = []
@@ -780,7 +634,6 @@ def TrovalineaFactory(
 
 					else:
 						# Cerca percorso ordinario
-
 						for p in punti:
 							s, a = self.get_nodi_from_infopoint(p)
 							nodi_geo.append(s)
@@ -817,6 +670,8 @@ def TrovalineaFactory(
 							tratto.formatta_percorso(percorso, 'auto_salvato', pas, {'flessibilita': timedelta(0)})
 							s = t
 							tempo_calcolo = datetime.now() - orario_inizio
+							da = percorso.get_punto_wgs_84()
+							a = percorso.get_punto_fine_wgs_84()
 							paline.LogCercaPercorso(
 								orario_richiesta=orario_inizio,
 								orario_partenza=data_partenza,
@@ -831,7 +686,13 @@ def TrovalineaFactory(
 								fr=fr,
 								auto=auto,
 								carpooling=carpooling,
-								linee_escluse=",".join(list(linee_escluse))
+								linee_escluse=",".join(list(linee_escluse)),
+								da_lng=da[0],
+								da_lat=da[1],
+								a_lng=a[0],
+								a_lat=a[1],
+								distanza=percorso.get_distanza(),
+								tempo=int(percorso.get_tempo_totale()),
 							).save()
 
 
@@ -980,11 +841,12 @@ def TrovalineaFactory(
 			for k in p.fermate:
 				f = p.fermate[k]
 				f.rete_percorso.aggiorna_posizione_veicoli()
-				for a in f.arrivi:
-					a2 = copy(a)
-					if 'tratto_percorso' in a2:
-						del a2['tratto_percorso']
-					arrivi.append(a2)
+				if f.is_valida():
+					for a in f.arrivi:
+						a2 = copy(a)
+						if 'tratto_percorso' in a2:
+							del a2['tratto_percorso']
+						arrivi.append(a2)
 			db.reset_queries()
 			return pickle.dumps(arrivi)
 
@@ -1049,12 +911,13 @@ def TrovalineaFactory(
 		
 		def exposed_serializza_dinamico(self):
 			return pickle.dumps(self.rete.serializza_dinamico(), 2)
-		
-		def exposed_deserializza_dinamico(self, res):
+
+		@autopickle
+		def exposed_deserializza_dinamico(self, param):
 			print "Deserializing..."
-			self.rete.deserializza_dinamico(pickle.loads(res))
+			self.rete.deserializza_dinamico(param)
 			print "Deserialization done"
-			
+
 		def exposed_get_rete_e_grafo(self):
 			return self.rete, self.grafo
 		
@@ -1096,6 +959,29 @@ def TrovalineaFactory(
 			except:
 				traceback.print_exc()
 			return 'OK'
+
+		@autopickle
+		def exposed_qualita(self, dati):
+			return {
+				'atac': self.rete.qualita_atac.get_qualita()
+			}
+
+		@autopickle
+		def exposed_statistiche(self, param):
+			percorsi = []
+			for id_percorso in self.rete.percorsi:
+				p = self.rete.percorsi[id_percorso]
+				if not p.soppresso:
+					percorsi.append({
+						'id_percorso': id_percorso,
+						'descrizione': p.descrizione,
+						'arrivo': p.get_destinazione(),
+						'stat': p.statistiche(),
+					})
+			return {
+				'percorsi': percorsi,
+			}
+
 
 		
 	Trovalinea.init_rete()

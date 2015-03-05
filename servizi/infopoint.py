@@ -62,7 +62,7 @@ def cerca_ricerca_errata(ricerca):
 	Altrimenti restituisce None
 	"""
 	ricerca = re_spazi_duplicati.sub(' ', ricerca).lower()
-	print ricerca
+	# print ricerca
 	res = RicercaErrata.objects.filter(ricerca=ricerca).order_by('-conteggio')
 	if len(res) > 0:
 		r = res[0]
@@ -267,6 +267,8 @@ def geocode_place(address, geocoder=DEFAULT_GEOCODER):
 		r = geocode_place(address_sym[0], geocoder)
 		r['ricerca'] = address
 		return r
+	if len(address) == 5 and address.isdigit():
+		address = 'fermata:%s' % address
 	if address.startswith('punto:'):
 		try:
 			lat, lng = address[7:-1].split(',')

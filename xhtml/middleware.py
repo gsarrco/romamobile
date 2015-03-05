@@ -247,9 +247,12 @@ class Middleware:
 		
 		
 	def process_template_response(self, request, response):
-		if response.context_data is None:
+		try:
+			if response.context_data is None:
+				response.context_data = {}
+		except:
 			response.context_data = {}
-		
+
 		# Merge context
 		response.context_data.update(request.ctx)
 	

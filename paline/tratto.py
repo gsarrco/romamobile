@@ -23,7 +23,7 @@ from datetime import date, time, datetime, timedelta
 from servizi.utils import RPyCAllowRead, modifica_url_con_storia, getdef
 from django.utils.safestring import mark_safe
 from servizi.utils import ricapitalizza
-from geomath import gbfe_to_wgs84
+from geomath import gbfe_to_wgs84, segment_point_dist, distance, piede_perpendicolare
 from django.utils.translation import ugettext as _
 from django.template.defaultfilters import date as datefilter
 from pprint import pprint
@@ -148,6 +148,11 @@ class Tratto(RPyCAllowRead):
 		return self.get_tempo_attesa() + self.get_tempo_percorrenza()
 	
 	def stampa(self, indent=0):
+		self.stampa_nric(indent)
+		for s in self.sub:
+			s.stampa(indent + 1)
+
+	def stampa_nric(self, indent=0):
 		spazi = "  " * indent
 		print spazi + "Tipo: ", type(self)
 		print spazi + "Partenza alle: ", self.tempo
@@ -158,8 +163,6 @@ class Tratto(RPyCAllowRead):
 		print spazi + "Tempo totale ric.:", self.get_tempo_totale()
 		print spazi + "Arrivo alle: ", self.tempo + timedelta(seconds=self.get_tempo_totale())
 		print
-		for s in self.sub:
-			s.stampa(indent + 1)
 			
 	def ricalcola_tempi(self, rete, grafo, opz):
 		pass
@@ -170,6 +173,49 @@ class Tratto(RPyCAllowRead):
 			s.attualizza(tempo, rete, grafo, opz)
 			tempo += timedelta(seconds=s.get_tempo_totale())
 		self.ricalcola_tempi(rete, grafo, opz)
+
+	def piu_vicino(self, punto):
+		"""
+		Trova il sottotratto più vicino al punto.
+
+		Restituisce la tupla (dist, indici, progressive, lunghezze, proiez_punto)
+		dist: distanza punto-segmento più vicino (None se il tratto non ha alcun segmento)
+		indici: lista di indici (riferiti all'array sub) che definisce un cammino radice-foglia dell'albero dei tratti
+		progressive: lista delle distanze della proiezione del punto sul segmento, a partire dal primo punto
+			di ciascuno dei sottotratti del percorso radice-foglia
+		lunghezze: lista delle lunghezze totali dei tratti del cammino radice-foglia. Può essere usato, ad esempio,
+			insieme alle progressive per calcolare le progressive inverse, cioè le progressive fino alla fine dei tratti
+		proiez_punto: proiezione del punto sul tratto
+		"""
+		if len(self.sub) == 0:
+			mindist, minprog, minpp = None, None, None
+			a = None
+			prog = 0
+			for b in self.poly:
+				if a is not None:
+					dist = segment_point_dist(a, b, punto)
+					if mindist is None or dist < mindist:
+						mindist = dist
+						pp = piede_perpendicolare(a, b, punto)
+						minprog, minpp = prog + distance(a, pp), pp
+					prog += distance(a, b)
+				a = b
+			return mindist, [], [minprog], [prog], minpp
+		else:
+			mindist, minind, minprog, minlung, minpp = None, None, None, None, None
+			disttot = 0
+			# Cerca il figlio più vicino
+			i = 0
+			n = len(self.sub)
+			for i in range(n):
+				s = self.sub[i]
+				dist, ind, prog, lung, pp = s.piu_vicino(punto)
+				if dist is not None and (mindist is None or dist < mindist):
+					mindist, minind, minprog, minlung, minpp = dist, [i] + ind, [disttot + prog[0]] + prog, lung, pp
+				disttot += lung[0]
+			return mindist, minind, minprog, [disttot] + minlung, minpp
+
+
 
 
 class TrattoRoot(Tratto):
@@ -510,17 +556,39 @@ def arrotonda_tempo(t):
 		t += timedelta(minutes=1)
 	return datefilter(t, _("H:i"))
 
-def formatta_percorso(tratto, tipo, ft, opzioni):
+def formatta_percorso(tratto, tipo, ft, opzioni, posizione=None):
+	"""
+	Visita l'albero dei tratti, e formatta gli elementi di interesse
+
+	tratto: radice del tratto da formattare
+	tipo: tipo di formattatore da usare
+	ft: oggetto di lavoro su cui è costruito l'output, dipendente dal tipo di formattatore
+	opzioni: opzioni da passare ai formattatori
+	posizione: eventuale tupla che rappresenta la posizione dell'utente, come restituita dal metodo piu_vicino,
+		relativizzata rispetto al tratto corrente; None se non è disponibile o se il tratto corrente non è nel
+		cammino radice-foglia della posizione dell'utente
+	"""
+	indice = -1
+	if posizione is not None:
+		distanza, indici, progressiva, lunghezza, piede_perp = posizione
+		if len(indici) > 0:
+			indice = indici[0]
+		posizione_ric = (distanza, indici[1:], progressiva[1:], lunghezza[1:], piede_perp)
 	try:
 		nome = tratto.clsname
 	except Exception:
 		nome = tratto.__class__.__name__
 	if (tipo, nome, False) in tipi_formattatore:
-		ft = tipi_formattatore[(tipo, nome, False)](tratto, ft, opzioni)
+		ft = tipi_formattatore[(tipo, nome, False)](tratto, ft, opzioni, posizione)
+	i = 0
 	for s in tratto.sub:
-		formatta_percorso(s, tipo, ft, opzioni)
+		if i == indice:
+			formatta_percorso(s, tipo, ft, opzioni, posizione_ric)
+		else:
+			formatta_percorso(s, tipo, ft, opzioni, None)
+		i += 1
 	if (tipo, nome, True) in tipi_formattatore:
-		ft = tipi_formattatore[(tipo, nome, True)](tratto, ft, opzioni)		
+		ft = tipi_formattatore[(tipo, nome, True)](tratto, ft, opzioni, posizione)
 	return ft
 
 class PercorsoIndicazioni(object):
@@ -544,6 +612,7 @@ class PercorsoIndicazioniIcona(object):
 		self.ricevi_nodo = True
 		self.numero_nodi = 0
 		self.numero_archi = 0
+		self.posizione_corrente = -1
 		
 	def aggiungi_nodo(self, t, nome, id, tipo, punto, url='', icona='nodo.png', overwrite=False, info_exp=''):
 		"""
@@ -590,6 +659,7 @@ class PercorsoIndicazioniIcona(object):
 		info_tratto_short='',
 		linea_short=None,
 		dist=0,
+		info_posizione_corrente=None,
 	):
 		"""
 		Mezzi:
@@ -620,9 +690,12 @@ class PercorsoIndicazioniIcona(object):
 			'info_tratto_short': info_tratto_short,
 			'linea_short': linea if linea_short is None else linea_short,
 			'dist': dist,
+			'info_posizione_corrente': info_posizione_corrente,
 		}})
 		self.numero_archi += 1
 		self.ricevi_nodo = True
+		if info_posizione_corrente is not None:
+			self.posizione_corrente = len(self.indicazioni) - 1
 		
 	def mark_safe(self):
 		for i in self.indicazioni:
@@ -654,11 +727,11 @@ def fermate_intermedie(tratto):
 			fermate.append((arrotonda_tempo(s.tempo), s.nome_palina_s, s.id_palina_s, s.tipo_percorrenza))
 	if old is not None:
 		s = old
-		fermate.append((arrotonda_tempo((s.tempo + timedelta(seconds = s.tempo_percorrenza))), s.nome_palina_t, s.id_palina_t, s.tipo_percorrenza))	
+		fermate.append((arrotonda_tempo((s.tempo + timedelta(seconds=s.tempo_percorrenza))), s.nome_palina_t, s.id_palina_t, s.tipo_percorrenza))
 	return fermate
 
 @formattatore('indicazioni_icona', [TrattoRoot])
-def format_indicazioni_icona_root(tratto, ft, opz):
+def format_indicazioni_icona_root(tratto, ft, opz, posizione):
 	if 'address' in tratto.partenza:
 		ft.aggiungi_nodo(
 			tratto.tempo,
@@ -681,7 +754,7 @@ def format_indicazioni_icona_root(tratto, ft, opz):
 
 
 @formattatore('indicazioni_icona', [TrattoRoot], True)
-def format_indicazioni_icona_root_post(tratto, ft, opz):
+def format_indicazioni_icona_root_post(tratto, ft, opz, posizione):
 	if 'address' in tratto.arrivo:
 		ft.aggiungi_nodo(
 			tratto.tempo + timedelta(seconds=tratto.get_tempo_totale()),
@@ -703,7 +776,7 @@ def format_indicazioni_icona_root_post(tratto, ft, opz):
 	return ft
 
 @formattatore('indicazioni_icona', [TrattoInterscambio])
-def format_indicazioni_icona_tratto_interscambio(tratto, ft, opz):
+def format_indicazioni_icona_tratto_interscambio(tratto, ft, opz, posizione):
 	versione = getdef(opz, 'versione', 2)
 	mezzo = 'I'
 	icona = 'interscambio.png'
@@ -732,6 +805,7 @@ def format_indicazioni_icona_tratto_interscambio(tratto, ft, opz):
 		info_tratto_exp='',
 		icona=icona,
 		bb=tratto.get_bounding_box_wgs84(),
+		info_posizione_corrente={} if posizione is not None else None,
 	)
 	ft.aggiungi_nodo(
 		t=tratto.tempo + timedelta(seconds=tratto.tempo_percorrenza),
@@ -746,7 +820,7 @@ def format_indicazioni_icona_tratto_interscambio(tratto, ft, opz):
 
 
 @formattatore('indicazioni_icona', [TrattoBus, TrattoMetro, TrattoTreno, TrattoFC, TrattoTeletrasporto])
-def format_indicazioni_icona_tratto_bus(tratto, ft, opz):
+def format_indicazioni_icona_tratto_bus(tratto, ft, opz, posizione):
 	numero_fermate = len([x for x in tratto.sub if isinstance(x, TrattoBusArcoPercorso)])
 	fermate = _("fermata") if numero_fermate==1 else _("fermate")
 	id_veicolo = None
@@ -757,6 +831,20 @@ def format_indicazioni_icona_tratto_bus(tratto, ft, opz):
 	tempo_s = tratto.tempo
 	tempo_t = tratto.tempo + timedelta(seconds=tratto.get_tempo_totale())
 	linea_short = None
+	info_posizione_corrente = None
+	if posizione is not None:
+		distanza, indici, progressiva, lunghezza, piede_perp = posizione
+		i = indici[0]
+		rimanenti = 0
+		for x in tratto.sub:
+			if i > 0:
+				i -= 1
+			elif isinstance(x, TrattoBusArcoPercorso):
+				rimanenti += 1
+		info_posizione_corrente = {
+			'fermate_rimanenti': rimanenti,
+		}
+
 	if isinstance(tratto, TrattoFC):
 		mezzo = 'T'
 		icona = 'treno'
@@ -827,6 +915,7 @@ def format_indicazioni_icona_tratto_bus(tratto, ft, opz):
 		bb=tratto.get_bounding_box_wgs84(),
 		linea_short=linea_short,
 		dist=tratto.get_distanza(),
+		info_posizione_corrente=info_posizione_corrente,
 	)
 	ft.aggiungi_nodo(
 		t=tempo_t,
@@ -840,7 +929,7 @@ def format_indicazioni_icona_tratto_bus(tratto, ft, opz):
 
 
 @formattatore('indicazioni_icona', [TrattoPiedi, TrattoBici, TrattoAuto])
-def format_indicazioni_icona_tratto_piedi(tratto, ft, opz):
+def format_indicazioni_icona_tratto_piedi(tratto, ft, opz, posizione):
 	sub = [s for s in tratto.sub if isinstance(s, TrattoPiediArco)]
 	if len(sub) > 0:
 		distanza_tratto = tratto.get_distanza()
@@ -895,11 +984,12 @@ def format_indicazioni_icona_tratto_piedi(tratto, ft, opz):
 			icona=icona,
 			bb=tratto.get_bounding_box_wgs84(),
 			dist=distanza_tratto,
+			info_posizione_corrente={} if posizione is not None else None,
 		)
 	return ft
 
 @formattatore('indicazioni_icona', [TrattoCarPooling])
-def format_indicazioni_icona_tratto_car_pooling(tratto, ft, opz):
+def format_indicazioni_icona_tratto_car_pooling(tratto, ft, opz, posizione):
 	sub = [s for s in tratto.sub if isinstance(s, TrattoCarPoolingArco)]
 	nome_primo_arco = None
 	if len(sub) > 0:
@@ -944,6 +1034,7 @@ def format_indicazioni_icona_tratto_car_pooling(tratto, ft, opz):
 			icona='carpooling.png',
 			bb=tratto.get_bounding_box_wgs84(),
 			dist=distanza_tratto,
+			info_posizione_corrente={} if posizione is not None else None,
 		)
 		ft.aggiungi_nodo(
 			tratto.tempo + timedelta(seconds=ta + tp),
@@ -956,7 +1047,7 @@ def format_indicazioni_icona_tratto_car_pooling(tratto, ft, opz):
 
 
 @formattatore('indicazioni_icona', [TrattoRisorsa])
-def format_indicazioni_icona_tratto_risorsa(tratto, ft, opz):
+def format_indicazioni_icona_tratto_risorsa(tratto, ft, opz, posizione):
 	ft.aggiungi_nodo(
 		tratto.tempo,
 		tratto.nome_luogo,
@@ -971,7 +1062,7 @@ def format_indicazioni_icona_tratto_risorsa(tratto, ft, opz):
 	
 # Formattatori indicazioni su mappa
 @formattatore('mappa', [TrattoBus])
-def format_mappa_tratto_bus(tratto, ft, opz):
+def format_mappa_tratto_bus(tratto, ft, opz, posizione):
 	numero_fermate = len([x for x in tratto.sub if isinstance(x, TrattoBusArcoPercorso)])
 	fermate = _("fermata") if numero_fermate==1 else _("fermate")
 	out = '[%s] ' % arrotonda_tempo(tratto.tempo)
@@ -998,7 +1089,7 @@ def format_mappa_tratto_bus(tratto, ft, opz):
 
 
 @formattatore('mappa', [TrattoMetro, TrattoFC, TrattoTreno])
-def format_mappa_tratto_metro(tratto, ft, opz):
+def format_mappa_tratto_metro(tratto, ft, opz, posizione):
 	numero_fermate = len([x for x in tratto.sub if isinstance(x, TrattoBusArcoPercorso)])
 	fermate = _("fermata") if numero_fermate==1 else _("fermate")
 	out = '[%s] ' % arrotonda_tempo(tratto.tempo)
@@ -1040,7 +1131,7 @@ def format_mappa_tratto_metro(tratto, ft, opz):
 
 
 @formattatore('mappa', [TrattoTeletrasporto])
-def format_mappa_teletrasporto(tratto, ft, opz):
+def format_mappa_teletrasporto(tratto, ft, opz, posizione):
 	ft.add_marker(tratto.get_punto_wgs_84(), '/paline/s/img/teletrasporto.png', icon_size=(16, 16), infobox='Smaterializzazione Teletrasporto', anchor=(8, 8))
 	color = '#B200FF'
 	ft.add_polyline([tratto.get_punto_wgs_84(), tratto.get_punto_fine_wgs_84()], 1, color, 0.5)
@@ -1048,24 +1139,24 @@ def format_mappa_teletrasporto(tratto, ft, opz):
 	return ft
 
 @formattatore('mappa', [TrattoPiedi, TrattoInterscambio])
-def format_mappa_piedi(tratto, ft, opz):
+def format_mappa_piedi(tratto, ft, opz, posizione):
 	color = '#000000'
 	ft.add_polyline(tratto.get_poly_wgs84(), 1, color, 2.5)
 	return ft
 
 @formattatore('mappa', [TrattoBici])
-def format_mappa_bici(tratto, ft, opz):
+def format_mappa_bici(tratto, ft, opz, posizione):
 	ft.add_polyline(tratto.get_poly_wgs84(), 1, '#267F00', 3.5)
 	return ft
 
 @formattatore('mappa', [TrattoAuto, TrattoCarPooling])
-def format_mappa_auto(tratto, ft, opz):
+def format_mappa_auto(tratto, ft, opz, posizione):
 	ft.add_polyline(tratto.get_poly_wgs84(), 1, '#F600FF', 3.5)
 	return ft
 
 
 @formattatore('mappa', [TrattoRisorsa])
-def format_mappa_luogo(tratto, ft, opz):
+def format_mappa_luogo(tratto, ft, opz, posizione):
 	ft.add_marker(
 		tratto.get_punto_wgs_84(),
 		icon=tratto.icon,
@@ -1077,7 +1168,7 @@ def format_mappa_luogo(tratto, ft, opz):
 
 
 @formattatore('mappa', [TrattoRoot])
-def format_mappa_root(tratto, ft, opz):
+def format_mappa_root(tratto, ft, opz, posizione):
 	out = '[%s] ' % arrotonda_tempo(tratto.tempo)
 	if tratto.partenza is None or 'address' not in tratto.partenza:
 		out += _("Parti")
@@ -1089,7 +1180,7 @@ def format_mappa_root(tratto, ft, opz):
 	return ft
 
 @formattatore('mappa', [TrattoRoot], True)
-def format_mappa_root_post(tratto, ft, opz):
+def format_mappa_root_post(tratto, ft, opz, posizione):
 	out = '[%s] ' % arrotonda_tempo(tratto.tempo + timedelta(seconds=tratto.get_tempo_totale()))
 	if tratto.arrivo is None or 'address' not in tratto.arrivo:
 		out += _("Sei arrivato")
@@ -1102,24 +1193,24 @@ def format_mappa_root_post(tratto, ft, opz):
 
 # Formattatori per statistiche percorso
 @formattatore('stat', [TrattoRoot])
-def format_stat_root(tratto, ft, opz):
+def format_stat_root(tratto, ft, opz, posizione):
 	ft.distanza_totale = tratto.get_distanza()
 	ft.tempo_totale = tratto.get_tempo_totale()
 	return ft
 	
 @formattatore('stat', [TrattoPiedi])
-def format_stat_piedi(tratto, ft, opz):
+def format_stat_piedi(tratto, ft, opz, posizione):
 	ft.distanza_piedi += tratto.get_distanza()
 	return ft
 	
 @formattatore('stat', [TrattoRoot], True)
-def format_stat_mappa_root_post(tratto, ft, opz):
+def format_stat_mappa_root_post(tratto, ft, opz, posizione):
 	ft.finalizza()
 	return ft
 
 # Formattatore percorso auto salvato
 @formattatore('auto_salvato', [TrattoAutoArco])
-def format_auto_salvato_tratto_auto_arco(tratto, ft, opz):
+def format_auto_salvato_tratto_auto_arco(tratto, ft, opz, posizione):
 	eid = tratto.id
 	e = ft.grafo.archi[eid]
 	ft.add_arco(

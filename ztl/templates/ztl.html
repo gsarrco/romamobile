@@ -23,7 +23,7 @@
 	{% if o.fasce|length > 0 %}
 		{% for f in o.fasce %}
 				{% if f.stato == "attiva" %}
-						<p><img class="dot" src="/xhtml/s/img/red_bullet.gif" height="5" width="13" alt="*" /><span>
+						<p><img class="dot" src="/xhtml/s/img/red_bullet.gif" height="5" width="13" alt="*" />
 						{% if f.inizio_ieri %}
 								{% blocktrans with ora_inizio=f.ora_inizio ora_fine=f.ora_fine %}Dalle {{ora_inizio}} di ieri alle {{ora_fine}} di oggi{% endblocktrans %}
 						{% else %}
@@ -36,25 +36,25 @@
 						{% if o.modificato %}*{% endif %}</p>
 				{% endif %}
 				{%  if f.stato == "passata" %}
-					<p><img class="dot" src="/xhtml/s/img/red_bullet.gif" height="5" width="13" alt="*" /><span>
-					{% trans "Non attiva" %}
+					<p><img class="dot" src="/xhtml/s/img/red_bullet.gif" height="5" width="13" alt="*" />
+						<span class="i">{% trans "Non attiva" %}</span>
 					</p>
 				{% endif %}
 				{% if f.stato == "futura" %}
-					<p><img class="dot" src="/xhtml/s/img/red_bullet.gif" height="5" width="13" alt="*" /><span>
+					<p><img class="dot" src="/xhtml/s/img/red_bullet.gif" height="5" width="13" alt="*" />
 					{% if f.fine_domani %}
 						{% blocktrans with ora_inizio=f.ora_inizio ora_fine=f.ora_fine %}Dalle {{ ora_inizio  }} alle {{ ora_fine }} di domani{% endblocktrans %}
 					{% else %}
 						{% blocktrans with ora_inizio=f.ora_inizio ora_fine=f.ora_fine %}Dalle {{ ora_inizio  }} alle {{ ora_fine }}{% endblocktrans %}
 					{% endif %}
-					{% if o.modificato %}*{% endif %}</span>
-					</p>	
+					{% if o.modificato %}*{% endif %}
+					</p>
 				{% endif %}
-				
+
 		{% endfor %}
 	{% else %}
 	<p>
-		<img class="dot" src="/xhtml/s/img/red_bullet.gif" height="5" width="13" alt="*" /><span><span class="i">{% trans "Non attiva" %}{% if o.modificato %}(*){% endif %}</span>
+		<img class="dot" src="/xhtml/s/img/red_bullet.gif" height="5" width="13" alt="*" /><span class="i">{% trans "Non attiva" %}{% if o.modificato %}(*){% endif %}</span>
 	</p>
 	{% endif %}
 	

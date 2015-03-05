@@ -172,7 +172,7 @@ class ArcoGeocoder(ArcoTomTom):
 		grafo.add_arco(e)
 			
 	def aggiorna_contesto(self, opt, rev=False):
-		if self.da_strada and opt['primo_tratto_bici']:
+		if self.da_strada and opt['primo_tratto_bici'] and not opt['bici_sul_tpl']:
 			if rev:
 				context = self.t.get_context(opt)
 			else:

@@ -33,6 +33,7 @@ admin.site.register(GiornoSettimana)
 admin.site.register(LinguaPreferita)
 admin.site.register(LogoPersonalizzato)
 admin.site.register(Festivita)
+admin.site.register(StatoProcessamento)
 
 class RicercaErrataAdmin(admin.ModelAdmin):
     list_display = ('ricerca', 'conteggio', 'conversione')

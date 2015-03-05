@@ -32,7 +32,6 @@ class ZTL(Luogo):
 	codice = models.CharField(max_length=15, unique=True, db_index=True)
 	descrizione = models.CharField(max_length=100)
 	ordinamento = models.IntegerField()
-	mapId = models.CharField(max_length=200, blank=True, null=True)
 	
 	GeoModel = Multipoligono
 	
