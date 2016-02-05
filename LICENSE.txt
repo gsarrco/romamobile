@@ -1,4 +1,4 @@
-Copyright 2013 Roma servizi per la mobilità srl
+Copyright 2013-2016 Roma servizi per la mobilita' srl
 Developed by Luca Allulli and Damiano Morosi
 
 Muoversi a Roma for Developers is free software: you can redistribute it

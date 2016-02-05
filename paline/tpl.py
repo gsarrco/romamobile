@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013-2014 Roma servizi per la mobilità srl
+#    Copyright 2013-2016 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -22,7 +22,7 @@
 from bt import AVLTree as Avl
 import pyximport; pyximport.install()
 from models import *
-import infotp
+from paline import cities
 from datetime import datetime, timedelta, time, date
 import Queue
 from threading import Thread, Lock
@@ -36,6 +36,8 @@ import traceback
 import geomath
 import osm
 import geocoder
+from django.contrib.gis.geos import Point
+from django.db import transaction as djangotransaction
 from servizi.utils import datetime2compact, datetime2time, transaction, date2datetime
 from servizi.utils import datetime2date, dateandtime2datetime, ricapitalizza
 from servizi.utils import model2contenttype, contenttype2model, batch_qs, datetime2mysql
@@ -45,7 +47,7 @@ import os, os.path
 import settings
 import tratto
 from django import db
-from django.db.models import Avg, Max, Min, Count
+from django.db.models import Avg, Max, Min, Count, F
 import os, os.path
 from floatingvehicle import FVPath
 from constance import config
@@ -60,6 +62,8 @@ from collections import defaultdict
 from pprint import pprint
 from urllib_transport import UrllibTransport
 from random import Random
+# import gtfs_rt
+
 
 LINEE_MINI = ['90', '542', '61', 'MEB', 'MEB1', '998', 'MEA', 'FR1']
 #LINEE_MINI = ['012', '063', '90', '999', 'MEB', 'MEB1']
@@ -69,11 +73,12 @@ MAX_PERIODO_PERCORSO_ATTIVO = timedelta(minutes=58)
 
 MIN_PESO_VELOCITA = 0.1
 
-TIMEOUT_VALIDITA_VEICOLO = timedelta(minutes=4)
+TIMEOUT_VALIDITA_VEICOLO = timedelta(minutes=3)
 AVANZAMENTO_INTERPOLATO = False
 
 TIMEOUT_AGGIORNAMENTO_RETE = timedelta(seconds=90)
 MAX_TENTATIVI_INFOTP = 5
+
 
 class RetePalina(object):
 	def __init__(self, id_palina, nome, soppressa=False):
@@ -94,46 +99,6 @@ class RetePalina(object):
 		#       Nel grafo, però, esistono solo i nodi relativi alle fermate, NON quelli relativi alle paline.
 		#       In questo modo sarà possibile transitare per le fermate ma non salire/scendere dal mezzo.
 
-	def aggiorna_arrivi(self, solo_capilinea=False, aggiorna_fv=False):
-		s = infotp.call_infotp(self.id_palina)
-		linee = s.findAll('linea')
-		if len(linee) > 0:
-			self.arrivi = {}
-			self.ultimo_aggiornamento = datetime.now()
-			_tb = lambda x: x == 'S'
-			for k in self.fermate:
-				f = self.fermate[k]
-				if f.aggiornabile_infotp():
-					f.reset_arrivi_temp()
-			for l in linee:
-				record = {
-					'tempo': int(l['tempo']),
-					'id_percorso': l['id_percorso'],
-					'id_veicolo': l['id_veicolo'],
-					'id_linea': l['id_linea'],
-					'destinazione': l['destinazione'],
-					'annuncio_infotp': l['annuncio_infotp'],
-					'posizione': int(l['posizione']),
-					'fermate': int(l['fermate']),
-					'distanza': int(l['distanza']),
-					'distanza_capolinea': int(l['distanza']),
-					'pedana': _tb(l['pedana_disabili']),
-					'aria': _tb(l['aria_condizionata']),
-					'moby': _tb(l['sistema_com_mobile']),
-					'meb': _tb(l["emettitrice_biglietti"]),
-					'a_capolinea': _tb(l['a_capolinea']),
-					'in_arrivo': _tb(l['in_arrivo']),
-				}
-				self.arrivi[l['id_veicolo']] = record
-				if l['id_percorso'] in self.fermate:
-					self.fermate[l['id_percorso']].aggiungi_arrivo_temp(record)
-				else:
-					logging.error("Il percorso %s non passa per la palina %s" % (l['id_percorso'], self.id_palina))
-			for k in self.fermate:
-				f = self.fermate[k]
-				if f.is_capolinea() and f.aggiornabile_infotp():
-					f.ordina_arrivi_temp(aggiorna_fv)
-
 	def serializza_dinamico(self):
 		return {
 			'type': 'RetePalina',
@@ -145,7 +110,6 @@ class RetePalina(object):
 	def deserializza_dinamico(self, rete, res):
 		self.arrivi = res['arrivi']
 		self.ultimo_aggiornamento = res['ultimo_aggiornamento']
-
 
 	def serializza(self):
 		return {
@@ -193,6 +157,7 @@ class RetePalina(object):
 				return True
 		return False
 
+
 class RetePercorso(object):
 	def __init__(self, id_percorso, id_linea, tipo, descrizione, soppresso, gestore):
 		object.__init__(self)
@@ -207,10 +172,15 @@ class RetePercorso(object):
 		self.tratti_percorso = []
 		self.frequenza = []
 		self.tempo_stat_orari = []
+		# Mapping tra gli indici delle fermate non soppresse (0-based) e i tratti di percorso che iniziano con tali fermate
+		# L'indice del capolinea finale non è mappato, perché esso non dà origine a un tratto di percorso
+		self.map_fermate_tratti = []
 		self.dist = 0
 		self.veicoli = {}
+		self.veicoli_problematici = {}
 		self.ultimo_aggiornamento = None
 		self.orario_inizio_aggiornamento_veicoli = None
+		self.segmenti = None
 		for i in range(0, 7):
 			self.frequenza.append([(0.0, -1, -1) for j in range(0, 24)])
 
@@ -227,6 +197,31 @@ class RetePercorso(object):
 	def deserializza(self, res):
 		self.frequenza = res['frequenza']
 		self.tempo_stat_orari = res['tempo_stat_orari']
+
+	def init_mapping_fermate_non_soppresse(self):
+		n_tratto = 0
+		for tp in self.tratti_percorso:
+			f = tp.s
+			if not f.rete_palina.soppressa:
+				self.map_fermate_tratti.append(n_tratto)
+			n_tratto += 1
+
+	def get_tratto_e_distanza_da_fermata(self, n_fermata, dist_fermata):
+		"""
+		Restituisce l'indice del tratto, il tratto e la distanza a partire dalla posizione linearizzata in fermate
+
+		Il metodo converte la posizione linearizzata, espressa in termini di fermate "non soppresse" e distanza
+		dall'ultima fermata, in una nuova posizione linearizzata espressa in termini di tratti di percorso:
+		restituisce una terna (indice_tratto_percorso, tratto_percorso, distanza_da_inizio_tratto_percorso)
+		"""
+		n_tratto = self.map_fermate_tratti[n_fermata]
+		tp = self.tratti_percorso[n_tratto]
+		dist = tp.rete_tratto_percorsi.dist
+		if dist < dist_fermata:
+			dist_fermata -= dist
+			tp = tp.t.tratto_percorso_successivo
+			n_tratto += 1
+		return (n_tratto, tp, dist_fermata)
 
 	def begin_aggiorna_veicoli(self):
 		self.orario_inizio_aggiornamento_veicoli = datetime.now()
@@ -255,6 +250,18 @@ class RetePercorso(object):
 				rete.veicoli[id_veicolo] = ReteVeicolo(id_veicolo)
 			self.veicoli[id_veicolo] = rete.veicoli[id_veicolo]
 
+	def iter_punti(self):
+		"""
+		Restituisce un iteratore sui punti della polilinea, dall'ultimo al primo
+		"""
+		tp = self.tratti_percorso[0]
+		while tp is not None:
+			punti = tp.rete_tratto_percorsi.punti
+			n = len(punti)
+			for i in range(n):
+				yield punti[i]
+			tp = tp.t.tratto_percorso_successivo
+
 	def iter_punti_rev(self):
 		"""
 		Restituisce un iteratore sui punti della polilinea, dall'ultimo al primo
@@ -266,6 +273,45 @@ class RetePercorso(object):
 			for i in range(n-1, -1, -1):
 				yield punti[i]
 			tp = tp.s.tratto_percorso_precedente
+
+	def set_punti(self):
+		self.segmenti = geocoder.SegmentGeocoder()
+		punti = list(self.iter_punti())
+		for i in range(1, len(punti)):
+			self.segmenti.add_segment(punti[i-1], punti[i], i)
+		self.segmenti.freeze()
+
+	def linearizza(self, p):
+		"""
+		Trasforma il punto p (coppia x, y) nella posizione linearizzata
+
+		Restituisce un dizionario con le seguenti chiavi:
+		- distanza_capolinea: distanza dal capolinea iniziale
+		- tratto_percorso: tratto_percorso a cui appartiene il punto
+		- distanza_inizio_tratto: distanza dall'inizio del tratto
+		- distanza_2d: distanza 2D del punto dal segmento
+		- progressiva: progressivo del tratto di percorso (partendo da 1 per il primo tratto)
+		"""
+		i, dist_tratto, dist_inizio = self.segmenti.project(p)
+
+		residua = dist_inizio
+		tp = self.tratti_percorso[0]
+		i = 0
+
+		while True:
+			dist = tp.rete_tratto_percorsi.dist
+			tratto_successivo = tp.t.tratto_percorso_successivo
+			i += 1
+			if residua < dist or tratto_successivo is None:
+				return {
+					'distanza_capolinea': dist_inizio,
+					'tratto_percorso': tp,
+					'distanza_inizio_tratto': residua,
+					'distanza_2d': dist_tratto,
+					'progressiva': i,
+				}
+			residua -= dist
+			tp = tratto_successivo
 
 	def linear_to_coord(self, distanza_capolinea):
 		"""
@@ -322,6 +368,22 @@ class RetePercorso(object):
 				'distanza': int(self.dist - p),
 			})
 		return out
+
+	def log_tempo_attesa(self, data=None, ora=None):
+		arrivi = self.tratti_percorso[-1].t.arrivi
+		if len(arrivi) > 0:
+			tempo = arrivi[0]['tempo']
+			if tempo > -1:
+				if data is None:
+					t = datetime.now()
+					ora = datetime2time(t)
+					data = datetime2date(t)
+				LogTempoAttesaPercorso(
+					id_percorso=self.id_percorso,
+					data=data,
+					ora=ora,
+					tempo=tempo
+				).save()
 
 
 	def stampa_tempi(self):
@@ -490,7 +552,6 @@ class RetePercorso(object):
 		else:
 			return round(t_prog / 60.0)
 
-
 	def statistiche(self):
 		now = datetime.now()
 		attesa_totale = 0
@@ -537,7 +598,70 @@ class RetePercorso(object):
 			'indice_attesa': indice_attesa,
 		}
 
+	def destinazione(self):
+		return self.tratti_percorso[-1].t.rete_palina.nome_ricapitalizzato
 
+	def esporta_come_shape(self, path, gbfe=False):
+		"""
+		Esporta il percorso come coppia di shapefile, uno per il percorso e uno per le fermate
+
+		path: cartella nella quale creare gli shapefile
+		Il nome degli shapefile ha lo schema seguente:
+		LINEA_PERCORSO_percorso.shp/dbf/...
+		LINEA_PERCORSO_fermate.shp/dbf/...
+		"""
+		base_file_name = "{}_{}_".format(self.id_linea, self.id_percorso)
+		with geomath.zipped_shapefile(shapefile.POLYLINE, path, base_file_name + "percorso", gbfe) as shp_p:
+			with geomath.zipped_shapefile(shapefile.POINT, path, base_file_name + "fermate", gbfe) as shp_f:
+				shp_p.autoBalance = 1
+				shp_f.autoBalance = 1
+				shp_f.field('ID_PAL', 'C', '10')
+				shp_f.field('NOME_PAL', 'C', '40')
+				shp_f.field('PROGR', 'N', '10')
+				shp_p.field('ID_LINEA', 'C', '10')
+				shp_p.field('ID_PERC', 'C', '10')
+				shp_p.field('ID_PAL_S', 'C', '10')
+				shp_p.field('NOME_PAL_S', 'C', '40')
+				shp_p.field('PROGR', 'N', '10')
+				shp_p.field('ID_PAL_T', 'C', '10')
+				shp_p.field('NOME_PAL_T', 'C', '40')
+				f = self.tratti_percorso[0].s
+				i = 0
+				palina_old = None
+				while f is not None:
+					pl = f.rete_palina
+					if gbfe:
+						lon, lat = pl.x, pl.y
+					else:
+						lon, lat = gbfe_to_wgs84(pl.x, pl.y)
+					shp_f.point(lon, lat)
+					shp_f.record(
+						ID_PAL=pl.id_palina,
+						NOME_PAL=pl.nome,
+						PROGR=i,
+					)
+					if palina_old is not None:
+						line = []
+						punti = f.tratto_percorso_precedente.rete_tratto_percorsi.punti
+						for pt in punti:
+							if gbfe:
+								ptw = pt
+							else:
+								ptw = gbfe_to_wgs84(*pt)
+							line.append(ptw)
+						shp_p.line(parts=[line])
+						shp_p.record(
+							ID_LINEA=self.id_linea,
+							ID_PERC=self.id_percorso,
+							ID_PAL_S=palina_old.id_palina,
+							NOME_PAL_S=palina_old.nome,
+							ID_PAL_T=pl.id_palina,
+							NOME_PAL_T=pl.nome,
+							PROGR=i,
+						)
+					palina_old = pl
+					i += 1
+					f = f.tratto_percorso_successivo.t if f.tratto_percorso_successivo is not None else None
 
 
 class ReteTrattoPercorsi(object):
@@ -557,7 +681,7 @@ class ReteTrattoPercorsi(object):
 		self.punti = []
 		self.dist = None
 		self.rete = rete
-		self.segmenti = geocoder.SegmentGeocoder()
+		self.segmenti = None #geocoder.SegmentGeocoder()
 
 		self.infotp = False
 		self.tratti_percorso = []
@@ -646,35 +770,24 @@ class ReteTrattoPercorsi(object):
 
 	def linearizza(self, p):
 		"""
-		Restituisce la distanza lineare dal capolinea iniziale della proiezione di p sul tratto
+		Restituisce la distanza lineare della proiezione di p sul tratto dall'inizio del tratto
 		"""
 		i, dist_tratto, dist_inizio = self.segmenti.project(p)
 		return dist_inizio
 
 	def set_dist(self, dist):
-		"""
-		#print "Tratto percorso", self.s.id_palina, self.t.id_palina
-		#print "Distanza dichiarata: ", dist
-		op = None
-		nd = 0
-		for p in self.punti:
-			if op is not None:
-				nd += geomath.distance(op, p)
-			op = p
-		print "Distanza calcolata: ", nd
-		#dist = nd
-		"""
+		if dist is not None:
+			delta = 0
+			if self.dist is not None:
+				delta = -self.dist
+			self.dist = dist
+			delta += dist
 
-		if self.dist is not None:
-			print "Distanza duplicata"
-
-		else:
-			if dist is not None:
-				self.dist = dist
-				for k in self.percorsi:
-					self.percorsi[k].rete_percorso.dist += dist
+			for k in self.percorsi:
+				self.percorsi[k].rete_percorso.dist += delta
 
 	def set_punti(self, punti):
+		self.segmenti = geocoder.SegmentGeocoder()
 		self.punti = punti
 		for i in range(1, len(punti)):
 			self.segmenti.add_segment(punti[i-1], punti[i], i)
@@ -949,7 +1062,7 @@ class ReteFermata(object):
 		self.arrivi.sort(key=lambda x: x['tempo'])
 
 
-	def elimina_arrivo(self, veicolo):
+	def elimina_veicolo(self, veicolo):
 		"""
 		Elimina le previsioni di arrivo per il veicolo passato; restituisce True se erano presenti.
 		"""
@@ -1021,6 +1134,21 @@ class ReteTrattoPercorso(object):
 			'da_capolinea': dist_tratto + self.s.distanza_da_partenza,
 		}
 
+	def elimina_veicolo(self, v):
+		id_veicolo = v.id_veicolo
+		if id_veicolo in self.veicoli:
+			del self.veicoli[id_veicolo]
+
+	def distanza_a_capolinea(self, dist_succ):
+		"""
+		Restituisce la distanza fino al capolinea finale
+
+		:param dist_succ: distanza alla fine del tratto
+		:return: distanza al capolinea finale
+		"""
+		return self.rete_percorso.dist - self.s.distanza_da_partenza - self.rete_tratto_percorsi.dist + dist_succ
+
+
 class ReteCorsa(object):
 	def __init__(self, percorso, veicolo=None):
 		super(ReteCorsa).__init__()
@@ -1059,6 +1187,16 @@ class ReteVeicolo(object):
 			}
 		else:
 			self.dotazioni = dotazioni
+		# Diagnostica problemi veicoli problematici
+		self.problematico = False
+		self.tratto_percorso_problematico = None
+		self.fuori_percorso = False
+		self.lontano_1d = False
+		self.distanza_1d = None
+		self.lontano_2d = False
+		self.distanza_2d = None
+		self.progressiva_atac = None
+		self.progressiva_ric = None
 
 
 	def serializza_dinamico(self):
@@ -1067,13 +1205,27 @@ class ReteVeicolo(object):
 			'id': self.id_veicolo,
 			'distanza_capolinea': self.distanza_capolinea,
 			'distanza_successiva': self.distanza_successiva,
-			'tratto_percorso': self.tratto_percorso.get_id(),
+			'tratto_percorso': None if not self.is_valido() else self.tratto_percorso.get_id(),
 			'ultimo_aggiornamento': self.ultimo_aggiornamento,
 			'ultima_interpolazione': self.ultima_interpolazione,
 			'a_capolinea': self.a_capolinea,
 			'dotazioni': self.dotazioni,
 			'punto': self.punto,
 		}
+
+	def log_su_db(self):
+		lon, lat = gbfe_to_wgs84(*self.punto)
+
+		LogPosizioneVeicolo(
+			id_veicolo=self.id_veicolo,
+			id_percorso=self.tratto_percorso.rete_percorso.id_percorso,
+			orario=self.ultimo_aggiornamento,
+			distanza_capolinea=self.distanza_capolinea,
+			lon=lon,
+			lat=lat,
+			sistema=settings.MERCURY_GIANO,
+		).save()
+
 
 	def deserializza_dinamico(self, rete, res):
 		self.distanza_capolinea = res['distanza_capolinea']
@@ -1085,15 +1237,19 @@ class ReteVeicolo(object):
 		self.dotazioni = res['dotazioni']
 		self.punto = res['punto']
 
-	def aggiorna_posizione(self, distanza_capolinea, distanza_successiva, tratto_percorso, a_capolinea, punto, propaga=True):
-		old_percorso = None
+	def aggiorna_posizione(self, distanza_capolinea, distanza_successiva, tratto_percorso, a_capolinea, punto, propaga=True, ultimo_aggiornamento=None):
+		"""
+		Aggiorna la posizione del veicolo.
+
+		Se punto=None, calcola le coordinate in base alla posizione linearizzata
+		"""
+		self.problematico = False
 		percorso = tratto_percorso.rete_percorso
 		if self.tratto_percorso is not None:
 			old_percorso = self.tratto_percorso.rete_percorso
 			if percorso != old_percorso:
-				self.reset_fermate()
-				if self.id_veicolo in old_percorso.veicoli:
-					del old_percorso.veicoli[self.id_veicolo]
+				self.elimina_da_percorso()
+
 		percorso.veicoli[self.id_veicolo] = self
 		old_tratto = None
 		if self.tratto_percorso is not None:
@@ -1106,10 +1262,13 @@ class ReteVeicolo(object):
 		self.distanza_capolinea = distanza_capolinea
 		self.distanza_successiva = distanza_successiva
 		self.tratto_percorso = tratto_percorso
-		self.ultimo_aggiornamento = datetime.now()
+		self.ultimo_aggiornamento = datetime.now() if ultimo_aggiornamento is None else ultimo_aggiornamento
 		self.ultima_interpolazione = self.ultimo_aggiornamento
 		self.a_capolinea = a_capolinea
-		self.punto = punto
+		if punto is None:
+			self.calcola_punto()
+		else:
+			self.punto = punto
 		if propaga:
 			self.propaga_su_fermate()
 
@@ -1124,7 +1283,7 @@ class ReteVeicolo(object):
 		self.ultima_interpolazione = ultima_interpolazione
 		self.calcola_punto()
 
-	def calcola_punto(self):
+	def get_punto(self):
 		"""
 		A partire dalla posizione linearizzata, calcola le coordinate occupate dal veicolo
 		"""
@@ -1146,7 +1305,10 @@ class ReteVeicolo(object):
 			#print "Fine ciclo, distanza residua", d2
 		if mp is None:
 			mp = op
-		self.punto = mp
+		return mp
+
+	def calcola_punto(self):
+		self.punto = self.get_punto()
 
 	def reset_fermate(self, a_fermata=None):
 		"""
@@ -1157,12 +1319,21 @@ class ReteVeicolo(object):
 		if a_fermata is None:
 			a_fermata = self.tratto_percorso.rete_percorso.tratti_percorso[-1].t
 		while a_fermata is not None:
-			a_fermata.elimina_arrivo(self)
+			a_fermata.elimina_veicolo(self)
 			tp = a_fermata.tratto_percorso_precedente
 			if tp is not None:
+				tp.elimina_veicolo(self)
 				a_fermata = tp.s
 			else:
 				a_fermata = None
+
+	def elimina_da_percorso(self):
+		if self.tratto_percorso is not None:
+			old_percorso = self.tratto_percorso.rete_percorso
+			self.reset_fermate()
+			if self.id_veicolo in old_percorso.veicoli:
+				del old_percorso.veicoli[self.id_veicolo]
+			self.tratto_percorso = None
 
 	def propaga_su_fermate(self):
 		tpo = self.tratto_percorso
@@ -1172,7 +1343,7 @@ class ReteVeicolo(object):
 		while tpo is not None:
 			numero += 1
 			fermata = tpo.t
-			fermata.elimina_arrivo(self)
+			fermata.elimina_veicolo(self)
 			tpi = tpo.rete_tratto_percorsi
 			dist = tpi.dist
 			velocita = tpi.get_velocita()
@@ -1191,9 +1362,32 @@ class ReteVeicolo(object):
 
 
 	def is_valido(self):
+		if self.tratto_percorso is None:
+			return False
 		if self.ultimo_aggiornamento is None or datetime.now() - self.ultimo_aggiornamento > TIMEOUT_VALIDITA_VEICOLO:
 			return False
 		return True
+
+	def set_problematico(
+		self,
+		fuori_percorso=False,
+		lontano_2d=False,
+		distanza_2d=None,
+		lontano_1d=False,
+		distanza_1d=None,
+		progressiva_atac=None,
+		progressiva_ric=None,
+	):
+		self.problematico = True
+		self.fuori_percorso = fuori_percorso
+		self.lontano_2d = lontano_2d
+		self.distanza_1d = distanza_1d
+		self.distanza_2d = distanza_2d
+		self.lontano_1d = lontano_1d
+		self.tratto_percorso_problematico = self.tratto_percorso
+		self.progressiva_atac = progressiva_atac
+		self.progressiva_ric = progressiva_ric
+		self.elimina_da_percorso()
 
 	def get_arrivi(self):
 		"""
@@ -1307,6 +1501,9 @@ class Rete(object):
 		self.geocoder = None
 		self.random = Random()
 		self.qualita_atac = QualitaAtac()
+		# [Workaround] Dizionario che associa ogni id_veicolo Atac all'id_percorso "ufficiale" che sta compiendo, ottenuto interrogando
+		# ciclicamente i capilinea. Usato per la validazione dei percorsi restituiti da CITIES
+		self.percorsi_veicoli_atac = {}
 
 	def serializza_dinamico_interno(self):
 		return {
@@ -1337,6 +1534,24 @@ class Rete(object):
 		out.append(self.serializza_dinamico_interno())
 		return out
 
+	def serializza_dinamico_veicoli(self, percorrenze=True, veicoli=True, percorsi_veicoli_atac=False):
+		out = []
+		if percorrenze:
+			for id in self.tratti_percorsi:
+				out.append(self.tratti_percorsi[id].serializza_dinamico())
+		if percorsi_veicoli_atac:
+			out.append({
+				'type': 'PercorsiVeicoliAtac',
+				'id': '',
+				'ultimo_aggiornamento': self.ultimo_aggiornamento,
+				'percorsi_veicoli_atac': self.percorsi_veicoli_atac
+			})
+		if veicoli:
+			for id in self.veicoli:
+				v = self.veicoli[id]
+				out.append(v.serializza_dinamico())
+			out.append(self.serializza_dinamico_interno())
+		return out
 
 	def deserializza_dinamico(self, res):
 		for r in res:
@@ -1364,6 +1579,61 @@ class Rete(object):
 			except Exception, e:
 				print e
 
+	def deserializza_dinamico_veicoli(self, res):
+		for r in res:
+			try:
+				t = r['type']
+				id = r['id']
+				if t == 'ReteTrattoPercorsi':
+					self.tratti_percorsi[id].deserializza_dinamico(self, r)
+				elif t == 'PercorsiVeicoliAtac':
+					self.percorsi_veicoli_atac = r['percorsi_veicoli_atac']
+				elif t == 'ReteVeicolo':
+					try:
+						id_tratto = r['tratto_percorso']
+						if id_tratto is None:
+							self.invalida_bus(r['id'])
+						else:
+							self.aggiorna_posizione_bus(
+								r['id'],
+								r['distanza_capolinea'],
+								r['distanza_successiva'],
+								self.tratti_percorso[id_tratto],
+								r['a_capolinea'],
+								r['punto'],
+								r['dotazioni'],
+								ultimo_aggiornamento=r['ultimo_aggiornamento'],
+							)
+					except:
+						logging.error('Errore aggiornamento posizione veicolo: %s' % traceback.format_exc())
+				elif t == 'Rete':
+					self.deserializza_dinamico_interno(r)
+			except Exception, e:
+				print e
+
+		self.invalida_bus_obsoleti()
+
+	def get_veicoli_tutti_percorsi(self, get_arrivi, get_distanza=False):
+		ret = []
+		for id_percorso in self.percorsi:
+			vs = self.get_veicoli_percorso(id_percorso)
+			out = []
+			for v in vs:
+				out.append(v.get_info(get_arrivi, get_distanza))
+			ret.append({
+				'id_percorso': id_percorso,
+				'arrivi': out,
+				'ultimo_aggiornamento': self.percorsi[id_percorso].tratti_percorso[-1].t.ultimo_aggiornamento
+			})
+		db.reset_queries()
+		return ret
+
+	def genera_gtfs_rt(self):
+		arrivi = {
+			'ultimo_aggiornamento': self.ultimo_aggiornamento,
+			'percorsi': self.get_veicoli_tutti_percorsi(True, True),
+		}
+		return None # gtfs_rt.generate_gtfs_rt(self, arrivi)
 
 	def add_palina(self, id_palina, nome, soppressa=False):
 		p = RetePalina(id_palina, nome, soppressa)
@@ -1409,35 +1679,21 @@ class Rete(object):
 	def add_ztl(self, codice, nome, orari):
 		self.ztl[codice] = ReteZtl(codice, nome, orari)
 
+	def log_tempi_attesa_percorsi(self):
+		t = datetime.now()
+		ora = datetime2time(t)
+		data = datetime2date(t)
+		if settings.CPD_LOG_PER_STATISTICHE:
+			for id_percorso in self.percorsi:
+				self.percorsi[id_percorso].log_tempo_attesa(data, ora)
 
-	def aggiorna_arrivi(self, num_thread=3, calcola_percorrenze=False, logging=False, aggiorna_arrivi=True, timeout=TIMEOUT_AGGIORNAMENTO_RETE):
+	def aggiorna_arrivi(self, calcola_percorrenze=False, logging=False, aggiorna_arrivi=True, timeout=TIMEOUT_AGGIORNAMENTO_RETE):
 		if aggiorna_arrivi:
 			print "Aggiornamento arrivi"
 			self.qualita_atac.start_ciclo()
-			s = self.capilinea
-			l = []
-			for p in s:
-				p = self.paline[p]
-				if p.aggiornabile_infotp():
-					l.append(p)
-			self.random.shuffle(l)
-			q = Queue.Queue()
-			for p in l:
-				q.put((p, MAX_TENTATIVI_INFOTP))
-			print "Aggiorno arrivi"
-			threads = []
-			for i in range(0, num_thread):
-				t = AggiornatoreCarichi(self, q, calcola_percorrenze, logging)
-				t.start()
-				threads.append(t)
-			tstop = datetime.now() + timeout
-			for t in threads:
-				n = datetime.now()
-				if tstop > n:
-					remaining = (tstop - n).seconds
-					t.join(remaining)
-			for t in threads:
-				t.quit()
+			self.qualita_atac.percorso_ok()
+			self.qualita_atac.risposta_ok()
+			self.dati_da_avm_atac()
 			self.qualita_atac.stop_ciclo()
 			print "Aggiornamento arrivi completato"
 		if calcola_percorrenze:
@@ -1450,12 +1706,43 @@ class Rete(object):
 				self.tratti_percorsi[k].media_tempi_percorrenza(logging)
 			self.percorrenze_calcolate = True
 			print "Calcolo percorrenze completato"
+			# Sincronizzazione periodica statistiche CITIES su DB
+			# percorsi_cities_sincronizza()
+		print "Log posizione veicoli"
+		plpvs = PercorsiLogPosizioneVeicolo.objects.all()
+		for plpv in plpvs:
+			id_percorso = plpv.id_percorso
+			if id_percorso in self.percorsi:
+				p = self.percorsi[id_percorso]
+				for id_veicolo in p.veicoli:
+					p.veicoli[id_veicolo].log_su_db()
+		print "Log posizione veicoli completato"
+		if logging:
+			print "Log tempi di attesa percorsi"
+			self.log_tempi_attesa_percorsi()
+			print "Log tempi attesa percorsi completato"
 		self.ultimo_aggiornamento = datetime.now()
 
-	def aggiorna_posizione_bus(self, id_veicolo, distanza_capolinea, distanza_successiva, tratto, a_capolinea, punto, dotazioni=None, propaga=True):
+	def invalida_bus_obsoleti(self):
+		for id_veicolo in self.veicoli:
+			v = self.veicoli[id_veicolo]
+			if not v.is_valido():
+				v.elimina_da_percorso()
+
+	def invalida_bus(self, id_veicolo):
+		if id_veicolo in self.veicoli:
+			self.veicoli[id_veicolo].elimina_da_percorso()
+
+	def aggiorna_posizione_bus(self, id_veicolo, distanza_capolinea, distanza_successiva, tratto, a_capolinea, punto, dotazioni=None, propaga=True, ultimo_aggiornamento=None):
 		if not id_veicolo in self.veicoli:
 			self.veicoli[id_veicolo] = ReteVeicolo(id_veicolo, dotazioni=dotazioni)
-		self.veicoli[id_veicolo].aggiorna_posizione(distanza_capolinea, distanza_successiva, tratto, a_capolinea, punto, propaga)
+		self.veicoli[id_veicolo].aggiorna_posizione(distanza_capolinea, distanza_successiva, tratto, a_capolinea, punto, propaga, ultimo_aggiornamento=ultimo_aggiornamento)
+		return self.veicoli[id_veicolo]
+
+	def elimina_veicolo_da_percorso(self, id_veicolo):
+		if id_veicolo in self.veicoli:
+			self.veicoli[id_veicolo].elimina_da_percorso()
+
 
 	def dati_da_avm_romatpl(self, dati):
 		# Determino distanza linearizzata
@@ -1463,75 +1750,281 @@ class Rete(object):
 		id_veicolo = dati['id_veicolo']
 		a_capolinea = False # TODO
 		percorso = self.percorsi[id_percorso]
-		tpo = percorso.tratti_percorso[dati['progressiva'] - 1]
-		tpi = tpo.rete_tratto_percorsi
+		if dati['progressiva'] - 1 >= len(percorso.tratti_percorso):
+			self.elimina_veicolo_da_percorso(id_veicolo)
+		else:
+			tpo = percorso.tratti_percorso[dati['progressiva'] - 1]
+			tpi = tpo.rete_tratto_percorsi
 
-		punto = geomath.wgs84_to_gbfe(dati['lon'], dati['lat'])
-		linear = tpo.linearizza(punto)
+			punto = geomath.wgs84_to_gbfe(dati['lon'], dati['lat'])
+			linear = tpo.linearizza(punto)
 
-		# Aggiungo campione
-		distanza_capolinea_finale = percorso.dist - linear['da_capolinea']
-		percorso.fv.add(id_veicolo, dati['timestamp'], distanza_capolinea_finale)
+			# Aggiungo campione
+			distanza_capolinea_finale = percorso.dist - linear['da_capolinea']
+			percorso.fv.add(id_veicolo, dati['timestamp'], distanza_capolinea_finale)
 
-		dotazioni = {
-			'meb': True,
-			'aria': True,
-			'moby': True,
-			'pedana': True,
-		}
+			dotazioni = {
+				'meb': True,
+				'aria': True,
+				'moby': True,
+				'pedana': True,
+			}
 
-		if id_veicolo.startswith("51") or id_veicolo.startswith("52"):
-			dotazioni['pedana'] = False
+			if id_veicolo.startswith("51") or id_veicolo.startswith("52"):
+				dotazioni['pedana'] = False
 
-		self.aggiorna_posizione_bus(id_veicolo, distanza_capolinea_finale, tpi.dist - linear['da_fermata'], tpo, a_capolinea, punto, dotazioni=dotazioni)
+			self.aggiorna_posizione_bus(id_veicolo, distanza_capolinea_finale, tpi.dist - linear['da_fermata'], tpo, a_capolinea, punto, dotazioni=dotazioni)
 
+	@djangotransaction.commit_on_success(using='gis')
+	def dati_da_avm_atac(self):
+		log_cities = config.LOG_ATAC_CITIES
+		log_cities_tr = config.LOG_ATAC_CITIES_TR
+		max_distanza = config.GIANO_CITIES_MAX_DISTANZA
+		try:
+			veicoli = cities.get_cities()
+			LogChiamataCities(orario=datetime.now(), successo=True).save()
+		except:
+			LogChiamataCities(orario=datetime.now(), successo=False, errore=traceback.format_exc(2047)).save()
+			return
+		percosi_cities_init()
+		in_percorso = 0
+		fuori_percorso = 0
+		altro_percorso = 0
+		filtrati = 0
+		per_tipo = defaultdict(list)
+		for v in veicoli:
+			v_fuori = False
+			v_filtrato = False
+			v_filtrato_2d = False
+			try:
+				id_veicolo = v['id_veicolo']
+				if log_cities_tr:
+					LogCitiesTr.objects.filter(num_soc=id_veicolo).update(recency=F('recency') + 1)
+					LogCitiesTr.objects.filter(num_soc=id_veicolo, recency__gte=50).delete()
+				id_percorso = v['id_percorso']
+				id_percorso_atac = id_percorso
+				if id_veicolo in self.percorsi_veicoli_atac:
+					id_percorso_vero = self.percorsi_veicoli_atac[id_veicolo]['id_percorso']
+					if id_percorso_vero != id_percorso:
+						altro_percorso += 1
+					else:
+						# print "Ok, il veicolo %s è in percorso %s" % (id_veicolo, id_percorso)
+						in_percorso += 1
+				else:
+					# print "Veicolo %s NON in percorso %s" % (id_veicolo, id_percorso)
+					fuori_percorso += 1
+					v_fuori = True
+				linea = v['id_linea']
+				if id_percorso in associazione_percorsi_cities:
+					id_percorso = associazione_percorsi_cities[id_percorso]
+				log_percorso_cities(id_percorso, linea, id_percorso in self.percorsi)
+				progressiva = v['progressiva']
+				distanza_precedente = v['dist_prec']
+				a_capolinea = (progressiva == 0 and distanza_precedente == 0)
+				percorso = self.percorsi[id_percorso]
+				n_tratto, tpo, dist_precedente_tratto = percorso.get_tratto_e_distanza_da_fermata(progressiva, distanza_precedente)
+				distanza_successiva = tpo.rete_tratto_percorsi.dist - dist_precedente_tratto
+				distanza_capolinea_finale = tpo.distanza_a_capolinea(distanza_successiva)
+				x, y = v['x'], v['y']
+				if x is not None:
+					punto = Point(x, y, srid=3004)
+				else:
+					punto = None
+
+				dotazioni = {
+					'meb': False,
+					'aria': False,
+					'moby': False,
+					'pedana': False,
+				}
+
+				veicolo = self.aggiorna_posizione_bus(id_veicolo, distanza_capolinea_finale, distanza_successiva, tpo, a_capolinea, punto, dotazioni=dotazioni)
+
+				cx, cy = veicolo.get_punto()
+				punto_ric = Point(cx, cy, srid=3004)
+
+				if punto is None:
+					dist = None
+				else:
+					dist = geomath.distance((x, y), (cx, cy))
+
+				dist_2d = None
+				progressiva_ric=None
+
+				if dist is not None and dist <= max_distanza:
+					# Aggiungo campione
+					percorso.fv.add(id_veicolo, v['timestamp'], distanza_capolinea_finale)
+				else:
+					# print "** Veicolo %s troppo distante, %f" % (id_veicolo, dist)
+					filtrati += 1
+					v_filtrato = True
+					linear = percorso.linearizza((x, y))
+					dist_2d = linear['distanza_2d']
+					if dist_2d <= max_distanza:
+						distanza_capolinea_finale = percorso.dist - linear['distanza_capolinea']
+						tratto_percorso = linear['tratto_percorso']
+						distanza_successiva = tratto_percorso.rete_tratto_percorsi.dist - linear['distanza_inizio_tratto']
+						veicolo = self.aggiorna_posizione_bus(id_veicolo, distanza_capolinea_finale, distanza_successiva, tpo, a_capolinea, punto, dotazioni=dotazioni)
+						progressiva_ric = linear['progressiva'] - 1
+					else:
+						v_filtrato_2d = True
+
+				if v_fuori or v_filtrato:
+					veicolo.set_problematico(
+						fuori_percorso=v_fuori,
+						lontano_1d=v_filtrato,
+						distanza_1d=dist,
+						lontano_2d=v_filtrato_2d,
+						distanza_2d=dist_2d,
+						progressiva_atac=progressiva,
+						progressiva_ric=progressiva_ric,
+					)
+
+				per_tipo[(v_fuori, v_filtrato)].append({'veicolo': v, 'distanza': dist})
+
+				# Log
+				if log_cities:
+					LogCities(
+						data_ora_ric=v['timestamp'],
+						num_soc=id_veicolo,
+						geom=punto,
+						linea=linea,
+						dest=v['dest'],
+						cod_perc=v['id_percorso'],
+						cod_perc_alt=v['cod_perc_alt'],
+						prog_ferm=progressiva,
+						dist_da_ferm=distanza_precedente,
+						ferm_da_arr=v['ferm_da_arr'],
+						cod_corsa=v['cod_corsa'],
+						geom_ric=punto_ric,
+						dist_ric=dist,
+						id_percorso_dec=id_percorso,
+					).save()
+				if log_cities_tr:
+					LogCitiesTr(
+						data_ora_ric=v['timestamp'],
+						num_soc=id_veicolo,
+						geom=punto,
+						linea=linea,
+						dest=v['dest'],
+						cod_perc=v['id_percorso'],
+						cod_perc_alt=v['cod_perc_alt'],
+						prog_ferm=progressiva,
+						dist_da_ferm=distanza_precedente,
+						ferm_da_arr=v['ferm_da_arr'],
+						cod_corsa=v['cod_corsa'],
+						geom_ric=punto_ric,
+						dist_ric=dist,
+						id_percorso_dec=id_percorso,
+					).save()
+			except:
+				logging.error('Errore aggiornamento posizione veicolo: %s' % traceback.format_exc())
+				if log_cities or log_cities_tr:
+					try:
+						x, y = v['x'], v['y']
+						if x is not None:
+							punto = Point(x, y, srid=3004)
+						else:
+							punto = None
+						if log_cities:
+							LogCities(
+								data_ora_ric=v['timestamp'],
+								num_soc=v['id_veicolo'],
+								geom=punto,
+								linea=v['id_linea'],
+								dest=v['dest'],
+								cod_perc=v['id_percorso'],
+								cod_perc_alt=v['cod_perc_alt'],
+								prog_ferm=v['progressiva'],
+								dist_da_ferm=distanza_precedente,
+								ferm_da_arr=v['ferm_da_arr'],
+								cod_corsa=v['cod_corsa'],
+								geom_ric=None,
+								dist_ric=None,
+								id_percorso_dec=None,
+							).save()
+						if log_cities_tr:
+							LogCitiesTr(
+								data_ora_ric=v['timestamp'],
+								num_soc=v['id_veicolo'],
+								geom=punto,
+								linea=v['id_linea'],
+								dest=v['dest'],
+								cod_perc=v['id_percorso'],
+								cod_perc_alt=v['cod_perc_alt'],
+								prog_ferm=v['progressiva'],
+								dist_da_ferm=distanza_precedente,
+								ferm_da_arr=v['ferm_da_arr'],
+								cod_corsa=v['cod_corsa'],
+								geom_ric=None,
+								dist_ric=None,
+								id_percorso_dec=None,
+							).save()
+					except:
+						logging.error('Errore logging veicolo errato: %s' % traceback.format_exc())
+
+		print "Interrogazione CITIES completata. %d in percorso, %d fuori percorso, %d altro percorso, %d filtrati" % (in_percorso, fuori_percorso, altro_percorso, filtrati)
+
+		# pprint(per_tipo[(False, True)])
+
+		print "%d ok, %d fuori percorso, %d filtrati, %d fuori e filtrati" % (
+			len(per_tipo[(False, False)]),
+			len(per_tipo[(True, False)]),
+			len(per_tipo[(False, True)]),
+			len(per_tipo[(True, True)]),
+		)
 
 	def costruisci_percorso_intersezione(self, id_percorso_1, id_percorso_2, id_percorso, id_linea, tipo, descrizione):
-		p1 = self.percorsi[id_percorso_1]
-		p2 = self.percorsi[id_percorso_2]
-		pal1 = p1.get_paline()
-		paline1 = set(pal1)
-		paline2 = set(p2.get_paline())
-		paline = paline1.intersection(paline2)
-		p = self.add_percorso(id_percorso, id_linea, tipo, descrizione, False, p1.gestore)
-		n = 0
-		old_f = None
-		for pa in pal1:
-			if pa in paline:
-				n += 1
-				f = str(id_percorso) + str(n)
-				self.add_fermata(f, pa.id_palina, id_percorso)
-				if old_f is not None:
-					self.add_tratto_percorso(id_percorso, old_f, f)
-				old_f = f
-		self.add_capolinea(id_percorso, pa.id_palina)
-		# Frequenze
-		for giorno_settimana in range(0, 7):
-			for ora_inizio in range(0, 24):
-				f1, oi1, of1 = p1.frequenza[giorno_settimana][ora_inizio]
-				f2, oi2, of2 = p2.frequenza[giorno_settimana][ora_inizio]
-				if f1 <= 0:
-					f = f2
-				elif f2 <= 0:
-					f = f1
-				else:
-					f = (1 / (1 / f1 + 1 / f2))
-				if oi1 == -1:
-					oi = oi2
-				elif oi2 == -1:
-					oi = oi1
-				else:
-					oi = min(oi1, oi2)
-				if of1 == -1:
-					of = of2
-				elif of2 == -1:
-					of = of1
-				else:
-					of = max(of1, of2)
-				p.frequenza[giorno_settimana][ora_inizio] = (f, oi, of)
-		linee = [id_linea, p1.id_linea, p2.id_linea]
-		for l in linee:
-			self.linee_equivalenti[l] = linee
+		try:
+			p1 = self.percorsi[id_percorso_1]
+			p2 = self.percorsi[id_percorso_2]
+			pal1 = p1.get_paline()
+			paline1 = set(pal1)
+			paline2 = set(p2.get_paline())
+			paline = paline1.intersection(paline2)
+			p = self.add_percorso(id_percorso, id_linea, tipo, descrizione, False, p1.gestore)
+			n = 0
+			old_f = None
+			for pa in pal1:
+				if pa in paline:
+					n += 1
+					f = str(id_percorso) + str(n)
+					self.add_fermata(f, pa.id_palina, id_percorso)
+					if old_f is not None:
+						self.add_tratto_percorso(id_percorso, old_f, f)
+					old_f = f
+			self.add_capolinea(id_percorso, pa.id_palina)
+			# Frequenze
+			for giorno_settimana in range(0, 7):
+				for ora_inizio in range(0, 24):
+					f1, oi1, of1 = p1.frequenza[giorno_settimana][ora_inizio]
+					f2, oi2, of2 = p2.frequenza[giorno_settimana][ora_inizio]
+					if f1 <= 0:
+						f = f2
+					elif f2 <= 0:
+						f = f1
+					else:
+						f = (1 / (1 / f1 + 1 / f2))
+					if oi1 == -1:
+						oi = oi2
+					elif oi2 == -1:
+						oi = oi1
+					else:
+						oi = min(oi1, oi2)
+					if of1 == -1:
+						of = of2
+					elif of2 == -1:
+						of = of1
+					else:
+						of = max(of1, of2)
+					p.frequenza[giorno_settimana][ora_inizio] = (f, oi, of)
+			linee = [id_linea, p1.id_linea, p2.id_linea]
+			for l in linee:
+				self.linee_equivalenti[l] = linee
+		except:
+			m = "Errore nella costruzione del percorso intersezione: %s" % traceback.format_exc()
+			logging.error(m)
+			print m
 
 
 	def costruisci_indice_periodi_aggregazione(self):
@@ -1545,9 +2038,13 @@ class Rete(object):
 			n += 1
 
 
-	def carica(self, retina=False, versione=None):
+	def carica(self, retina=False, versione=None, rete_base=None):
 		"""
 		Genera e restituisce una rete a partire dal database
+
+		bool retina: se True, carica una versione ridotta della rete a scopo di test
+		datetime versione: se definita, timestamp dell'inizio di validità della versione
+		Rete rete_base: se definita, rete (precedente) da cui copiare la geometria degli oggetti non modificati nella nuova rete
 		"""
 		if versione is None:
 			inizio_validita = datetime2compact(VersionePaline.attuale().inizio_validita)
@@ -1568,6 +2065,8 @@ class Rete(object):
 				self.percorsi[p['id']].deserializza(p)
 			for p in res['tratti_percorsi']:
 				self.tratti_percorsi[p['id']].deserializza(p)
+			for id_percorso in self.percorsi:
+				self.percorsi[id_percorso].set_punti()
 			self.velocita_medie = res['velocita_medie']
 			self.indice_stat_periodi_aggregazione = res['indice_stat_periodi_aggregazione']
 			f.close()
@@ -1614,6 +2113,26 @@ class Rete(object):
 				for f in fs:
 					percorso_rete.frequenza[f.giorno_settimana][f.ora_inizio] = (f.frequenza, f.da_minuto, f.a_minuto)
 			print "Carico coordinate paline"
+			if rete_base is not None:
+				print "Trasferimento da vecchia rete"
+				for id_palina in rete_base.paline:
+					try:
+						pold = rete_base.paline[id_palina]
+						pnew = r.paline[id_palina]
+						pnew.x, pnew.y = pold.x, pold.y
+					except:
+						print "Trasferimento non possibile per palina ", id_palina
+				for id_tratto in rete_base.tratti_percorsi:
+					try:
+						told = rete_base.tratti_percorsi[id_tratto]
+						tnew = r.tratti_percorsi[id_tratto]
+						tnew.set_punti(told.punti)
+						tnew.set_dist(told.dist)
+						tnew.sposta_paline_su_percorso()
+					except:
+						print "Trasferimento non possibile per tratto ", id_tratto
+						traceback.print_exc()
+				print "Nuove coordinate"
 			path_shp = os.path.join(path_rete, 'shp')
 			sf = shapefile.Reader(os.path.join(path_shp, 'Fermate_Percorsi.shp'))
 			rs = sf.shapeRecords()
@@ -1640,6 +2159,8 @@ class Rete(object):
 				except Exception:
 					pass
 					#print id_palina
+			for id_percorso in self.percorsi:
+				self.percorsi[id_percorso].set_punti()
 			print "Carico statistiche"
 			self.costruisci_indice_periodi_aggregazione()
 			self.carica_stat_percorrenze_archi()
@@ -1655,6 +2176,9 @@ class Rete(object):
 				'indice_stat_periodi_aggregazione': self.indice_stat_periodi_aggregazione,
 			}, 2))
 			f.close()
+		print "Elaboro mapping fermate soppresse"
+		for id_percorso in self.percorsi:
+			self.percorsi[id_percorso].init_mapping_fermate_non_soppresse()
 		print "Carico ZTL"
 		today = date.today()
 		zs = orari_per_ztl(today, today + timedelta(days=settings.CPD_GIORNI_LOOKAHEAD))
@@ -1856,107 +2380,22 @@ class Rete(object):
 
 
 
-class AggiornatoreCarichi(Thread):
-	def __init__(self, rete, queue, calcola_percorrenze, logging, aggiorna_arrivi=True):
-		Thread.__init__(self)
-		self.rete = rete
-		self.queue = queue
-		self.calcola_percorrenze = calcola_percorrenze
-		self.logging = logging
-		self.aggiorna_arrivi = aggiorna_arrivi
-		self.quit_request = False
-
-	def run(self):
-		print "Aggiornatore carichi, inizio thread", str(self)
-		try:
-			while not self.quit_request:
-				p, tentativi_rimasti = self.queue.get_nowait()
-				try:
-					p.aggiorna_arrivi(self.calcola_percorrenze, aggiorna_fv=self.calcola_percorrenze)
-					if self.logging:
-						p.log_arrivi()
-					p.propaga_arrivi_indietro()
-					self.rete.qualita_atac.risposta_ok()
-					self.rete.qualita_atac.percorso_ok()
-				except Exception, e:
-					self.rete.qualita_atac.risposta_ko()
-					if tentativi_rimasti > 1:
-						self.queue.put((p, tentativi_rimasti - 1))
-					else:
-						self.rete.qualita_atac.percorso_ko()
-					logging.error(traceback.format_exc())
-		except Queue.Empty:
-			pass
-		except Exception, e:
-			logging.error(traceback.format_exc())
-		print "Aggiornatore carichi, fine thread", str(self)
-
-	def quit(self):
-		self.quit_request = True
-
-
-
-class AggiornatoreUploadFCD(Thread):
-	"""
-	Caricatore degli FVD su servizio esterno.
-	"""
-	def __init__(self, rete, intervallo):
-		Thread.__init__(self)
-		self.rete = rete
-		self.intervallo = intervallo
-		self.ultimo_aggiornamento = None
-		self.stopped = False
-
-	def stop(self):
-		self.stopped = True
-
-	def run(self):
-		transport = UrllibTransport({
-			'http': 'http://192.168.90.44:80/',
-		})
-
-		s = xmlrpclib.ServerProxy('http://193.204.166.15:8000/', transport=transport)
-
-		while not self.stopped:
-			if self.ultimo_aggiornamento is not None:
-				t1 = self.ultimo_aggiornamento + self.intervallo
-				t2 =  datetime.now()
-				diff = (max(t1, t2) - min(t1, t2)).seconds
-				if diff > 0:
-					sleep(diff)
-			aggiornamento_precedente = self.ultimo_aggiornamento
-			self.ultimo_aggiornamento = datetime.now()
-			try:
-				out = []
-				for id_percorso in self.rete.percorsi:
-					p = self.rete.percorsi[id_percorso]
-					out.extend(p.campioni_fvd(aggiornamento_precedente))
-
-				# pprint(out)
-				s.add('rsmtoken', out)
-
-			except Exception, e:
-				logging.error(traceback.format_exc())
-		print "Stoppato"
-
-
-
 class Aggiornatore(Thread):
 	"""
-	Aggiornatore dinamico della rete. Calcola i dati interrogando le paline.
+	Aggiornatore dinamico della rete Atac..
 	"""
-	def __init__(self, rete, intervallo, num_threads=3, cicli_calcolo_percorrenze=4, cicli_logging=24, aggiorna_arrivi=True):
+	def __init__(self, rete, intervallo, cicli_calcolo_percorrenze=4, cicli_logging=24, aggiorna_arrivi=True, gtfs_rt_handler=None):
 		Thread.__init__(self)
 		self.rete = rete
 		self.intervallo = intervallo
 		self.ultimo_aggiornamento = None
-		self.num_threads = num_threads
 		self.stopped = False
 		self.cicli_calcolo_percorrenze = cicli_calcolo_percorrenze
 		self.ciclo_calcolo_percorrenze = 0
 		self.cicli_logging = cicli_logging
 		self.ciclo_logging = 0
 		self.aggiorna_arrivi = aggiorna_arrivi
+		self.gtfs_rt_handler = gtfs_rt_handler
 		self.mercury = Mercury(settings.MERCURY_GIANO)
 
 	def stop(self):
@@ -1975,12 +2414,55 @@ class Aggiornatore(Thread):
 				print "Inizio aggiornamento arrivi"
 				self.ciclo_calcolo_percorrenze = (self.ciclo_calcolo_percorrenze + 1) % self.cicli_calcolo_percorrenze
 				self.ciclo_logging = (self.ciclo_logging + 1) % self.cicli_logging
-				self.rete.aggiorna_arrivi(self.num_threads, self.ciclo_calcolo_percorrenze == 0, self.ciclo_logging == 0, aggiorna_arrivi=self.aggiorna_arrivi)
+				aggiorna_percorrenze = self.ciclo_calcolo_percorrenze == 0
+				self.rete.aggiorna_arrivi(self.ciclo_calcolo_percorrenze == 0, self.ciclo_logging == 0, aggiorna_arrivi=self.aggiorna_arrivi)
 				print "Fine aggiornamento arrivi, serializzazione"
-				self.mercury.async_all('deserializza_dinamico', self.rete.serializza_dinamico(), replace=True)
+				self.mercury.async_all_stored('deserializza_dinamico_veicoli_stored', self.rete.serializza_dinamico_veicoli(aggiorna_percorrenze))
 				print "Serializzazione completata"
+				if self.gtfs_rt_handler is not None:
+					print "Generazione GTFS Real Time"
+					g = self.rete.genera_gtfs_rt()
+					print "Attivazione GTFS Real Time"
+					self.gtfs_rt_handler(g)
+					print "GTFS Real Time generato e attivato"
 			except Exception, e:
 				logging.error(traceback.format_exc())
+		print "Stoppato"
+
+
+class AggiornatorePercorsiAtac(Thread):
+	"""
+	Aggiornatore dinamico dei percorsi Atac. Calcola i dati interrogando i capilinea.
+	"""
+
+	def __init__(self, rete, intervallo=timedelta(seconds=60)):
+		Thread.__init__(self)
+		self.rete = rete
+		self.intervallo = intervallo
+		self.ultimo_aggiornamento = None
+		self.stopped = False
+		self.mercury = Mercury(settings.MERCURY_GIANO_PERCORSI)
+
+	def stop(self):
+		self.stopped = True
+
+	def run(self):
+		while not self.stopped:
+			if self.ultimo_aggiornamento is not None:
+				t1 = self.ultimo_aggiornamento + self.intervallo
+				t2 = datetime.now()
+				if t1 > t2:
+					diff = (t1 - t2).seconds
+					sleep(diff)
+			self.ultimo_aggiornamento = datetime.now()
+			try:
+				cities.percorsi_veicoli_multithread(self.rete)
+				ser = self.rete.serializza_dinamico_veicoli(percorrenze=False, veicoli=False, percorsi_veicoli_atac=True)
+				self.mercury.async_all('deserializza_dinamico_veicoli', ser)
+
+			except Exception, e:
+				print "Errore nell'aggiornamento percorsi Atac:"
+				traceback.print_exc()
 		print "Stoppato"
 
 
@@ -2405,6 +2887,9 @@ class ArcoPercorrenzaTeletrasporto(ArcoPercorrenzaBus):
 	def __init__(self, nodo_fermata_s, nodo_fermata_t):
 		Arco.__init__(self, nodo_fermata_s, nodo_fermata_t, (99, nodo_fermata_s.rete_fermata.id_fermata, nodo_fermata_t.rete_fermata.id_fermata))
 
+	def get_coordinate(self):
+		return self.s.get_coordinate() + self.t.get_coordinate()
+
 
 	def get_tempo(self, t, opz):
 		if not opz['teletrasporto']:
@@ -2785,7 +3270,7 @@ def carica_rete_su_grafo(r, g, retina=False, versione=None):
 		inizio_validita = datetime2compact(versione)
 	path_rete = os.path.join(settings.TROVALINEA_PATH_RETE, inizio_validita)
 	geocoding_file = os.path.join(path_rete, 'archi_geocoding%s.v3.dat' % ('_mini' if retina else ''))
-	r.geocoder = geocoder.Geocoder(g, 12) # 12 e' il tipo degli archi stradali
+	r.geocoder = geocoder.Geocoder(g, 12, caching_id='mini' if retina else 'full') # 12 e' il tipo degli archi stradali
 	gc = r.geocoder
 	try:
 		g.deserialize(geocoding_file)
@@ -2807,7 +3292,7 @@ def carica_rete_su_grafo(r, g, retina=False, versione=None):
 					g.add_arco(a)
 		g.serialize(geocoding_file, [geocoder.ArcoGeocoder], [geocoder.NodoGeocoder])
 
-	if not retina:
+	if True: #not retina:
 		# Nodi luogo e connessione
 		print "Aggiungo e collego nodi luogo"
 		for risorsa in risorse.modelli_risorse:
@@ -2836,16 +3321,18 @@ def carica_rete_su_grafo(r, g, retina=False, versione=None):
 	fn = os.path.join(path_rete, 'rete', 'fr.txt')
 	carica_orari_fr_da_file(r, g, fn)
 
+	gc.serialize_cache()
 	db.reset_queries()
 
 
 
-def carica_rete_e_grafo(retina=False, versione=None):
+def carica_rete_e_grafo(retina=False, versione=None, rete_base=None):
 	rete = Rete()
-	rete.carica(retina, versione)
+	rete.carica(retina, versione, rete_base=rete_base)
 	g = Grafo()
 	registra_classi_grafo(g)
 	g.deserialize(os.path.join(settings.TROVALINEA_PATH_RETE, '%s%s.v3.dat' % (settings.GRAPH, '_mini' if retina else '')))
+	#tomtom.load_from_shp(g, 'C:\\Users\\allulll\\Desktop\\grafo\\cpd\\RM_nw%s'  % ('_mini' if retina else ''))
 	carica_rete_su_grafo(rete, g, retina, versione)
 	return (rete, g)
 
@@ -2855,7 +3342,7 @@ def calcola_frequenze_giorno(giorno, giorno_settimana, percorsi_da_rete=True):
 		FrequenzaPercorso.objects.filter(giorno_settimana=giorno_settimana).delete()
 		giorno_succ = giorno + timedelta(days=1)
 		if percorsi_da_rete:
-			ps = Percorso.objects.by_date(giorno).all()
+			ps = Percorso.objects.by_date(date2datetime(giorno) + timedelta(hours=7)).all()
 			id_percorsi = [p.id_percorso for p in ps]
 		else:
 			pcs = PartenzeCapilinea.objects.filter(orario_partenza__gte=giorno, orario_partenza__lt=giorno_succ).distinct('id_percorso')
@@ -3109,7 +3596,7 @@ def carica_orari_fr_da_file(r, g, filename):
 	f = open(filename, 'r')
 	for l in f:
 		a = l.split("\t")
-		if len(a) > 4 and (a[4].startswith('FR') or a[4].startswith('FL')):
+		if len(a) > 4 and (a[4].startswith('LE') or a[4].startswith('FL')):
 			id_percorso = a[5]
 			validita = a[0]
 			day = None
@@ -3294,6 +3781,98 @@ class QualitaAtac(Qualita):
 	def risposta_ko(self):
 		self.qnew.risposte_totali += 1
 
+def analizza_consistenza_rete(rete, correggi=False):
+	for id_fermata in rete.fermate:
+		f = rete.fermate[id_fermata]
+		id_palina = f.rete_palina.id_palina
+		id_percorso = f.rete_percorso.id_percorso
+		elimina = []
+		out = []
+		for a in f.arrivi:
+			try:
+				id_veicolo = a['id_veicolo']
+				v = rete.veicoli[id_veicolo]
+			except:
+				print id_palina, id_percorso, id_veicolo, 'Veicolo non riconosciuto'
+				out.append((id_palina, id_percorso, id_veicolo, 'Veicolo non riconosciuto'))
+				elimina.append(a)
+				break
+			if v.tratto_percorso.rete_percorso.id_percorso != id_percorso:
+				print id_palina, id_percorso, id_veicolo, 'Veicolo sul percorso %s' % v.tratto_percorso.rete_percorso.id_percorso
+				out.append((id_palina, id_percorso, id_veicolo, 'Veicolo sul percorso %s' % v.tratto_percorso.rete_percorso.id_percorso))
+				elimina.append(a)
+		if correggi:
+			for a in elimina:
+				f.arrivi.remove(a)
+	return out
+
+associazione_percorsi_cities = {}
+
+def percosi_cities_init():
+	if percorsi_cities_data[0] is None or percorsi_cities_data[0] != date.today():
+		percorsi_cities_data[0] = date.today()
+		percorsi_cities.clear()
+		pcs = LogPercorsoCities.objects.filter(data=date.today())
+		for pc in pcs:
+			percorsi_cities[pc.id_percorso] = [pc.riconosciuto, pc.conteggio]
+	pas = PercorsoAtac.objects.all()
+	for pa in pas:
+		associazione_percorsi_cities[pa.id_percorso_atac] = pa.percorso.id_percorso
+
+def log_percorso_cities(id_percorso, id_linea, riconosciuto):
+	if not id_percorso in percorsi_cities:
+		percorsi_cities[id_percorso] = [riconosciuto, 1]
+		LogPercorsoCities(
+			data=percorsi_cities_data[0],
+			id_percorso=id_percorso,
+			id_linea=id_linea,
+			riconosciuto=riconosciuto,
+			conteggio=1,
+		).save()
+	else:
+		percorsi_cities[id_percorso][1] += 1
+
+def percorsi_cities_sincronizza():
+	for id_percorso in percorsi_cities:
+		riconosciuto, conteggio = percorsi_cities[id_percorso]
+		ps = LogPercorsoCities.objects.filter(data=percorsi_cities_data[0], id_percorso=id_percorso)
+		if len(ps) > 0:
+			for p in ps[1:]:
+				p.delete()
+			p = p[0]
+			p.conteggio = conteggio
+			p.save()
 
 
+def grafo2shape(g, path, filename):
+	"""
+	Esporta il grafo g come shapefile
 
+	path: cartella nella quale creare gli shapefile
+	Il nome degli shapefile ha lo schema seguente:
+	LINEA_PERCORSO_percorso.shp/dbf/...
+	LINEA_PERCORSO_fermate.shp/dbf/...
+	"""
+	base_file_name = "grafo"
+	with geomath.zipped_shapefile(shapefile.POLYLINE, path, filename, gbfe=True) as shp_p:
+		shp_p.autoBalance = 1
+		shp_p.field('EID', 'C', '80')
+		shp_p.field('ID_S', 'C', '80')
+		shp_p.field('ID_T', 'C', '80')
+		shp_p.field('DESC', 'C', '80')
+		for eid in g.archi:
+			e = g.archi[eid]
+			if e.id[0] == 12:
+				line = e.get_coordinate()
+				desc = ""
+				if e.id[0] != 12:
+					print eid, line
+				else:
+					desc = e.get_nome().encode('iso-8859-1')
+				shp_p.line(parts=[line])
+				shp_p.record(
+					EID=str(e.id),
+					ID_S=str(e.s.id),
+					ID_T=str(e.t.id),
+					DESC=desc,
+				)

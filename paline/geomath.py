@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013-2014 Roma servizi per la mobilità srl
+#    Copyright 2013-2016 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -22,6 +22,10 @@
 from math import *
 import pyproj
 import math
+import os, os.path, shutil
+from servizi.utils import make_temp_directory
+from contextlib import contextmanager
+import shapefile
 
 # Promemoria coordinate usate da:
 # Nostro grafo: gbfe
@@ -31,6 +35,7 @@ import math
 # osm: wgs84
 # mapstraction: wgs84
 
+
 gbfe = pyproj.Proj("+proj=tmerc +lat_0=0 +lon_0=15 +k=0.9996 +x_0=2520000 +y_0=0 +ellps=intl +units=m +no_defs")
 gbfo = pyproj.Proj("+proj=tmerc +lat_0=0 +lon_0=9 +k=0.9996 +x_0=1500000 +y_0=0 +ellps=intl +units=m +no_defs")
 corr_gbfe = (-16, 78)
@@ -39,9 +44,11 @@ def gbfe_to_wgs84(x, y):
 	x, y = (x + corr_gbfe[0], y + corr_gbfe[1])
 	return gbfe(x, y, inverse=True)
 
+
 def wgs84_to_gbfe(x, y):
 	x, y = gbfe(x, y)
 	return (x - corr_gbfe[0], y - corr_gbfe[1])
+
 
 def distance_proj(lat1, lon1, lat2, lon2):
 	a = lat1 - lat2
@@ -59,6 +66,7 @@ def dot(A, B, C):
 	dot = AB[0] * BC[0] + AB[1] * BC[1]
 	return dot
 
+
 def cross(A, B, C):
 	AB = [0, 0]
 	AC = [0, 0]
@@ -69,10 +77,12 @@ def cross(A, B, C):
 	cross = AB[0] * AC[1] - AB[1] * AC[0]
 	return cross
 
+
 def distance(A, B):
 	d1 = A[0] - B[0]
 	d2 = A[1] - B[1]
 	return math.sqrt(d1*d1+d2*d2)
+
 
 def segment_point_dist(A, B, C):
 	d = distance(A,B)
@@ -87,6 +97,7 @@ def segment_point_dist(A, B, C):
 		return abs(dist)
 	else:
 		return distance(A, C)
+
 
 def azimuth_deg(p1, p2):
 	"""
@@ -108,6 +119,7 @@ def azimuth_deg(p1, p2):
 	if dx < 0 or (dx == 0 and dy < 0):
 		a += 180
 	return a
+
 
 def piede_perpendicolare(A, B, P):
 	Ax, Ay = A
@@ -159,7 +171,8 @@ class SegmentRepo(object):
 		ds = distance(e.s.get_coordinate()[0], p)
 		dt = distance(e.t.get_coordinate()[0], p)
 		return (e, e.s if ds < dt else e.t)
-	
+
+
 class ShapelySegmentRepo(object):
 	def __init__(self):
 		object.__init__(self)
@@ -196,7 +209,8 @@ class ShapelySegmentRepo(object):
 		ds = distance(e.s.get_coordinate()[0], p)
 		dt = distance(e.t.get_coordinate()[0], p)
 		return (e, e.s if ds < dt else e.t)
-	
+
+
 class Geocoder(object):
 	def __init__(self, graph, edge_type_id=None):
 		object.__init__(self)
@@ -209,4 +223,44 @@ class Geocoder(object):
 	
 	def find_nearest_edge_and_point(self, point):
 		return self.repo.find_nearest_segment(point)
-	
+
+
+def generate_prj_file(base_file_name, gbfe=False):
+	"""
+	Generate .prj file for shapefile projection
+
+	base_file_name: path and file name without extension (.prj is added by this function)
+	"""
+	with open("%s.prj" % base_file_name, "w") as prj:
+		if gbfe:
+			epsg = 'PROJCS["Monte_Mario_Italy_zone_2",GEOGCS["GCS_Monte Mario",DATUM["D_Monte_Mario",SPHEROID["International_1924",6378388,297]],PRIMEM["Greenwich",0],UNIT["Degree",0.017453292519943295]],PROJECTION["Transverse_Mercator"],PARAMETER["latitude_of_origin",0],PARAMETER["central_meridian",15],PARAMETER["scale_factor",0.9996],PARAMETER["false_easting",2520000],PARAMETER["false_northing",0],UNIT["Meter",1]]'
+		else:
+			epsg = 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433]]'
+		prj.write(epsg)
+
+
+@contextmanager
+def zipped_shapefile(type, path, base_name, gbfe=False):
+	"""
+	Generate zipped shapefile
+
+	Generates a shapefile.Writer, that can be manipulated. After the generator block, file is actually created on disk
+
+	base_name should not contain extension (neither .zip nor .shp)
+
+	Usage example:
+	with zipped_shapefile(shapefile.LINE, './roads') as shp:
+		shp.field('ID', 'C', '10')
+		shp.line(parts=[[[41, 12], [42, 13]],])
+		shp.record(ID=1)
+	"""
+	shp = shapefile.Writer(type)
+	yield shp
+	with make_temp_directory() as tmpdir:
+		base_path = os.path.join(tmpdir, base_name)
+		shp.save(base_path)
+		generate_prj_file(base_path, gbfe)
+		zipfile = shutil.make_archive(base_name, 'zip', tmpdir)
+		shutil.move(zipfile, os.path.join(path, base_name + ".zip"))
+
+

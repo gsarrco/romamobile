@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013-2014 Roma servizi per la mobilità srl
+#    Copyright 2013-2016 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -50,6 +50,21 @@ class Command(BaseCommand):
 			default=False,
 			help='riavvia anche i server con flag ready==False',
 		),
+		make_option(
+			'-r',
+			action='store_true',
+			dest='set_action_r',
+			default=False,
+			help='pone la action a R per il daemon_control, per riavviare i demoni',
+		),
+		make_option(
+			'-n',
+			action='store',
+			dest='numero_riavvii',
+			type='int',
+			default=1,
+			help='riavvia fino a n demoni, es. -n 4',
+		),
 	)
 	
 
@@ -61,6 +76,9 @@ class Command(BaseCommand):
 		for nome in args:		
 			print "Orchestro demone ", nome
 			sc = DaemonControl.objects.get(name=nome)
+			if options['set_action_r']:
+				sc.action = 'R'
+				sc.save()
 			ss_istanziati = sc.daemon_set.all()
 			if options['forza_riavvio']:
 				print "Forzo riavvio"
@@ -91,22 +109,24 @@ class Command(BaseCommand):
 			
 			if sc.action != 'F':
 				# Chiudo un eventuale server obsoleto
-				server_chiusi = 0			
+				server_chiusi = 0
+				numero_riavvi = options['numero_riavvii']
 				if len(ss_pronti) == len(ss_istanziati):
 					ss_scaduti = ss_istanziati.filter(
 						Q(active_since__lt=n - timedelta(minutes=sc.restart_timeout))
 						| Q(action='R')
 					).exclude(action='F').order_by('ready')
 					if len(ss_scaduti) > 0:
-						s = ss_scaduti[0]
-						if s.action == 'R' or sc.restart_from <= t <= sc.restart_to or not s.ready:
-							print "Chiudo il processo ", sc.name, s.pid
-							try:
-								os.kill(s.pid, signal.SIGTERM)
-							except Exception:
-								pass
-							s.delete()
-							server_chiusi = 1
+						for i in range(min(numero_riavvi, len(ss_scaduti))):
+							s = ss_scaduti[i]
+							if s.action == 'R' or sc.restart_from <= t <= sc.restart_to or not s.ready:
+								print "Chiudo il processo ", sc.name, s.pid
+								try:
+									os.kill(s.pid, signal.SIGTERM)
+								except Exception:
+									pass
+								s.delete()
+								server_chiusi += 1
 									
 				# Istanzio i server richiesti, fino a raggiungere il numero previsto
 				for i in range(max(0, sc.instances - len(ss_istanziati) + server_chiusi)):

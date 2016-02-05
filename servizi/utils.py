@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013-2014 Roma servizi per la mobilità srl
+#    Copyright 2013-2016 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -32,17 +32,19 @@ from itertools import chain
 from django.utils.translation import ugettext_lazy as _
 from django.template.response import TemplateResponse
 from django.template import Template, Context
-from django.template.loader import get_template
+from django.template.loader import get_template, render_to_string
 from django.template.defaultfilters import time as timefilter
 from django.template.loaders.app_directories import Loader as TemplateLoader
 from django.http import HttpResponseRedirect
 from django.forms.widgets import CheckboxInput
-from django.core.mail import send_mail
+from django.core.mail import send_mail, EmailMultiAlternatives
+from email.mime.image import MIMEImage
 from datetime import datetime, date, time, timedelta
 from django.db import transaction as dbtrans
 from contextlib import contextmanager
 import settings
-import os, os.path
+import os, os.path, shutil
+import tempfile
 import threading, Queue
 import cPickle as pickle
 import re
@@ -94,6 +96,9 @@ def project(obj, *attributes):
 		d[a] = attr if attr is not None else ''
 	return d
 
+def sec2min(sec):
+	return int(round(sec / 60.0))
+
 def datetime2mysql(dt):
 	return dt.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -128,6 +133,9 @@ def unmarshal_datetime(dt):
 	if dt is None:
 		return None
 	return mysql2datetime(datetime2mysql(dt))
+
+def datetime2unixtime(dt):
+	return (dt - datetime(1970, 1, 1)).total_seconds()
 
 def model2contenttype(model):
 	return contenttypes.ContentType.objects.get_for_model(model).pk
@@ -389,6 +397,39 @@ def transaction(actual=True, debug=False):
 		if actual:
 			dbtrans.commit()
 
+def _create_decorator_transaction_commit_manually(using=None):
+	def deco(f):
+		def g(*args, **kwargs):
+			try:
+				out = f(*args, **kwargs)
+			except Exception as e:
+				if using is not None:
+					dbtrans.rollback(using=using)
+				else:
+					dbtrans.rollback()
+				raise e
+			return out
+		if using is not None:
+			return dbtrans.commit_manually(using=using)(g)
+		return dbtrans.commit_manually(g)
+	return deco
+
+def transaction_commit_manually(*args, **kwargs):
+	"""
+	Improved transaction.commit_manually, that does not hide exceptions.
+
+	If an exception occurs, rollback work and raise exception again
+	"""
+	# If 'using' keyword is provided, return a decorator
+	if 'using' in kwargs:
+		return _create_decorator_transaction_commit_manually(using=kwargs['using'])
+	# If 'using' keyword is not provided, act as a decorator:
+	# first argument is function to be decorated; return modified function
+	f = args[0]
+	deco = _create_decorator_transaction_commit_manually()
+	return deco(f)
+
+
 def _multisplit_ric(ss, elems):
 	if len(elems) == 0:
 		return ss
@@ -536,6 +577,41 @@ def template_to_mail(dest, template_name, ctx, process_template=False):
 	subj = righe[1]
 	msg = "\n".join(righe[2:])
 	send_mail(subj, msg, fr, dest, fail_silently=True)
+
+
+def template_to_mail_html(dest, template_name, template_html_name, ctx, process_template=False, images=[]):
+	"""
+	Invia una mail multipart (testo + HTML) effettuando il rendering del template
+
+	La prima riga del template contiene il mittente.
+	La seconda riga contiene l'oggetto.
+	Le restanti righe contengono il corpo del messaggio.
+
+	Allega anche un messaggio HTML, con eventuali immagini.
+	Il template HTML contiene solamente il testo dell'email
+	Ogni immagine è una coppia (nome, contenuto):
+	- nome è il nome dell'immagine. Nel file HTML ci si può riferire ad esso così: <img src="cid:nome_immagine.png" />
+	- contenuto è il contenuto "secco" dell'immagine, ad esempio la stringa ottenuta leggendo il file immagine con read()
+	"""
+	if type(dest) != list:
+		dest = [dest]
+	if process_template:
+		righe = render_text_template(template_name, ctx).splitlines()
+	else:
+		t = get_template(template_name)
+		righe = t.render(Context(ctx)).splitlines()
+	fr = righe[0]
+	subj = righe[1]
+	msg = "\n".join(righe[2:])
+	msg_html = render_to_string(template_html_name, ctx)
+	m = EmailMultiAlternatives(subj, msg, fr, dest)
+	m.attach_alternative(msg_html, 'text/html')
+	for i in images:
+		img = MIMEImage(i[1])
+		img.add_header('Content-ID', '<{}>'.format(i[0]))
+		m.attach(img)
+	m.send(fail_silently=True)
+
 
 class PickledObject(str):
     """
@@ -796,7 +872,7 @@ def batch_qs(qs, batch_size=50000):
 	Yields tuples, one by one, from the queryset. The query is performed in batches.
 
 	Usage:
-			# Make sure to order your querset
+			# Make sure to order your queryset
 			article_qs = Article.objects.order_by('id')
 			for start, end, total, qs in batch_qs(article_qs):
 					print "Now processing %s - %s of %s" % (start + 1, end, total)
@@ -870,3 +946,19 @@ def cache_method(timeout_sec):
 			return f(*args, **kwargs)
 		return g
 	return decorator
+
+
+def dictfetchall(cursor):
+	"Returns all rows from a cursor as a dict"
+	desc = cursor.description
+	return [
+		dict(zip([col[0] for col in desc], row))
+		for row in cursor.fetchall()
+	]
+
+
+@contextmanager
+def make_temp_directory():
+	temp_dir = tempfile.mkdtemp()
+	yield temp_dir
+	shutil.rmtree(temp_dir)

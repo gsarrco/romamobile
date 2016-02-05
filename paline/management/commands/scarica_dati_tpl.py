@@ -27,5 +27,5 @@ class Command(BaseCommand):
 		print "\n\n4 di 5: Download rete"
 		scarica_rete()
 		print "\n\n5 di 5: Aggiornamento rete nel database"
-		carica_rete()
+		carica_rete(no_validate=True)
 

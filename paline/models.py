@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013-2014 Roma servizi per la mobilità srl
+#    Copyright 2013-2016 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -20,6 +20,8 @@
 #
 
 from django.db import models, connections
+from django.contrib.gis.db import models as gismodels
+from django.contrib.gis.geos import Point, GEOSGeometry
 import urllib2
 import re
 import time
@@ -48,6 +50,7 @@ import base64
 from paline.geomath import gbfe_to_wgs84
 from mercury.models import Mercury
 from gis.models import Polilinea
+import zlib
 
 ABILITA_CACHING = True
 INTERVALLO_IN_ARRIVO = 90 # secondi
@@ -55,6 +58,18 @@ INTERVALLO_IN_ARRIVO = 90 # secondi
 TIPI_LINEA_INFOTP = ['BU', 'TR']
 TIPI_LINEA_FERRO = ['ME', 'FR', 'FC']
 GESTORI_INFOTP = ['ATAC']
+
+web_mercury = [None, None]
+
+def get_web_cl_mercury():
+	if web_mercury[0] is None:
+		web_mercury[0] = Mercury(settings.MERCURY_WEB_CL, persistent_connection=True)
+	return web_mercury[0]
+
+def get_web_cpd_mercury():
+	if web_mercury[1] is None:
+		web_mercury[1] = Mercury(settings.MERCURY_WEB, persistent_connection=True)
+	return web_mercury[1]
 
 # istanziazione versioning paline
 class VersionePaline(VersioneVersioning):
@@ -400,9 +415,9 @@ class Palina(VersionatoPaline, Disabilitabile):
 			ret['id_news'] = self.id_news_disabilitazione_complessivo()
 		if lineas is not None:
 			ret['linea'] = ",".join(lineas)
-		ret['collocazione'] = self.descrizione			
-		c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB)
-		v = pickle.loads(c.root.tempi_attesa(self.id_palina))
+		ret['collocazione'] = self.descrizione
+		merc = get_web_cl_mercury()
+		v = merc.sync_any('tempi_attesa_ap', {'id_palina': self.id_palina})
 		veicoli = []
 		for el in v:
 			el2 = {}
@@ -703,8 +718,8 @@ class Percorso(VersionatoPaline, Disabilitabile):
 	
 	def get_veicoli(self, get_arrivi, id_veicolo=None):
 		fermate = Fermata.objects.by_date().filter(percorso=self).order_by('progressiva')
-		c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB)
-		vs = pickle.loads(c.root.veicoli_percorso(self.id_percorso, get_arrivi))
+		merc = get_web_cl_mercury()
+		vs = merc.sync_any('veicoli_percorso_ap', {'id_percorso': self.id_percorso, 'get_arrivi': get_arrivi})
 		out = []
 		for v in vs:
 			if id_veicolo is None or v['id_veicolo'] == id_veicolo:
@@ -719,9 +734,10 @@ class Percorso(VersionatoPaline, Disabilitabile):
 					infobox = '<p><b>Veicolo %s</b></p><p>' % v['id_veicolo']
 					arrivi = v['arrivi']
 					for f in fermate:
-						if f.palina.id_palina in arrivi:
-							orario = arrivi[f.palina.id_palina] 
-							infobox += '<b>%s:</b> %s<br/>' % (orario.strftime("%H:%M"), f.palina.nome_ricapitalizzato())
+						pal = f.palina
+						if not pal.soppressa and pal.id_palina in arrivi:
+							orario = arrivi[pal.id_palina]
+							infobox += '<b>%s:</b> %s<br/>' % (orario.strftime("%H:%M"), pal.nome_ricapitalizzato())
 					infobox += '</p>'
 					el['infobox'] = infobox
 				out.append(el)
@@ -745,9 +761,33 @@ class Percorso(VersionatoPaline, Disabilitabile):
 		return a
 
 
+class PercorsoAtac(VersionatoPaline):
+	"""
+	Sometimes Atac routes have different ID's than RSM
+	"""
+	percorso = models.ForeignKey(Percorso)
+	id_percorso_atac = models.CharField(max_length=10, db_index=True)
+
+	@classmethod
+	def lookup(cls, id_percorso):
+		"""
+		Lookup for route id as an Atac id. If id is not found, look up in RSM routes.
+
+		Return route (instance of Percorso), or None
+		"""
+		pas = cls.objects.by_date().filter(id_percorso_atac=id_percorso)
+		if len(pas) == 1:
+			return pas[0].percorso
+		ps = Percorso.objects.by_date().filter(id_percorso=id_percorso)
+		if len(ps) == 1:
+			return ps[0]
+		return None
+
+
 def get_primi_arrivi(paline):
 	ids = [p.id_palina for p in paline]
-	arrivi_raw = Mercury.sync_any_static(settings.MERCURY_WEB, 'primi_arrivi_per_paline', {'id_paline': ids})
+	merc = get_web_cl_mercury()
+	arrivi_raw = merc.sync_any('primi_arrivi_per_paline', {'id_paline': ids})
 	out = {}
 	for palina in paline:
 		fermate = Fermata.objects.by_date().filter(palina=palina)
@@ -830,6 +870,17 @@ def get_primi_arrivi(paline):
 	return out
 
 
+class ReteDinamicaSerializzata(models.Model):
+	ultimo_aggiornamento = models.DateTimeField()
+	_rete = models.TextField(db_column='rete')
+
+	def set_rete(self, data):
+		self._rete = base64.encodestring(zlib.compress(pickle.dumps(data)))
+
+	def get_rete(self):
+		return pickle.loads(zlib.decompress(base64.decodestring(self._rete)))
+
+	rete = property(get_rete, set_rete)
 
 
 def _converti_dotazioni_bordo(x, dotaz):
@@ -1111,7 +1162,7 @@ class FrequenzaPercorso(models.Model):
 		return -1
 	
 class PartenzeCapilinea(models.Model):
-	id_percorso = models.CharField(max_length=30, db_index=True)
+	id_percorso = models.CharField(db_index=True, max_length=30, primary_key=True)
 	orario_partenza = models.DateTimeField(db_index=True)
 		
 	class Meta:
@@ -1148,7 +1199,7 @@ class ArcoRimosso(models.Model):
 	
 	class Meta:
 		verbose_name_plural = "Archi rimossi"
-		
+
 
 	
 class LogTempoArco(models.Model):
@@ -1158,7 +1209,8 @@ class LogTempoArco(models.Model):
 	ora = models.TimeField(db_index=True)
 	tempo = models.FloatField() # In effetti è una velocità
 	peso = models.FloatField(default=1.0)
-	
+
+
 class LogTempoArcoAggr(models.Model):
 	id_palina_s = models.CharField(db_index=True, max_length=20)
 	id_palina_t = models.CharField(db_index=True, max_length=20)
@@ -1166,19 +1218,138 @@ class LogTempoArcoAggr(models.Model):
 	ora = models.IntegerField(db_index=True)
 	tempo = models.FloatField()
 	peso = models.FloatField(default=1.0)
-	
+
+
 class LogTempoAttesaPercorso(models.Model):
 	id_percorso = models.CharField(db_index=True, max_length=30)
 	data = models.DateField(db_index=True)
 	ora = models.TimeField(db_index=True)
 	tempo = models.FloatField()
-	
+
+
 class LogTempoAttesaPercorsoAggr(models.Model):
 	id_percorso = models.CharField(db_index=True, max_length=30)
 	data = models.DateField(db_index=True)
 	ora = models.IntegerField(db_index=True)
 	tempo = models.FloatField()
-	
+
+
+class LogPosizioneVeicolo(models.Model):
+	id_percorso = models.CharField(db_index=True, max_length=30)
+	id_veicolo = models.CharField(db_index=True, max_length=10)
+	orario = models.DateTimeField(db_index=True)
+	distanza_capolinea = models.FloatField()
+	lon = models.FloatField()
+	lat = models.FloatField()
+	sistema = models.CharField(max_length=31, null=True, blank=True, default=None)
+
+class LogPercorsoCities(models.Model):
+	data = models.DateField(db_index=True)
+	id_percorso = models.CharField(max_length=30, db_index=True)
+	id_linea = models.CharField(max_length=30)
+	riconosciuto = models.BooleanField()
+	conteggio = models.IntegerField()
+
+class LogCitiesLineaPreservata(models.Model):
+	id_linea = models.CharField(max_length=12)
+
+	def __unicode__(self):
+		return self.id_linea
+
+	class Meta:
+		verbose_name_plural = 'Log cities linee preservate'
+
+class LogCities(gismodels.Model):
+	data_ora_ric = models.DateTimeField(db_index=True)
+	num_soc = models.CharField(max_length=10, db_index=True)
+	geom = gismodels.PointField(srid=3004, null=True, blank=True, db_index=True)
+	lat = models.FloatField(null=True, blank=True)
+	long = models.FloatField(null=True, blank=True)
+	linea = models.CharField(max_length=12, db_index=True)
+	dest = models.CharField(max_length=100)
+	cod_perc = models.CharField(max_length=10, db_index=True)
+	cod_perc_alt = models.CharField(max_length=10)
+	prog_ferm = models.IntegerField()
+	dist_da_ferm = models.IntegerField()
+	ferm_da_arr = models.IntegerField()
+	cod_corsa = models.CharField(max_length=20, db_index=True, null=True, blank=True)
+	geom_ric = gismodels.PointField(srid=3004, null=True, blank=True, db_index=True)
+	dist_ric = models.FloatField(null=True, blank=True, default=None)
+	id_percorso_dec = models.CharField(max_length=10, db_index=True, null=True, blank=True)
+
+	objects = gismodels.GeoManager()
+	database_name = 'gis'
+
+class LogCitiesTr(gismodels.Model):
+	data_ora_ric = models.DateTimeField(db_index=True)
+	num_soc = models.CharField(max_length=10, db_index=True)
+	geom = gismodels.PointField(srid=3004, null=True, blank=True, db_index=True)
+	lat = models.FloatField(null=True, blank=True)
+	long = models.FloatField(null=True, blank=True)
+	linea = models.CharField(max_length=12, db_index=True)
+	dest = models.CharField(max_length=40)
+	cod_perc = models.CharField(max_length=10, db_index=True)
+	cod_perc_alt = models.CharField(max_length=10)
+	prog_ferm = models.IntegerField()
+	dist_da_ferm = models.IntegerField()
+	ferm_da_arr = models.IntegerField()
+	cod_corsa = models.CharField(max_length=20, db_index=True)
+	geom_ric = gismodels.PointField(srid=3004, null=True, blank=True, db_index=True)
+	dist_ric = models.FloatField(null=True, blank=True, default=None)
+	id_percorso_dec = models.CharField(max_length=10, db_index=True, null=True, blank=True)
+	recency = models.IntegerField(db_index=True, default=0)
+
+	objects = gismodels.GeoManager()
+	database_name = 'gis'
+
+
+percorsi_cities = {}
+percorsi_cities_data = [None]
+
+class LogChiamataCities(models.Model):
+	orario = models.DateTimeField(db_index=True)
+	successo = models.BooleanField()
+	errore = models.CharField(max_length=2047, blank=True, default='')
+
+class PercorsiLogPosizioneVeicolo(models.Model):
+	id_percorso = models.CharField(db_index=True, max_length=30)
+
+class LogRomaTpl(models.Model):
+	id_vettura = models.CharField(max_length=5, db_index=True)
+	num_tel = models.CharField(max_length=15)
+	tipo_mess = models.CharField(max_length=3)
+	tipo_evento = models.CharField(max_length=2)
+	dataora = models.DateTimeField(db_index=True)
+	tipo_fix = models.CharField(max_length=1)
+	lat = models.FloatField()
+	lon = models.FloatField()
+	progressivo_msg = models.IntegerField()
+	msg_da_ultimo_zn = models.IntegerField()
+	reason = models.IntegerField()
+	dataorazn = models.DateTimeField()
+	latzn = models.FloatField()
+	lonzn = models.FloatField()
+	id_percorso = models.CharField(max_length=6)
+	prog_nodo_percorso = models.IntegerField()
+	id_fermata = models.CharField(max_length=6)
+	nsecdazn_1 = models.IntegerField()
+	metri_da_zn_1 = models.IntegerField()
+	velocita_servizio = models.IntegerField()
+	velocita_trasferimento = models.IntegerField()
+	velocita_linea = models.IntegerField()
+	numero_fermate_vl = models.IntegerField()
+	numero_passeggeri = models.IntegerField()
+	carico_passeggeri = models.IntegerField()
+	cartellino = models.CharField(max_length=6)
+	corsa = models.CharField(max_length=6)
+	id_linea_zn = models.CharField(max_length=6)
+	id_linea_attuale = models.CharField(max_length=6)
+	modalita = models.CharField(max_length=3)
+	metri_da_zn = models.IntegerField()
+	targa_percorso = models.CharField(max_length=6)
+	metri_da_reset = models.IntegerField()
+
+
 class StatPeriodoAggregazione(models.Model):
 	"""
 	Definizione dei periodi di aggregazione, per livelli

@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013-2014 Roma servizi per la mobilità srl
+#    Copyright 2013-2016 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -205,7 +205,10 @@ def get_fav(request):
 		fav.update(OrderedDict([(i.indirizzo_composito(), ('I%d' % i.pk, i.nome)) for i in IndirizzoPreferito.objects.filter(user=u)]))
 
 	rrs = RicercaRecente.by_request(request)
-	fav.update(OrderedDict([(r.ricerca, ("R%d" % r.pk, r.descrizione)) for r in rrs]))
+	for r in rrs:
+		ricerca = r.ricerca
+		if not ricerca in fav:
+			fav['ricerca'] = ("R%d" % r.pk, r.descrizione)
 
 	return fav
 
@@ -249,9 +252,9 @@ def servizi_new(request):
 	# if getdef(request.session, 'js_version', True):
 	# 	return HttpResponseRedirect('/percorso/js?hl=%s' % request.lingua.codice)
 
-	ctx = {}
+	# ctx = {}
 	servizi_pubblico = ['news', 'risorse', 'bike', 'carpooling', 'paline', 'percorso']
-	servizi_privato = ['news', 'ztl', 'bollettino', 'tempi', 'parcheggi', 'telecamere']
+	servizi_privato = ['news', 'ztl', 'bollettino', 'tempi', 'telecamere']
 	servizi_altro = ['lingua', 'contatti']
 		
 	# se lo sfondo non e' impostato, lo imposta a scuro
@@ -274,32 +277,42 @@ def servizi_new(request):
 		start_address='',
 		stop_address='',
 	)
-		
-	# Servizi da mostrare nel menu
-	ctx['servizi_pubblico'] = [s for s in ServizioLingua.objects.filter(lingua=request.lingua, servizio__servizio__nome__in=servizi_pubblico).order_by('servizio__ordine') if s.servizio.servizio.utente_abilitato(request.user)]
-	ctx['servizi_privato'] = [s for s in ServizioLingua.objects.filter(lingua=request.lingua, servizio__servizio__nome__in=servizi_privato).order_by('servizio__ordine') if s.servizio.servizio.utente_abilitato(request.user)]	
-	ctx['servizi_altro'] = [s for s in ServizioLingua.objects.filter(lingua=request.lingua, servizio__servizio__nome__in=servizi_altro).order_by('servizio__ordine') if s.servizio.servizio.utente_abilitato(request.user)]
-	
-	# News in prima pagina
-	ns = news.News.objects.filter(primo_piano=True, codice_lingua=request.lingua.codice)
-	us = []
-	for n in ns:
-		us.append({
-			'link': '/news/dettaglio/%d/%d' % (n.prima_categoria().id_categoria,  n.id_news),
-			'messaggio': n.titolo,
-		})
-	
 
 
-	# Altri messaggi (custom)
-	# us.append({
-	# 	'link': '/info/carpooling',
-	# 	'messaggio': u'Nuovo servizio Car pooling',
-	# })
+	ctx = cache.get('servizi-menu-%s' % request.lingua)
 
-	request.ctx['notifiche'].extend(us)
+	if ctx is None:
+		ctx = {}
+		# Servizi da mostrare nel menu
+		ctx['servizi_pubblico'] = [s for s in ServizioLingua.objects.filter(lingua=request.lingua, servizio__servizio__nome__in=servizi_pubblico).order_by('servizio__ordine') if s.servizio.servizio.utente_abilitato(request.user)]
+		ctx['servizi_privato'] = [s for s in ServizioLingua.objects.filter(lingua=request.lingua, servizio__servizio__nome__in=servizi_privato).order_by('servizio__ordine') if s.servizio.servizio.utente_abilitato(request.user)]
+		ctx['servizi_altro'] = [s for s in ServizioLingua.objects.filter(lingua=request.lingua, servizio__servizio__nome__in=servizi_altro).order_by('servizio__ordine') if s.servizio.servizio.utente_abilitato(request.user)]
 
-	
+		# News in prima pagina
+		ns = news.News.objects.filter(primo_piano=True, codice_lingua=request.lingua.codice)
+		us = []
+		for n in ns:
+			us.append({
+				'link': '/news/dettaglio/%d/%d' % (n.prima_categoria().id_categoria,  n.id_news),
+				'messaggio': n.titolo,
+			})
+
+		# Altri messaggi (custom)
+		# if request.lingua.codice == 'en':
+		# 	us.append({
+		# 		'link': '/info/strike-en',
+		# 		'messaggio': u'Regular public transport service on Thursday 28',
+		# 	})
+
+
+
+		request.ctx['notifiche'].extend(us)
+
+		cache.set('servizi-menu-%s' % request.lingua, ctx, 60)
+
+
+
+
 	# Percorsi salvati
 	try:
 		utente_generico = UtenteGenerico.by_request(request)

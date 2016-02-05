@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013-2014 Roma servizi per la mobilità srl
+#    Copyright 2013-2016 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -22,8 +22,7 @@
 from models import *
 from django.db import models, connections, transaction
 from django.db.models import Q
-from paline.models import IndirizzoAutocompl, ParolaIndirizzoAutocompl, PalinaPreferita
-from percorso.models import IndirizzoPreferito
+from paline.models import get_web_cpd_mercury, get_web_cl_mercury
 from autenticazione.models import TokenApp, TOKEN_APP_LENGTH
 from servizi.utils import dict_cursor, project, datetime2mysql, group_required, generate_key
 from servizi.views import get_fav, login_app_id_sito, delete_fav
@@ -38,6 +37,8 @@ import importlib
 from carpooling import models as carpooling
 session_engine = importlib.import_module(settings.SESSION_ENGINE)
 from django.contrib.auth import login, authenticate, logout, get_user
+from servizi.autocomplete import find_in_list
+from mercury.models import Mercury
 import traceback
 
 login_ws_url = 'http://login.muoversiaroma.it/Handler.ashx'
@@ -47,45 +48,17 @@ password_sito = ''
 
 @jsonrpc_method('servizi_autocompleta_indirizzo')
 def autocompleta_indirizzo(request, cerca):
-	parole = cerca.split()
-	parole.sort(key=lambda x: -len(x))
-	if len(parole) == 0:
-		return {'cerca': cerca, 'risultati': []}
-	maxlength = len(parole[0])
-	if maxlength >= 3:
-		pias = IndirizzoAutocompl.objects
+	if len(cerca) < 3:
+		return {'cerca': cerca, 'risultati': ''}
+
+	if 'favorites' in request.session:
+		fav = request.session['favorites']
 	else:
-		pias = IndirizzoAutocompl.objects.none()
-	u = request.user
-	auth = False
-	if u.is_authenticated():
-		auth = True
-		pps = PalinaPreferita.objects.filter(gruppo__user=u)
-		ips = IndirizzoPreferito.objects.filter(user=u)
+		fav = get_fav(request)
 
-	rrs = RicercaRecente.by_request(request, limit=False)
+	preferiti_list = find_in_list(cerca, fav.values())
+	pias_list = get_web_cpd_mercury().sync_any('autocomplete', {'lookup': cerca})
 
-	for p in parole:
-		# print p
-		if auth:
-			pps = pps.filter(Q(id_palina__icontains=p) | Q(nome__icontains=p))
-			ips = ips.filter(Q(indirizzo__icontains=p) | Q(nome__icontains=p))
-		rrs = rrs.filter(descrizione__icontains=p)
-		if maxlength >= 3:
-			pias = pias.filter(parolaindirizzoautocompl__parola__startswith=p.lower())
-
-	# print "Fuori dal ciclo"
-	rrs = rrs.order_by('-orario')[:RICERCHE_RECENTI_MAX_LENGTH]
-	rrs_list = [("R%d" % u.pk, u.descrizione) for u in rrs]
-	if auth:
-		pps_list = [("P%d" % u.pk, u.nome) for u in pps]
-		ips_list = [("I%d" % u.pk, u.nome) for u in ips]
-		preferiti_list = pps_list + ips_list + rrs_list
-	else:
-		preferiti_list = rrs_list
-
-	pias = pias.order_by('indirizzo')
-	pias_list = [("A%d" % u.pk, u.indirizzo) for u in pias[:10]]
 	return {'cerca': cerca, 'risultati': preferiti_list + pias_list}
 
 
@@ -218,6 +191,7 @@ def _servizi_app_init(request, session_or_token, urlparams):
 
 	# Favorites
 	fav = get_fav(request)
+	request.session['favorites'] = fav
 	fav_list = [(k, fav[k][0], fav[k][1]) for k in fav]
 	out['fav'] = fav_list
 

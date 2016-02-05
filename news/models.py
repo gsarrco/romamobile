@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013-2014 Roma servizi per la mobilità srl
+#    Copyright 2013-2016 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -20,7 +20,8 @@
 #
 
 from django.db import models
-from servizi.utils import oggetto_con_max, oggetto_con_min
+from servizi.utils import oggetto_con_max, oggetto_con_min, datetime2mysql
+import json
 
 class AssNewsCategoria(models.Model):
 	id_news = models.ForeignKey('News', db_column='id_news')
@@ -65,3 +66,34 @@ class News(models.Model):
 			return oggetto_con_max(News.objects.filter(data_pubblicazione__lt=self.data_pubblicazione, codice_lingua=self.codice_lingua, categorie=categoria), 'data_pubblicazione')
 		except News.DoesNotExist as e:
 			return None
+
+def genera_json():
+	news = []
+	ns = News.objects.all().order_by('categorie__id_categoria', '-data_pubblicazione').distinct()
+
+	for n in ns:
+		news.append({
+			'id_news': n.id_news,
+			'codice_lingua': n.codice_lingua,
+			'categorie': [c.id_categoria for c in n.categorie.all()],
+			'titolo': n.titolo,
+			'contenuto': n.contenuto,
+			'data_pubblicazione': datetime2mysql(n.data_pubblicazione),
+			'primo_piano': n.primo_piano,
+		})
+
+	cat = []
+
+	cs = Categoria.objects.all()
+	for c in cs:
+		cat.append({
+			'id_categoria': c.id_categoria,
+			'codice_lingua': c.codice_lingua,
+			'nome': c.nome,
+			'posizione': c.posizione,
+		})
+
+	return json.dumps({
+		'categorie': cat,
+		'news': news,
+	})

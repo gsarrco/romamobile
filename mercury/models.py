@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013-2014 Roma servizi per la mobilità srl
+#    Copyright 2013-2016 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -20,7 +20,7 @@
 #
 
 
-from django.db import models
+from django.db import models, reset_queries
 import rpyc
 from rpyc.utils.server import ThreadedServer
 from threading import Thread
@@ -33,6 +33,7 @@ from contextlib import contextmanager
 import os
 import random
 import settings
+import zlib as compressor
 
 """
 Esempio 1: creazione di un servizio Operazioni
@@ -76,6 +77,104 @@ config = {
 	'allow_public_attrs': True,
 	'allow_pickle': True,
 }
+
+# Stores for large messages
+class Store(object):
+	"""
+	A store object stores large data, as a mechanism to asynchronously call a remote method
+
+	This is an abstract base class. A derived class must implement the following methods:
+	- store(self, param, peer_type, method, id=None)
+	- retrieve(self, peer_type, method, id=None), return retrieved param
+
+	Moreover, mixins can implement the following methods to preprocess (encode) data:
+	- encode(self, param): encode, call inherited encoders, and return encoded param
+	- decode(self, param): call inherited decoders, decode and return decoded param
+	"""
+	def __init__(self):
+		super(Store, self).__init__()
+
+	def encode(self, param):
+		try:
+			param = super(Store, self).encode(param)
+		except:
+			pass
+		return param
+
+	def decode(self, param):
+		try:
+			param = super(Store, self).decode(param)
+		except:
+			pass
+		return param
+
+
+class PickleMixin(object):
+	def __init__(self):
+		super(PickleMixin, self).__init__()
+
+	def encode(self, param):
+		param = pickle.dumps(param, 2)
+		try:
+			param = super(PickleMixin, self).encode(param)
+		except:
+			pass
+		return param
+
+	def decode(self, param):
+		try:
+			param = super(PickleMixin, self).decode(param)
+		except:
+			pass
+		return pickle.loads(param)
+
+
+class CompressMixin(object):
+	def __init__(self):
+		super(CompressMixin, self).__init__()
+
+	def encode(self, param):
+		param = compressor.compress(param)
+		try:
+			param = super(CompressMixin, self).encode(param)
+		except:
+			pass
+		return param
+
+	def decode(self, param):
+		try:
+			param = super(PickleMixin, self).decode(param)
+		except:
+			pass
+		return compressor.decompress(param)
+
+class FileStore(PickleMixin, Store):
+	def __init__(self, path='/tmp'):
+		super(FileStore, self).__init__()
+		self.path = path
+
+	def _filename(self, peer_type, method, id):
+		if id is None:
+			id = ''
+		return os.path.join(self.path, "%s_%s_%s" % (peer_type, method, id))
+
+	def store(self, param, peer_type, method, id=None):
+		fn = self._filename(peer_type, method, id)
+		with open(fn, 'w') as f:
+			param = self.encode(param)
+			f.write(param)
+
+	def retrieve(self, peer_type, method, id=None):
+		fn = self._filename(peer_type, method, id)
+		with open(fn) as f:
+			return self.decode(f.read())
+
+class CompressedFileStore(FileStore, CompressMixin):
+	pass
+
+# default_store = CompressedFileStore(settings.MERCURY_FILE_STORE_PATH)
+default_store = FileStore(settings.MERCURY_FILE_STORE_PATH)
+
 
 # Message broker
 
@@ -286,7 +385,7 @@ class Watchdog(Thread):
 					print "Restart scheduled"
 
 class Mercury(Thread):
-	def __init__(self, type, listener=None, nworkers=3, daemon=None, watchdog_daemon=None):
+	def __init__(self, type, listener=None, nworkers=3, daemon=None, watchdog_daemon=None, persistent_connection=False):
 		Thread.__init__(self)
 		self.queue = Queue()
 		self.workers = [MercuryWorker(self) for i in range(nworkers)]
@@ -317,6 +416,11 @@ class Mercury(Thread):
 		self.watchdog = None
 		if watchdog_daemon is not None:
 			self.watchdog = MercuryWatchdog(self, watchdog_daemon)
+		self.persistent_connection = persistent_connection
+		if persistent_connection:
+			self.connection = self.restore_connection()
+		else:
+			self.connection = None
 
 		
 	# API
@@ -364,13 +468,58 @@ class Mercury(Thread):
 				'method': method,
 				'param': dumped_param,
 			})
-	
-	def sync_any(self, method, param, by_queue=False):
+
+	def async_all_stored(self, method, param, id='', store=None):
+		"""
+		Call method asyncrouly on all receivers. Return immediately
+
+		method: method name
+		param: method parameter (only one parameter is allowed)
+		replace: if True, cancel pending invocations of the same method, ad give priority of new invocations to clients
+			for which pending invocations have been cancelled
+		"""
+		if store is None:
+			store = default_store
 		if self.peer is not None:
-			c = self.peer.connect_any(by_queue)
+			cs = self.peer.connect_all()
+			peer_type = self.peer.type.name
 		else:
-			c = Peer.connect_any_static(self.type.name, by_queue)
-		return pickle.loads(getattr(c.root, method)(pickle.dumps(param, 2)))
+			cs = Peer.connect_all_static(self.type.name)
+			peer_type = self.type.name
+		sent_param = {
+			'peer_type': peer_type,
+			'method': method,
+			'id': id,
+		}
+		dumped_param = pickle.dumps(sent_param, protocol=2)
+		store.store(param, peer_type, method, id)
+
+		for c in cs:
+			self.queue.put({
+				'connection': c,
+				'method': method,
+				'param': dumped_param,
+			})
+
+	def restore_connection(self):
+		if self.peer is not None:
+			self.connection = self.peer.connect_any()
+		else:
+			self.connection = Peer.connect_any_static(self.type.name)
+
+	def sync_any(self, method, param, by_queue=False):
+		if self.persistent_connection:
+			try:
+				return pickle.loads(getattr(self.connection.root, method)(pickle.dumps(param, 2)))
+			except:
+				self.restore_connection()
+				return pickle.loads(getattr(self.connection.root, method)(pickle.dumps(param, 2)))
+		else:
+			if self.peer is not None:
+				c = self.peer.connect_any(by_queue)
+			else:
+				c = Peer.connect_any_static(self.type.name, by_queue)
+			return pickle.loads(getattr(c.root, method)(pickle.dumps(param, 2)))
 	
 	@classmethod
 	def sync_any_static(cls, name, method, param, by_queue=False):
@@ -418,6 +567,18 @@ def autopickle(f):
 	def g(self, param):
 		return pickle.dumps(f(self, pickle.loads(param)), 2)
 	return g
+
+def autostored(store=None):
+	if store is None:
+		store = default_store
+	def deco(f):
+		def g(self, sent_param):
+			sent_param = pickle.loads(sent_param)
+			param = store.retrieve(sent_param['peer_type'], sent_param['method'], sent_param['id'])
+			return pickle.dumps(f(self, param), 2)
+		return g
+	return deco
+
 
 def queued(daemon):
 	def deco(f):
@@ -474,6 +635,7 @@ class Daemon(models.Model):
 	ready = models.BooleanField(blank=True, default=False)
 	pid = models.IntegerField(default=-1)
 	action = models.CharField(max_length=1, default='N', choices=daemon_action_choices)
+	number = models.IntegerField(blank=True, null=True, default=None)
 
 	@classmethod
 	def get_process_daemon(cls, name):
@@ -486,3 +648,63 @@ class Daemon(models.Model):
 	def __unicode__(self):
 		return u"[%s] %s (%s)" % (self.active_since, self.control, self.pid)
 
+	def save(self, *args, **kwargs):
+		if self.number is None:
+			ds = Daemon.objects.filter(control=self.control)
+			s = set([d.number for d in ds if d.number is not None])
+			i = 1
+			while i in s:
+				i += 1
+			self.number = i
+		super(Daemon, self).save(*args, **kwargs)
+
+
+class Node(models.Model):
+	"""
+	An execution node for jobs, i.e., a physical or virtual machine
+	"""
+	name = models.CharField(max_length=31)
+
+	def __unicode__(self):
+		return self.name
+
+
+job_action_choices = [
+	('N', 'Normal mode (auto execution)'),
+	('F', 'Force execution, then go to normal'),
+	('O', 'Force execution once, then stop'),
+	('S', 'Stopped'),
+]
+
+
+class Job(models.Model):
+	node = models.ForeignKey(Node)
+	function = models.CharField(max_length=63, help_text="""
+		Function to be called, with format: "app.function".
+		Function function must be defined in file app/jobs.py, and take a Job instance as a parameter.
+	""")
+	start_ts = models.DateTimeField(blank=True, null=True, default=None)
+	stop_ts = models.DateTimeField(blank=True, null=True, default=None)
+	completed_ts = models.DateTimeField(blank=True, null=True, default=None)
+	keepalive_ts = models.DateTimeField(blank=True, null=True, default=None)
+	timeout_minutes = models.IntegerField(default=10)
+	last_status = models.IntegerField(default=0) # UNIX-like: 0 is ok, > 0 is error
+	last_message = models.CharField(max_length=2047, blank=True, default='')
+	completion = models.FloatField(blank=True, null=True, default=None)
+	last_element_ts = models.DateTimeField(blank=True, null=True, default=None)
+	last_element_pk = models.IntegerField(blank=True, null=True, default=None)
+	action = models.CharField(max_length=1, default='S', choices=job_action_choices)
+	sched_hour = models.CharField(max_length=63, default='*')
+	sched_minute = models.CharField(max_length=63, default='*')
+	sched_dow = models.CharField(max_length=31, default='*')
+	sched_dom = models.CharField(max_length=63, default='*')
+	sched_moy = models.CharField(max_length=63, default='*')
+
+	def __unicode__(self):
+		return self.function
+
+	def keep_alive(self, completion=None):
+		self.completion = completion
+		self.keepalive_ts = datetime.now()
+		self.save()
+		reset_queries()

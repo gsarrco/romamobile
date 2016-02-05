@@ -147,9 +147,6 @@
 					{% endif %}
 				{% endif %}
 				<a href='{% hist %}/paline/palina/{{ f.id_palina }}{% endhist %}'>{% if id_palina == f.id_palina %}<span class="emph">{{ f.nome_ricapitalizzato }}</span>{% else %}{{ f.nome_ricapitalizzato }}{% endif %}</a>
-				{% if not mostra_arrivi %}
-					(<a href="{% hist %}/paline/mappa/static/{{percorso.id_percorso}}?id_palina={{f.id_palina}}{% endhist %}" class="small">{% trans "Mappa" %}</a>)
-				{% endif %}
 			</div>
 		{% endif %}
 	{% endfor %}

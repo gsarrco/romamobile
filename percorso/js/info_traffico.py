@@ -1,5 +1,5 @@
 #
-#    Copyright 2013-2014 Roma servizi per la mobilità srl
+#    Copyright 2013-2016 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -58,7 +58,7 @@ from util import get_checked_radio, HidingPanel, ValidationErrorRemover
 from util import LoadingButton, MyAnchor
 from datetime import date, time, datetime, timedelta
 from Calendar import Calendar, DateField, TimeField
-from map import MapPanel, Layer, LayerPanel
+from map import MapPanel, Layer, LayerPanel, Polygon
 
 from DissolvingPopup import DissolvingPopup
 from util import JsonHandler, redirect
@@ -68,13 +68,18 @@ client = JSONProxy('/json/', ['stato_traffico'])
 
 
 
-class InfoTrafficoPanel(SimplePanel):
-	def __init__(self, owner):
-		SimplePanel.__init__(self)
+class InfoTraffico(): #SimplePanel):
+	def __init__(self, owner, map):
+		#SimplePanel.__init__(self)
 		self.owner = owner
-		self.map = None
+		self.map = map
 		self.layer_in = None
 		self.layer_out = None
+		self.layer_oscuramento = None
+		self.onTrafficoIn()
+		self.onTrafficoOut()
+		self.oscuramento()
+		"""
 		self.base = VP(
 			self,
 			[
@@ -93,11 +98,12 @@ class InfoTrafficoPanel(SimplePanel):
 			]
 		)
 		self.add(self.base)
-		
+		"""
+
 		
 	def onTrafficoIn(self):
 		if self.layer_in is None:
-			self.base.by_name('in').start()
+			# self.base.by_name('in').start()
 			client.stato_traffico('in', JsonHandler(self.onTrafficoInDone))
 		else:
 			self.layer_in.setVisible(True)
@@ -105,7 +111,7 @@ class InfoTrafficoPanel(SimplePanel):
 				
 	def onTrafficoOut(self):
 		if self.layer_out is None:
-			self.base.by_name('out').start()
+			# self.base.by_name('out').start()
 			client.stato_traffico('out', JsonHandler(self.onTrafficoOutDone))
 		else:
 			self.layer_out.setVisible(True)
@@ -113,21 +119,33 @@ class InfoTrafficoPanel(SimplePanel):
 
 
 	def onTrafficoInDone(self, res):
-		self.map.hideAllLayers()
+		# self.map.hideAllLayers()
 		self.layer_in = Layer('traffico-in', 'Traffico in ingresso', self.map)
 		self.layer_in.deserialize(res['mappa'])
 		self.layer_in.centerOnMap()
-		self.base.by_name('in').stop()
+		# self.base.by_name('in').stop()
 		
 	def onTrafficoOutDone(self, res):
-		self.map.hideAllLayers()
+		# self.map.hideAllLayers()
 		self.layer_out = Layer('traffico-out', 'Traffico in uscita', self.map)
 		self.layer_out.deserialize(res['mappa'])
 		self.layer_out.centerOnMap()		
-		self.base.by_name('out').stop()
+		# self.base.by_name('out').stop()
 		
 	def setMap(self, map):
 		self.map = map
-		
 
-		
+	def oscuramento(self):
+		if self.layer_oscuramento is None:
+			self.layer_oscuramento = Layer('oscuramento', 'Oscuramento', self.map)
+			Polygon(
+				self.layer_oscuramento,
+				[(10.0, 40.0), (13.0, 40.0), (13.0, 43.0), (10.0, 43.0)],
+				0.8,
+				'#000000',
+				1,
+				-10,
+			)
+
+
+

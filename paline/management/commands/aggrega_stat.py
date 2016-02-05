@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013-2014 Roma servizi per la mobilità srl
+#    Copyright 2013-2016 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -22,11 +22,11 @@
 from django.core.management.base import BaseCommand, CommandError
 from autenticazione.models import LogAutenticazioneServizi
 from log_servizi.models import Invocazione
-from stats.models import *
 from paline.models import Disservizio, DisservizioPalinaElettronica as DPE
 from datetime import datetime, timedelta, date
 from django.db import connections, transaction
 from servizi.utils import mysql2date, datetime2date, date2mysql
+from paline.jobs import *
 
 class Command(BaseCommand):
 	args = '[<data>] [deleteonly]'
@@ -35,34 +35,12 @@ class Command(BaseCommand):
 	
 	def handle(self, *args, **options):
 		if len(args) == 0:
-			data = datetime2date(datetime.now() - timedelta(days=1))
+			data = datetime2date(datetime.now() - timedelta(days=30))
 		else:
 			data = mysql2date(args[0])
 				
 		print data
 				
-		connection = connections['default']
-		cursor = connection.cursor()
-		if not 'deleteonly' in args:
-			print "Elaboro statistiche"
-			cursor.execute('''
-				insert into paline_logtempoarcoaggr(id_palina_s, id_palina_t, data, ora, tempo, peso)
-				select id_palina_s, id_palina_t, data, hour(ora) as ora, sum(peso*tempo)/sum(peso) as tempo, sum(peso) as peso
-				from paline_logtempoarco
-				where data = %s
-				group by hour(ora), id_palina_s, id_palina_t;	
-			''', (data, )
-			)
-			transaction.commit_unless_managed() 
-		for i in range(24):
-			print "Elimino vecchi dati, ore %d" % i
-			sql = '''
-				delete from paline_logtempoarco
-				where data = '%s'
-				and hour(ora) = %d
-			''' % (date2mysql(data), i)
-			print sql
-			cursor.execute(sql)
-			transaction.commit_unless_managed() 
+		aggrega_stat(data)
 	
 
