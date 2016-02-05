@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013-2014 Roma servizi per la mobilità srl
+#    Copyright 2013-2016 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -21,49 +21,53 @@
 
 import settings
 
+def get_model_database(model):
+	try:
+		return model.database_name
+	except:
+		pass
+	if settings.DATABASE_APPS_MAPPING.has_key(model._meta.app_label):
+		return settings.DATABASE_APPS_MAPPING[model._meta.app_label]
+	return None
+
 class DatabaseAppsRouter(object):
-    """
-    A router to control all database operations on models for different
-    databases.
+	"""
+	A router to control all database operations on models for different
+	databases.
+
+	In case an app is not set in settings.DATABASE_APPS_MAPPING, the router
+	will fallback to the `default` database.
  
-    In case an app is not set in settings.DATABASE_APPS_MAPPING, the router
-    will fallback to the `default` database.
+	Settings example:
  
-    Settings example:
+	DATABASE_APPS_MAPPING = {'app1': 'db1', 'app2': 'db2'}
+	"""
  
-    DATABASE_APPS_MAPPING = {'app1': 'db1', 'app2': 'db2'}
-    """
+	def db_for_read(self, model, **hints):
+		""""Point all read operations to the specific database."""
+		return get_model_database(model)
  
-    def db_for_read(self, model, **hints):
-        """"Point all read operations to the specific database."""
-        if settings.DATABASE_APPS_MAPPING.has_key(model._meta.app_label):
-            return settings.DATABASE_APPS_MAPPING[model._meta.app_label]
-        return None
+	def db_for_write(self, model, **hints):
+		"""Point all write operations to the specific database."""
+		return get_model_database(model)
  
-    def db_for_write(self, model, **hints):
-        """Point all write operations to the specific database."""
-        if settings.DATABASE_APPS_MAPPING.has_key(model._meta.app_label):
-            return settings.DATABASE_APPS_MAPPING[model._meta.app_label]
-        return None
+	def allow_relation(self, obj1, obj2, **hints):
+		"""Allow any relation between apps that use the same database."""
+		db_obj1 = get_model_database(obj1)
+		db_obj2 = get_model_database(obj2)
+		if db_obj1 and db_obj2:
+			if db_obj1 == db_obj2:
+				return True
+			else:
+				return False
+		return None
  
-    def allow_relation(self, obj1, obj2, **hints):
-        """Allow any relation between apps that use the same database."""
-        db_obj1 = settings.DATABASE_APPS_MAPPING.get(obj1._meta.app_label)
-        db_obj2 = settings.DATABASE_APPS_MAPPING.get(obj2._meta.app_label)
-        if db_obj1 and db_obj2:
-            if db_obj1 == db_obj2:
-                return True
-            else:
-                return False
-        return None
- 
-    def allow_syncdb(self, db, model):
-        """Make sure that apps only appear in the related database."""
-        no_sync = []
-        if model._meta.app_label in no_sync:
-            return False
-        elif db in settings.DATABASE_APPS_MAPPING.values():
-            return settings.DATABASE_APPS_MAPPING.get(model._meta.app_label) == db
-        elif settings.DATABASE_APPS_MAPPING.has_key(model._meta.app_label):
-            return False
-        return None
+	def allow_syncdb(self, db, model):
+		"""Make sure that apps only appear in the related database."""
+		no_sync = [] #'news']
+		if model._meta.app_label in no_sync:
+			return False
+		db_model = get_model_database(model)
+		if db_model is None:
+			return False
+		return db_model == db

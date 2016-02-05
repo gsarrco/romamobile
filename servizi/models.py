@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013-2014 Roma servizi per la mobilità srl
+#    Copyright 2013-2016 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -490,7 +490,12 @@ class VersionatoManager(models.Manager):
 	
 	def with_latest_version(self):
 		v = self.versione.objects.ultima().numero
-		return self.get_query_set().filter(min_versione__lte=v, max_versione__gte=v)		
+		return self.get_query_set().filter(min_versione__lte=v, max_versione__gte=v)
+
+	def delete_queryset(self, qs):
+		for q in qs:
+			q.delete()
+
 
 class Versionato(models.Model):
 	min_versione = models.IntegerField(db_index=True)
@@ -541,8 +546,28 @@ class Versionato(models.Model):
 			os = cls.objects.by_version(v)
 			for o in os:
 				o.save()
-				
-				
+
+	def delete(self):
+		if self.max_versione == self.min_versione:
+			models.Model.delete(self)
+		else:
+			self.max_versione -= 1
+			models.Model.save(self)
+
+
+	@classmethod
+	def extend_to_current_version(cls):
+		"""
+		Estende la validità di tutte le istanze della versione precedente (ultima attiva) alla versione attuale
+
+		Prima di invocare extend_to_current_version, è necessario creare una nuova versione
+		"""
+		ultima = cls.versione.objects.ultima().numero
+		precedente = oggetto_con_max(cls.versione.objects.filter(attiva=True, numero__lt=ultima), 'numero').numero
+		cls.objects.filter(max_versione__gte=precedente).update(max_versione=ultima)
+
+
+
 # Ricerche recenti
 
 
@@ -569,7 +594,8 @@ class RicercaRecente(models.Model):
 	@classmethod
 	def by_request(cls, request, limit=True):
 		rrs = cls.get_queryset_by_request(request)
-		rrs.filter(orario__lt=datetime.now() - RICERCHE_RECENTI_MAX_AGE).delete()
+		# Non cancello più le ricerche vecchie perché questa operazione è eseguita da un job
+		# rrs.filter(orario__lt=datetime.now() - RICERCHE_RECENTI_MAX_AGE).delete()
 		if limit:
 			return rrs.order_by('-orario')[:RICERCHE_RECENTI_MAX_LENGTH]
 		return rrs.order_by('-orario')
@@ -762,7 +788,7 @@ def processa_lotti(nome, queryset, field, limit=200, by_id=False):
 		with processa_prossimo_lotto(nome, queryset, field, limit, by_id) as els:
 			if len(els) > 0:
 				yield els
-			else:
+			if len(els) < limit:
 				esci = True
 
 
@@ -771,3 +797,4 @@ def processamento_in_corso(nome, intervallo_guardia=timedelta(minutes=1)):
 	if sp.orario_inizio_esecuzione is None:
 		return False
 	return sp.orario_inizio_esecuzione >= datetime.now() - intervallo_guardia
+

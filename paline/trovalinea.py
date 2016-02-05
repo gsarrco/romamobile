@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013-2014 Roma servizi per la mobilità srl
+#    Copyright 2013-2016 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -36,29 +36,33 @@ from paline.caricamento_rete.caricamento_rete import lancia_processo_caricamento
 from django.core.mail import send_mail
 import traceback
 from servizi.utils import datetime2mysql, mysql2datetime, model2contenttype, contenttype2model, getdef
+from servizi.autocomplete import Autocomplete
 import settings
 from threading import Thread, Lock 
 from Queue import PriorityQueue, Queue
 from time import sleep
 from paline import models as paline
 from carpooling import models as carpoolingmodels
+from paline.gtfs_rt_upload import gtfs_realtime_uploader
 import cPickle as pickle
 from IPython import embed
 from copy import copy, deepcopy
 import logging
 import carpoolinggraph
 import tomtom
-from mercury.models import MercuryListener, autopickle, queued, Peer
+from mercury.models import MercuryListener, autopickle, queued, Peer, autostored
 from django import db
 from ztl.models import ZTL
 from pprint import pprint
-from paline.models import LogAvm, Gestore
+from paline.models import LogAvm, Gestore, LogRomaTpl, IndirizzoAutocompl
+from constance import config
 import os, os.path
+import json
 
 
 PERCORSI_INTERSEZIONE = [
-	('53498', '50819', 'MEBCom11', 'MEBCom1', 'ME', 'Metro B - B1'),
-	('53499', '50820', 'MEBCom12', 'MEBCom1', 'ME', 'Metro B - B1'),
+	('56082', '50819', 'MEBCom11', 'MEBCom1', 'ME', 'Metro B - B1'), # B1, B Direz. Bologna
+	('56083', '50820', 'MEBCom12', 'MEBCom1', 'ME', 'Metro B - B1'), # B1, B Direz. Laurentina
 ]
 FATTORE_AVANZAMENTO_TEMPO = 0.8
 N_ISTANZE_PARALLELE = 3
@@ -146,7 +150,7 @@ class ShellThread(Thread):
 	
 	def run(self):
 		embed()
-		
+
 		
 
 def TrovalineaFactory(
@@ -158,9 +162,19 @@ def TrovalineaFactory(
 		dt=None,
 		download=False,
 		daemon=None,
+		tempo_reale_percorsi=False,
 	):
 	"""
 	Restituisce una classe Trovalinea, pronta per essere registrata con un server RPyC
+
+	retina: usa una rete limitata per scopi di test
+	calcola_percorso: carica il grafo per il cerca percorso e cerca luogo
+	tempo_reale: avvia la sincronizzazione della posizione dei veicoli
+	shell: avvia shell
+	special: rete speciale (deprecato)
+	dt: carica la versione della rete attiva all'orario dt
+	download: sincronizza i dati in tempo reale scaricandoli dai server di muovi.roma.it
+	daemon: demone in ascolto relativo al processo in esecuzione
 	"""
 	
 	class Trovalinea(MercuryListener):
@@ -194,15 +208,20 @@ def TrovalineaFactory(
 				
 			
 			if tempo_reale: # Rimuovere per abilitare aggiornamento arrivi in modalità esclusivamente push
-				aggiorna_arrivi = tpl.Aggiornatore(r, timedelta(seconds=20 if tempo_reale else 60), num_threads=3, aggiorna_arrivi=tempo_reale)
+				aggiorna_arrivi = tpl.Aggiornatore(r, timedelta(seconds=25 if tempo_reale else 60), aggiorna_arrivi=tempo_reale, gtfs_rt_handler=gtfs_realtime_uploader)
 				aggiorna_arrivi.start()
-				aggiorna_upload_fcd = tpl.AggiornatoreUploadFCD(r, intervallo=timedelta(seconds=4*60))
-				aggiorna_upload_fcd.start()
+			if tempo_reale_percorsi:
+				aggiorna_percorsi = tpl.AggiornatorePercorsiAtac(r)
+				aggiorna_percorsi.start()
 				
 			if download:
 				aggiorna_download = tpl.AggiornatoreDownload(r, timedelta(seconds=40))
 				aggiorna_download.start()
-				
+
+			print "Inizializzo supporto autocompletamento"
+			ias = IndirizzoAutocompl.objects.all()
+			cls.autocomplete = Autocomplete([("A%d" % ia.pk, ia.indirizzo) for ia in ias])
+
 			print "Inizializzazione completata"
 			
 			if pause is not None:
@@ -324,9 +343,9 @@ def TrovalineaFactory(
 						elif 5 < v <= 10:
 							color_tr = '#FF0000'
 						elif 10 < v <= 15:
-							color_tr = '#FFAA00'
+							color_tr = '#FFFF00' if fattore_thickness > 1 else '#FFAA00'
 						else:
-							color_tr = '#00FF00'
+							color_tr = '#FF7070' if fattore_thickness > 1 else '#00FF00'
 					if con_percorso:
 						mappa.add_polyline(punti_wgs_tratto, opacity=0.6, color=color, thickness=5 * fattore_thickness, zIndex=0)
 					if color_tr is not None:
@@ -369,7 +388,23 @@ def TrovalineaFactory(
 			db.reset_queries()
 			if serialize:
 				return pickle.dumps(mappa.serialize())
-			
+
+		# does not need autopickle
+		def exposed_percorso_su_mappa_ap(self, param):
+			param = pickle.loads(param)
+			res = self.exposed_percorso_su_mappa(
+				param['id_percorso'],
+				None,
+				param['path_img'],
+				getdef(param, 'con_stato', False),
+				getdef(param, 'con_fermate', True),
+				getdef(param, 'con_bus', True),
+				getdef(param, 'fattore_thickness', 1),
+				getdef(param, 'con_percorso', True),
+				getdef(param, 'con_bus_immediato', False),
+			)
+			return res
+
 		def exposed_palina_su_mappa(self, id_palina, mappa, path_img):
 			serialize = False
 			if mappa is None:
@@ -381,89 +416,28 @@ def TrovalineaFactory(
 			bb = BoundingBox()
 			bb.update(*c)
 			mappa.add_marker_busstop(
-					c,
-					img,
-					palina.id_palina,
-					(16, 16),
-					"Caricamento...",
-					palina.nome,
-					0,
-					anchor=(8, 8),
-					open=True,
+				c,
+				img,
+				palina.id_palina,
+				(16, 16),
+				"Caricamento...",
+				palina.nome,
+				0,
+				anchor=(8, 8),
+				open=True,
 			)
 			mappa.center_and_zoom(bb.get_center(), 12)
 			db.reset_queries()
 			if serialize:
-				return pickle.dumps(mappa.serialize())			
-			
-			
-		def exposed_percorso_su_mappa_special(self, id_percorso, path_img):
-			p = self.rete_special.percorsi[id_percorso]
-			metrob = p.id_linea[:3] == 'MEB'
-			out = {
-				'fermate': [],
-			}
-			punti_wgs = []
-			img = path_img + 'partenza.png'
-			if metrob:
-				img = path_img + 'metro.png'
-			for t in p.tratti_percorso:
-				palina = t.s.rete_palina
-				c = gbfe_to_wgs84(palina.x, palina.y)
-				out['fermate'].append({
-					'punto': c,
-					'id_palina': palina.id_palina,
-					'img': img,
-					'img_size': [16, 16],
-					'name': palina.nome,
-					'id_toggle': id_percorso,			
-				})				
-				img = path_img + 'fermata.png'
-				if metrob:
-					img = path_img + 'metro_fermata.png'				
-				punti = t.rete_tratto_percorsi.punti
-				for x, y in punti:
-					punti_wgs.append(gbfe_to_wgs84(x, y))
-			color = '#7F0000'
-			if metrob:
-				color = '#0000FF'
-			out['percorso'] = {
-				'punti': punti_wgs,
-				'opacity': 0.8,
-				'color': color,
-				'thickness': 3,
-				'id_toggle': id_percorso,
-			}
-			palina = t.t.rete_palina
-			c = gbfe_to_wgs84(palina.x, palina.y)
-			img = path_img + 'arrivo.png'
-			if metrob:
-				img = path_img + 'metro.png'			
-			out['fermate'].append({
-				'punto': c,
-				'id_palina': palina.id_palina,
-				'img': img,
-				'img_size': [16, 16],
-				'name': palina.nome,
-				'id_toggle': id_percorso,			
-			})
-			db.reset_queries()
-			return pickle.dumps(out)
-				
-		def exposed_percorsi_special(self):
-			percorsi = []
-			linee = ['60', '60L', '80', '80B', '82', '335', '337', '342', '344', '690']
-			ps = self.rete_special.percorsi
-			percorsi_new = [ps[k] for k in ps if ps[k].id_linea in linee]
-			percorsi_new.sort(key=lambda p: p.id_linea)
-			for p in percorsi_new:
-				percorsi.append({
-					'id_percorso': p.id_percorso,
-					'descrizione': "%s direz. %s" % (p.descrizione, p.tratti_percorso[-1].t.rete_palina.nome),
-				})
-			db.reset_queries()
-			return pickle.dumps(percorsi)
-		
+				return pickle.dumps(mappa.serialize())
+
+		# does not need autopickle
+		def exposed_palina_su_mappa_ap(self, param):
+			param = pickle.loads(param)
+			res = self.exposed_palina_su_mappa(param['id_palina'], None, param['path_img'])
+			return res
+
+
 		@autopickle
 		def exposed_carica_percorso_carpooling(self, param):
 			pk = param['pk']
@@ -668,11 +642,13 @@ def TrovalineaFactory(
 							percorso.partenza = {}
 							percorso.arrivo = {}
 							tratto.formatta_percorso(percorso, 'auto_salvato', pas, {'flessibilita': timedelta(0)})
+							indicazioni_icona = tratto.PercorsoIndicazioniIcona()
+							tratto.formatta_percorso(percorso, 'indicazioni_icona', indicazioni_icona, {})
 							s = t
 							tempo_calcolo = datetime.now() - orario_inizio
 							da = percorso.get_punto_wgs_84()
 							a = percorso.get_punto_fine_wgs_84()
-							paline.LogCercaPercorso(
+							l = paline.LogCercaPercorso(
 								orario_richiesta=orario_inizio,
 								orario_partenza=data_partenza,
 								da=punti[i - 1]['ricerca'],
@@ -693,7 +669,9 @@ def TrovalineaFactory(
 								a_lat=a[1],
 								distanza=percorso.get_distanza(),
 								tempo=int(percorso.get_tempo_totale()),
-							).save()
+							)
+							l.save()
+							self.docit_logger.log(l, json.dumps(indicazioni_icona.indicazioni))
 
 
 						start = punti[0]
@@ -792,7 +770,12 @@ def TrovalineaFactory(
 				return pickle.dumps((rv.paline, rv.linee_ord))
 			except Exception:
 				traceback.print_exc()
-		
+
+		# does not need autopickle
+		def exposed_oggetti_vicini_ap(self, param):
+			param = pickle.loads(param)
+			return self.exposed_oggetti_vicini(param['start'])
+
 		def exposed_risorse_vicine(self, start, tipi_ris, num_ris, max_distanza=1000):
 			print "Risorse vicine"
 			mappa = gmaps.Map()
@@ -832,7 +815,11 @@ def TrovalineaFactory(
 			db.reset_queries()
 			return pickle.dumps(mappa.serialize())
 
-		
+		# does not need autopickle
+		def exposed_risorse_vicine_ap(self, param):
+			param = pickle.loads(param)
+			return self.exposed_risorse_vicine(param['start'], param['tipi_ris'], param['num_ris'], getdef(param, 'max_distanza', 1000))
+
 		def exposed_tempi_attesa(self, id_palina):
 			#print "Servo arrivi"
 			p = self.rete.paline[id_palina]
@@ -849,6 +836,12 @@ def TrovalineaFactory(
 						arrivi.append(a2)
 			db.reset_queries()
 			return pickle.dumps(arrivi)
+
+		# does not need autopickle
+		def exposed_tempi_attesa_ap(self, param):
+			param = pickle.loads(param)
+			return self.exposed_tempi_attesa(param['id_palina'])
+
 
 		@autopickle
 		def exposed_primi_arrivi_per_paline(self, param):
@@ -878,12 +871,26 @@ def TrovalineaFactory(
 				return pickle.dumps(arrivi)
 			db.reset_queries()
 			return None
-		
+
+		# does not need autopickle
+		def exposed_arrivi_veicolo_ap(self, param):
+			param = pickle.loads(param)
+			res = self.exposed_arrivi_veicolo(param['id_veicolo'])
+			if res is not None:
+				return res
+			return pickle.dumps(None)
+
+
 		def exposed_percorso_fermate(self, id_percorso):
 			#print "Servo veicoli percorso"
 			db.reset_queries()
 			return pickle.dumps(self.rete.percorsi[id_percorso].stato())
-		
+
+		# does not need autopickle
+		def exposed_percorso_fermate_ap(self, param):
+			param = pickle.loads(param)
+			return self.exposed_percorso_fermate(param['id_percorso'])
+
 		def exposed_veicoli_percorso(self, id_percorso, get_arrivi, get_distanza=False):
 			#print "Servo veicoli percorso"
 			vs = self.rete.get_veicoli_percorso(id_percorso)
@@ -892,23 +899,25 @@ def TrovalineaFactory(
 				out.append(v.get_info(get_arrivi, get_distanza))
 			db.reset_queries()
 			return pickle.dumps(out)
-		
+
+		# does not need autopickle
+		def exposed_veicoli_percorso_ap(self, param):
+			param = pickle.loads(param)
+			if not 'get_distanza' in param:
+				param['get_distanza'] = False
+			return self.exposed_veicoli_percorso(param['id_percorso'], param['get_arrivi'], param['get_distanza'])
+
 		def exposed_veicoli_tutti_percorsi(self, get_arrivi, get_distanza=False):
 			#print "Servo veicoli percorso"
-			ret = []
-			for id_percorso in self.rete.percorsi:
-				vs = self.rete.get_veicoli_percorso(id_percorso)
-				out = []
-				for v in vs:
-					out.append(v.get_info(get_arrivi, get_distanza))
-				ret.append({
-					'id_percorso': id_percorso,
-					'arrivi': out,
-					'ultimo_aggiornamento': self.rete.percorsi[id_percorso].tratti_percorso[-1].t.ultimo_aggiornamento
-				})
-			db.reset_queries()
-			return pickle.dumps(ret)
-		
+			return pickle.dumps(self.rete.get_veicoli_tutti_percorsi(get_arrivi, get_distanza))
+
+		# does not need autopickle
+		def exposed_veicoli_tutti_percorsi_ap(self, param):
+			param = pickle.loads(param)
+			if not 'get_distanza' in param:
+				param['get_distanza'] = False
+			return self.exposed_veicoli_tutti_percorsi(param['get_arrivi'], param['get_distanza'])
+
 		def exposed_serializza_dinamico(self):
 			return pickle.dumps(self.rete.serializza_dinamico(), 2)
 
@@ -918,9 +927,30 @@ def TrovalineaFactory(
 			self.rete.deserializza_dinamico(param)
 			print "Deserialization done"
 
+		@autostored()
+		def exposed_deserializza_dinamico_stored(self, param):
+			print "Deserializing stored network..."
+			self.rete.deserializza_dinamico(param)
+			print "Stored deserialization done"
+
 		def exposed_get_rete_e_grafo(self):
 			return self.rete, self.grafo
-		
+
+		@autostored()
+		def exposed_deserializza_dinamico_veicoli_stored(self, param):
+			print "Deserializing stored vehicles..."
+			self.rete.deserializza_dinamico_veicoli(param)
+			print "Stored deserialization done"
+
+		@autopickle
+		def exposed_deserializza_dinamico_veicoli(self, param):
+			print "Deserializing vehicles..."
+			self.rete.deserializza_dinamico_veicoli(param)
+			print "Deserialization done"
+
+		def exposed_get_rete_e_grafo(self):
+			return self.rete, self.grafo
+
 		@autopickle
 		def exposed_coordinate_palina(self, res):
 			palina = self.rete.paline[res['id_palina']]
@@ -931,8 +961,52 @@ def TrovalineaFactory(
 			}
 		
 		@autopickle
-		def exposed_dati_da_avm_romatpl(self, dati):
-			self.rete.dati_da_avm_romatpl(dati)
+		def exposed_dati_da_avm_romatpl(self, param):
+			for d in param['dati']:
+				try:
+					self.rete.dati_da_avm_romatpl(d)
+				except:
+					logging.error("Errore processamento dati RomaTPL: %s" % traceback.format_exc())
+			if config.LOG_ROMATPL:
+				for d in param['log']:
+					try:
+						LogRomaTpl(
+							id_vettura=d['id_vettura'],
+							num_tel=d['num_tel'],
+							tipo_mess=d['tipo_mess'],
+							tipo_evento=d['tipo_evento'],
+							dataora=d['dataora'],
+							tipo_fix=d['tipo_fix'],
+							lat=d['lat'],
+							lon=d['lon'],
+							progressivo_msg=d['progressivo_msg'],
+							msg_da_ultimo_zn=d['msg_da_ultimo_zn'],
+							reason=d['reason'],
+							dataorazn=d['dataorazn'],
+							latzn=d['latzn'],
+							lonzn=d['lonzn'],
+							id_percorso=d['id_percorso'],
+							prog_nodo_percorso=d['prog_nodo_percorso'],
+							id_fermata=d['id_fermata'],
+							nsecdazn_1=d['nsecdazn_1'],
+							metri_da_zn_1=d['metri_da_zn_1'],
+							velocita_servizio=d['velocita_servizio'],
+							velocita_trasferimento=d['velocita_trasferimento'],
+							velocita_linea=d['velocita_linea'],
+							numero_fermate_vl=d['numero_fermate_vl'],
+							numero_passeggeri=d['numero_passeggeri'],
+							carico_passeggeri=d['carico_passeggeri'],
+							cartellino=d['cartellino'],
+							corsa=d['corsa'],
+							id_linea_zn=d['id_linea_zn'],
+							id_linea_attuale=d['id_linea_attuale'],
+							modalita=d['modalita'],
+							metri_da_zn=d['metri_da_zn'],
+							targa_percorso=d['targa_percorso'],
+							metri_da_reset=d['metri_da_reset'],
+						).save()
+					except:
+						logging.error("Errore logging dati RomaTPL: %s" % traceback.format_exc())
 			return 'OK'
 
 		@autopickle
@@ -967,6 +1041,10 @@ def TrovalineaFactory(
 			}
 
 		@autopickle
+		def exposed_analizza_consistenza_rete(self, dati):
+			return tpl.analizza_consistenza_rete(self.rete, getdef(dati, 'correggi', False))
+
+		@autopickle
 		def exposed_statistiche(self, param):
 			percorsi = []
 			for id_percorso in self.rete.percorsi:
@@ -982,8 +1060,36 @@ def TrovalineaFactory(
 				'percorsi': percorsi,
 			}
 
+		@autopickle
+		def exposed_autocomplete(self, param):
+			return self.autocomplete.find(param['lookup'])[:10]
 
-		
+		@autopickle
+		def exposed_veicoli_problematici(self, param):
+			limite = datetime.now() - timedelta(minutes=5)
+			veicoli = []
+			for id_veicolo in self.rete.veicoli:
+				v = self.rete.veicoli[id_veicolo]
+				if v.problematico and v.ultimo_aggiornamento >= limite:
+					percorso = v.tratto_percorso_problematico.rete_percorso
+					veicoli.append({
+						'id_veicolo': v.id_veicolo,
+						'id_percorso': percorso.id_percorso,
+						'id_linea': percorso.id_linea,
+						'destinazione': percorso.destinazione(),
+						'fuori_percorso': v.fuori_percorso,
+						'lontano_1d': v.lontano_1d,
+						'distanza_1d': v.distanza_1d,
+						'lontano_2d': v.lontano_2d,
+						'distanza_2d': v.distanza_2d,
+						'tot_fermate': len(percorso.tratti_percorso) + 1,
+						'prog_atac': v.progressiva_atac,
+						'prog_ric': v.progressiva_ric,
+					})
+
+			return {'veicoli': veicoli}
+
+
 	Trovalinea.init_rete()
 	Trovalinea.init_scheduler()
 	return Trovalinea 

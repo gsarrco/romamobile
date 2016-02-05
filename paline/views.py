@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013-2014 Roma servizi per la mobilità srl
+#    Copyright 2013-2016 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -58,7 +58,6 @@ from urllib import quote
 from servizi import infopoint
 import string
 import pickle
-import infotp
 import os, os.path
 import xmlrpclib
 from paline.geomath import gbfe_to_wgs84
@@ -381,8 +380,8 @@ def _percorso(request, id_percorso, ctx=None, id_veicolo=None, giorno_partenze=N
 	try:
 		p = Percorso.objects.by_date().get(id_percorso=id_percorso)
 		ctx['percorso'] = p
-		c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB)
-		fermate = pickle.loads(c.root.percorso_fermate(id_percorso))['fermate']
+		merc = get_web_cl_mercury()
+		fermate = merc.sync_any('percorso_fermate_ap', {'id_percorso': id_percorso})['fermate']
 		percorsi = list(Percorso.objects.by_date().select_related('linea').filter(linea=p.linea, soppresso=False))
 		percorsi.sort(cmp=_cmp_percorsi)
 		ctx['percorsi'] = percorsi
@@ -390,9 +389,8 @@ def _percorso(request, id_percorso, ctx=None, id_veicolo=None, giorno_partenze=N
 		if id_veicolo is not None:
 			ctx['id_veicolo'] = id_veicolo
 			ctx['mostra_arrivi'] = True
-			arrivi = c.root.arrivi_veicolo(id_veicolo)
+			arrivi = merc.sync_any('arrivi_veicolo_ap', {'id_veicolo': id_veicolo})
 			if arrivi is not None:
-				arrivi = pickle.loads(arrivi)
 				for f in fermate:
 					if f['id_palina'] in arrivi:
 						f['orario_arrivo'] = datefilter(arrivi[f['id_palina']], _("H:i"))
@@ -490,7 +488,7 @@ def visualizza_mappa(request, id_percorso):
 		except Exception:
 			id_palina = None
 
-		c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB)
+		c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB_CL)
 		
 		m = gmaps.Map()
 		c.root.percorso_su_mappa(id_percorso, m, '/paline/s/img/', con_stato=True)
@@ -517,7 +515,7 @@ def visualizza_mappa_statica(request, action=None):
 		except Exception:
 			id_palina = None
 
-		c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB)
+		c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB_CL)
 		
 		m = gmaps.Map()
 		c.root.percorso_su_mappa(id_percorso, m, '/paline/s/img/')
@@ -548,25 +546,6 @@ def visualizza_mappa_statica(request, action=None):
 
 
 
-def visualizza_mappa_palina(request, id_palina):
-	try:
-		p = Palina.objects.by_date().get(id_palina=id_palina, soppressa=False)
-		nome = "%s (%s)" % (p.nome_ricapitalizzato(), p.id_palina)
-		c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB)
-		
-		m = gmaps.Map()
-		c.root.palina_su_mappa(id_palina, m, '/paline/s/img/')
-
-		mappa = mark_safe(m.render(url_tempi="http://%s/ws/xml/paline/7" % (request.META['HTTP_HOST'],), nome_metodo='paline.Trovalinea.Veicoli.Locale', id_palina=None))
-		
-		return TemplateResponse(request, 'map-fullscreen.html', {'mappa': mappa, 'id_palina': id_palina})
-	
-	except Palina.DoesNotExist:
-		return TemplateResponse(request, 'messaggio.html', {'msg': _("La palina %s non esiste") % id_palina})
-	
-	
-				
-
 def visualizza_mappa_statica_palina(request, id_palina, zoom=None, center_x=None, center_y=None):
 	ctx = {}
 	
@@ -574,7 +553,7 @@ def visualizza_mappa_statica_palina(request, id_palina, zoom=None, center_x=None
 		p = Palina.objects.by_date().get(id_palina=id_palina, soppressa=False)
 		nome = "%s (%s)" % (p.nome_ricapitalizzato(), p.id_palina)
 		
-		c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB)
+		c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB_CL)
 				
 		m = gmaps.Map()
 		c.root.palina_su_mappa(id_palina, m, '/paline/s/img/')
@@ -600,7 +579,7 @@ def visualizza_mappa_statica_palina(request, id_palina, zoom=None, center_x=None
 def test_mappa(request):
 	ctx = {}
 	
-	c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB)
+	c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB_CL)
 	
 	m = gmaps.Map()
 	percorsi = pickle.loads(c.root.percorsi_su_mappa_special(m, '/paline/s/img/'))
@@ -955,12 +934,11 @@ def _default(request, cerca, ctx, as_service, dett_paline=False):
 				id_richiesta = hashlib.md5(pickle.dumps(('oggetti_vicini', res))).hexdigest()
 				trs = cache.get(id_richiesta)
 				if trs is None:
-					c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB)
-					trs = c.root.oggetti_vicini(res)
+					merc = get_web_cpd_mercury()
+					trs = merc.sync_any('oggetti_vicini_ap', {'start': res})
 					cache.set(id_richiesta, trs)
-				ps, ls = pickle.loads(trs)
+				ps, ls = trs
 				paline = []
-				linee = []
 				for p in ps:
 					palina = Palina.objects.by_date().select_related().get(id_palina=p[0])
 					palina.distanza = p[1]
@@ -999,19 +977,6 @@ def smart_search(request, token, qs):
 		'percorsi': [], 	
 	}
 	return _default(None, qs, ctx, True)
-
-@paline7.xmlrpc("paline.Trovalinea.PercorsoMappaSpecial", require_token=False)
-def percorso_mappa_special(request, id_percorso):
-	c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB)
-	out = pickle.loads(c.root.percorso_su_mappa_special(id_percorso, ''))
-	return out
-		
-@paline7.metodo("Trovalinea.PercorsiSpecial")
-def percorsi_special(request, token):
-	c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB)
-	out = pickle.loads(c.root.percorsi_special())
-	return out
-
 
 def default(request):
 	f = populate_form(request, MultiForm, cerca='')
@@ -1123,6 +1088,8 @@ def elenco_linee(request):
 	ps = Percorso.objects.by_date().select_related('linea', 'arrivo').filter(soppresso=False)
 	if 'scolastico' in request.REQUEST:
 		ps = ps.filter(carteggio__contains='S')
+	if 'gestore' in request.REQUEST:
+		ps = ps.filter(linea__gestore__nome=request.REQUEST['gestore'])
 	ps = ps.order_by('linea__id_linea')
 	ls = defaultdict(list)
 	for p in ps:
@@ -1353,11 +1320,10 @@ def get_partenze_capilinea(request, token, giorno):
 def get_veicoli_percorso(request, token, id_percorso):
 	"""
 	Restituisce i veicoli di un percorso
-	"""
-	c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB)
-	vs = pickle.loads(c.root.veicoli_tutti_percorsi(False, True))
 	
-	return vs
+	Per l'università di Tor Vergata
+	"""
+	return get_web_cl_mercury().sync_any('veicoli_tutti_percorsi_ap', {'get_arrivi': False, 'get_distanza': True})
 
 @paline7.metodo("GetVeicoliTuttiPercorsi")
 def get_veicoli_tutti_percorsi(request, token):
@@ -1368,10 +1334,7 @@ def get_veicoli_tutti_percorsi(request, token):
 	r, g = c.root.get_rete_e_grafo()
 	vs = pickle.loads(c.root.veicoli_tutti_percorsi(False, True))
 	
-	return {
-		'ultimo_aggiornamento': unmarshal_datetime(r.ultimo_aggiornamento),
-		'percorsi': vs,
-	}
+	return vs
 
 @paline7.metodo("GetVeicoliPercorsoConPrevisioni")
 def get_veicoli_percorso_con_previsioni(request, token, id_percorso):
@@ -1381,9 +1344,26 @@ def get_veicoli_percorso_con_previsioni(request, token, id_percorso):
 	Per l'università di Tor Vergata
 	"""
 	c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB)
-	vs = pickle.loads(c.root.veicoli_tutti_percorsi(True, True))
+	vs = pickle.loads(c.root.veicoliarshali_percorsi(True, True))
 
 	return vs
+
+@paline7.metodo("GetVeicoliTuttiPercorsiConPrevisioni")
+def get_veicoli_tutti_percorsi_con_previsioni(request, token):
+	"""
+	Restituisce i veicoli di tutti i percorsi
+
+	Per l'università di Tor Vergata
+	"""
+	c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB)
+	r, g = c.root.get_rete_e_grafo()
+	vs = pickle.loads(c.root.veicoli_tutti_percorsi(True, True))
+
+	return {
+		'ultimo_aggiornamento': unmarshal_datetime(r.ultimo_aggiornamento),
+		'percorsi': vs,
+	}
+
 
 @paline7.metodo("GetOrarioUltimoAggiornamentoArrivi")
 def get_orario_ultimo_aggiornamento_arrivi(request, token):

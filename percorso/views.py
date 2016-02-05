@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013-2014 Roma servizi per la mobilità srl
+#    Copyright 2013-2016 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -85,7 +85,7 @@ def inizializza_linee_escluse(linee_escluse=None):
 	if linee_escluse is None:
 		linee_escluse = {}
 		for l in paline.models.LineaSospesa.objects.all():
-			linee_escluse[l.id_linea] = l.id_linea
+			linee_escluse[l.id_linea] = l.id_linea.upper()
 
 	return linee_escluse
 
@@ -302,6 +302,8 @@ def infopoint_to_cache_key(infopoint):
 	dt = infopoint['dt']
 	dt = datetime(dt.year, dt.month, dt.day, dt.hour, dt.hour, dt.minute)
 	ck['dt'] = dt
+	if 'data' in ck:
+		del ck['data']
 	if 'percorso_auto_salvato' in ck:
 		del ck['percorso_auto_salvato']
 	return md5(pickle.dumps(ck)).hexdigest()

@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013-2014 Roma servizi per la mobilità srl
+#    Copyright 2013-2016 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -70,9 +70,10 @@ from map import MapPanel, Layer, LayerPanel, get_location
 from cerca_percorso import CercaPercorsoPanel
 from cerca_linea import CercaLineaPanel
 from cerca_luogo import CercaLuogoPanel
+from info_traffico import InfoTraffico
 from news import NewsPanel
 from globals import base_url, make_absolute, flavor, set_user, set_control, ios, version, android, old_android, get_os
-from __pyjamas__ import JS
+from __pyjamas__ import JS, wnd
 
 from DissolvingPopup import DissolvingPopup
 from util import JsonHandler, JsonInteractiveHandler, WaitingHandler, redirect
@@ -744,7 +745,6 @@ class ControlPanel(GeneralMenuPanel):
 		cp_params = self.cerca_percorso.availableParams()
 		for p in cp_params:
 			if p in params:
-				print "Trovato"
 				self.cerca_percorso.setParam(p, params[p])
 		cl_params = self.cerca_linea.availableParams()
 		for p in cl_params:
@@ -1145,7 +1145,9 @@ class LargeLayoutPanel(HorizontalPanel):
 	def addVmsLayer(self):
 		raw_params = getRawParams()
 		if raw_params.find('vms=1') != -1:
-			Layer(['pannelli', 0], _('Pannelli VMS'), self.map, self)
+			Layer('pannelli', 'Pannelli VMS', self.map, self, True, ['pannelli', 0])
+		if raw_params.find('info_traffico=1') != -1:
+			self.info_traffico = InfoTraffico(self, self.map)
 
 	def getControlPanel(self):
 		return self.left.control
@@ -1379,44 +1381,64 @@ def register_pausable_timers():
 	""")
 
 control_panel = [None]
-	
-if __name__ == '__main__':
-	raw_params = getRawParams()
-	lang = 'it'
-	store_lang = False
-	stored_lang = storage_get('hl', '-')
-	if stored_lang != '-':
-		lang = stored_lang
-	elif raw_params.find('hl=it') != -1:
+
+framework_init_done = [False]
+
+def onFrameworkInit():
+	if not framework_init_done[0]:
+		framework_init_done[0] = True
+		raw_params = getRawParams()
 		lang = 'it'
-		store_lang = True
-	elif raw_params.find('hl=en') != -1 or raw_params.find('HL=EN') != -1:
-		lang = 'en'
-		store_lang = True
-	if store_lang:
-		storage_set('hl', lang)
-	set_lang('it', lang)
+		store_lang = False
+		stored_lang = storage_get('hl', '-')
+		if stored_lang != '-':
+			lang = stored_lang
+		elif raw_params.find('hl=it') != -1:
+			lang = 'it'
+			store_lang = True
+		elif raw_params.find('hl=en') != -1 or raw_params.find('HL=EN') != -1:
+			lang = 'en'
+			store_lang = True
+		if store_lang:
+			storage_set('hl', lang)
+		set_lang('it', lang)
 
-	rp = RootPanel()
-	splash = DOM.getElementById("Loading-Message")
-	par = DOM.getParent(splash)
-	DOM.removeChild(par, splash)
-	small = int(Window.getClientWidth()) < 800
-	gp = GeneralPanel(small=small)
-	rp.add(gp)
-	gp.createMap()
-	gp.relayout()
+		rp = RootPanel()
+		splash = DOM.getElementById("Loading-Message")
+		par = DOM.getParent(splash)
+		DOM.removeChild(par, splash)
+		small = int(Window.getClientWidth()) < 800
+		gp = GeneralPanel(small=small)
+		rp.add(gp)
+		gp.createMap()
+		gp.relayout()
 
 
-	session_key = storage_get('session_key', '')
-	client.servizi_app_init_2({
-		'session_or_token': session_key,
-		'versione': version,
-		'os': get_os(),
-	}, getRawParams(), JsonHandler(gp.onAppInit))
+		session_key = storage_get('session_key', '')
+		client.servizi_app_init_2({
+			'session_or_token': session_key,
+			'versione': version,
+			'os': get_os(),
+		}, getRawParams(), JsonHandler(gp.onAppInit))
 
-	register_pausable_timers()
-	Window.addWindowResizeListener(gp)
-	gp.getElement().scrollIntoView()
+		register_pausable_timers()
+		Window.addWindowResizeListener(gp)
+		gp.getElement().scrollIntoView()
 
+
+wnd().onFrameworkInitJs = onFrameworkInit
+
+if __name__ == '__main__':
+	if flavor == 'web':
+		onFrameworkInit()
+	else:
+		# ready_timer = Timer(notify=onFrameworkInit)
+		# ready_timer.schedule(1500)
+		JS("""
+			$wnd.document.addEventListener(
+				"deviceready",
+				function() {$wnd.onFrameworkInitJs();},
+				false
+			);
+		""")
 

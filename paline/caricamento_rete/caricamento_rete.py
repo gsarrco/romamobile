@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013-2014 Roma servizi per la mobilità srl
+#    Copyright 2013-2016 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -48,6 +48,7 @@ gestoriFile = 'gestori.DBF'
 lineeFile = 'linee.DBF'
 fermateFile = 'fermate.DBF'
 percorsiFile = 'percorsi.DBF'
+transcodificaFile = 'transcod.DBF'
 descrizionePercorsiFile = 'descrizioni.DBF'
 percorsiNoOrariFile = 'eccezione_orari.DBF'
 
@@ -64,6 +65,10 @@ def scarica_rete():
 	print "Download rete"
 	res = sp.paline.GetRete(token)['risposta']
 	print "Salvataggio rete"
+	try:
+		os.mkdir(os.path.join(settings.TROVALINEA_PATH_RETE, 'temp'))
+	except:
+		pass
 	f = open(os.path.join(settings.TROVALINEA_PATH_RETE, 'temp/rete.zip'), 'wb')
 	f.write(res['rete'].data)
 	f.close()
@@ -92,6 +97,8 @@ def carica_rete_auto():
 
 def carica_rete(no_load=False, no_validate=False):
 	versione = processa_file_zip(no_load)
+	if versione is None:
+		return None
 	transaction.enter_transaction_management()
 	transaction.managed(True)
 	if not no_load:
@@ -107,6 +114,7 @@ def carica_rete(no_load=False, no_validate=False):
 		caricaLinee(path(lineeFile))
 		caricaPercorsi(path(percorsiFile), path(descrizionePercorsiFile), percorsiNoOrariFile=path(percorsiNoOrariFile))
 		caricaFermate(path(fermateFile))
+		caricaPercorsiAtac(path(transcodificaFile))
 		attivaNuovaRete()
 		transaction.commit()
 		db.reset_queries()
@@ -138,6 +146,70 @@ def carica_rete(no_load=False, no_validate=False):
 	print "Rete aggiornata con successo"
 	return versione
 
+
+def carica_rete_incrementale(no_load=False, no_validate=False):
+	versione = processa_file_zip(no_load)
+	if versione is None:
+		return None
+	transaction.enter_transaction_management()
+	transaction.managed(True)
+	if not no_load:
+		base = os.path.join(settings.TROVALINEA_PATH_RETE, '%s/rete' % datetime2compact(versione))
+		path = lambda f: os.path.join(base, f)
+		print "---Carico versione precedente di rete"
+		rete_base = tpl.Rete()
+		rete_base.carica()
+		print "---Estendo validità rete attuale"
+		generaRete(versione)
+		Carteggio.extend_to_current_version()
+		Palina.extend_to_current_version()
+		Gestore.extend_to_current_version()
+		Linea.extend_to_current_version()
+		Percorso.extend_to_current_version()
+		Fermata.extend_to_current_version()
+		PercorsoAtac.extend_to_current_version()
+		print "---Carico elementi nuovi o modificati"
+		caricaCarteggi(path(carteggiFile), sovrascrivi=True)
+		caricaPaline(path(palineFile), sovrascrivi=True)
+		caricaGestori(path(gestoriFile), sovrascrivi=True)
+		caricaLinee(path(lineeFile), sovrascrivi=True)
+		caricaPercorsi(path(percorsiFile), path(descrizionePercorsiFile), percorsiNoOrariFile=path(percorsiNoOrariFile), sovrascrivi=True)
+		caricaFermate(path(fermateFile), sovrascrivi=True)
+		caricaPercorsiAtac(path(transcodificaFile), sovrascrivi=True)
+		attivaNuovaRete()
+		transaction.commit()
+		db.reset_queries()
+		print "---Carico nuovi elementi geografici"
+
+	if not no_validate:
+	# Validazione
+		try:
+			print "Validazione caricamento rete"
+			r = tpl.Rete()
+			r.carica(versione=versione, rete_base=rete_base)
+			print "Validazione distanza tratti percorso"
+			out = r.valida_distanze()
+			if out != "":
+				raise Exception(out)
+			print "Validazione connessione rete a grafo"
+			g = graph.Grafo()
+			tpl.registra_classi_grafo(g)
+			#tomtom.load_from_shp(g, 'C:\\Users\\allulll\\Desktop\\grafo\\cpd\\RM_nw%s' % ('_mini' if retina else ''))
+			g.deserialize(os.path.join(settings.TROVALINEA_PATH_RETE, '%s.v3.dat' % settings.GRAPH))
+			tpl.carica_rete_su_grafo(r, g, False, versione=versione)
+
+		except Exception, e:
+			print "Validazione fallita"
+			traceback.print_exc()
+			v = VersionePaline.objects.ultima()
+			v.attiva = False
+			v.save()
+			transaction.commit()
+			raise e
+	print "Rete aggiornata con successo"
+	return versione
+
+
 def carica_rete_in_memoria(path_base):
 	path = lambda f: os.path.join(path_base, f)
 	carteggi = caricaCarteggi(path(carteggiFile), True)
@@ -164,6 +236,9 @@ def processa_file_zip(no_load=False):
 	versione = mysql2datetime(rete.read('validita.txt')[:19])
 	if no_load:
 		return versione
+	if len(VersionePaline.objects.filter(inizio_validita=versione)) > 0:
+		# raise Exception(u"Esiste gia' una rete con l'inizio di validita' indicato")
+		return None
 	prefix = os.path.join(settings.TROVALINEA_PATH_RETE, datetime2compact(versione))
 	rete_path = os.path.join(prefix, 'rete')
 	shp_path = os.path.join(prefix, 'shp')
@@ -209,15 +284,18 @@ def generateColumnExtractor(description):
 
 	return extractor
 
-def caricaCarteggi(carteggiFile, in_memoria=False):
+def caricaCarteggi(carteggiFile, in_memoria=False, sovrascrivi=False):
 	dbf = Dbf()
 	dbf.openFile(carteggiFile)
 	print "Carico carteggi"
 	cs = {}
 	for row in dbf:
 		if not in_memoria:
+			codice = row['CODICE']
+			if sovrascrivi:
+				Carteggio.objects.delete_queryset(Carteggio.objects.by_date().filter(codice=codice))
 			Carteggio(
-				codice=row['CODICE'],
+				codice=codice,
 				descrizione=row['DESCRIZ'],
 			).save()
 		else:
@@ -225,7 +303,7 @@ def caricaCarteggi(carteggiFile, in_memoria=False):
 	return cs
 
 	
-def caricaPaline(palineFile, in_memoria=False):
+def caricaPaline(palineFile, in_memoria=False, sovrascrivi=False):
 	dbf = Dbf()
 	dbf.openFile(palineFile)
 	ps = []
@@ -233,8 +311,11 @@ def caricaPaline(palineFile, in_memoria=False):
 	for row in dbf:
 		nome = row['NOME']
 		if not in_memoria:
+			id_palina = row['ID_PALINA']
+			if sovrascrivi:
+				Palina.objects.delete_queryset(Palina.objects.by_date().filter(id_palina=id_palina))
 			p = Palina(
-				id_palina=row['ID_PALINA'],
+				id_palina=id_palina,
 				nome=nome,
 				descrizione=row['DESCRIZION'],
 				soppressa=(row['SOPPRESSA'] == 'TRUE'),
@@ -256,17 +337,20 @@ def caricaPaline(palineFile, in_memoria=False):
 	if in_memoria:
 		return ps
 
-def caricaGestori(gestoriFile):
+def caricaGestori(gestoriFile, sovrascrivi=False):
 	dbf = Dbf()
 	dbf.openFile(gestoriFile)
 	print "Carico gestori"
 	for row in dbf:
+		nome = row['GESTORE']
+		if sovrascrivi:
+			Gestore.objects.delete_queryset(Gestore.objects.by_date().filter(nome=nome))
 		Gestore(
-			nome=row['GESTORE'],
+			nome=nome,
 			descrizione=row['DESCRIZION'],
 		).save()
 
-def caricaLinee(lineeFile, in_memoria=False):
+def caricaLinee(lineeFile, in_memoria=False, sovrascrivi=False):
 	dbf = Dbf()
 	dbf.openFile(lineeFile)
 	ls = {}
@@ -286,8 +370,11 @@ def caricaLinee(lineeFile, in_memoria=False):
 				g = Gestore.objects.with_latest_version().get(nome=row['GESTORE'])
 			except Gestore.DoesNotExist:
 				raise Exception("%s: il gestore con id %s non esiste" % (lineeFile, row['GESTORE']))
+			id_linea = row['ID_LINEA']
+			if sovrascrivi:
+				Linea.objects.delete_queryset(Linea.objects.by_date().filter(id_linea=id_linea))
 			Linea(
-				id_linea=row['ID_LINEA'],
+				id_linea=id_linea,
 				monitorata=row['ABILITATA'],
 				gestore=g,
 				tipo=tipo,
@@ -303,7 +390,7 @@ def caricaLinee(lineeFile, in_memoria=False):
 		return ls
 		
 		
-def caricaPercorsi(percorsiFile, descrizionePercorsiFile, in_memoria=False, linee=None, carteggi=None, percorsiNoOrariFile=None):
+def caricaPercorsi(percorsiFile, descrizionePercorsiFile, in_memoria=False, linee=None, carteggi=None, percorsiNoOrariFile=None, sovrascrivi=False):
 	# Carico descrizione percorsi
 	dbf = Dbf()
 	dbf.openFile(descrizionePercorsiFile)
@@ -342,13 +429,18 @@ def caricaPercorsi(percorsiFile, descrizionePercorsiFile, in_memoria=False, line
 				partenza = Palina.objects.with_latest_version().get(id_palina=row['PARTENZA'])
 			except Palina.DoesNotExist:
 				raise Exception("%s: la palina di partenza con id %s non esiste" % (percorsiFile, row['PARTENZA']))
-			try:		
+			try:
 				arrivo = Palina.objects.with_latest_version().get(id_palina=row['ARRIVO'])
 			except Palina.DoesNotExist:
 				raise Exception("%s: la palina di arrivo con id %s non esiste" % (percorsiFile, row['ARRIVO']))
 			if partenza == arrivo:
 				verso = 'C'
-				precart = ''				
+				precart = ''
+			if sovrascrivi:
+				if sovrascrivi:
+					PercorsoAtac.objects.delete_queryset(PercorsoAtac.objects.by_date().filter(percorso__id_percorso=id_percorso))
+					Fermata.objects.delete_queryset(Fermata.objects.by_date().filter(percorso__id_percorso=id_percorso))
+					Percorso.objects.delete_queryset(Percorso.objects.by_date().filter(id_percorso=id_percorso))
 			Percorso(
 				id_percorso=id_percorso,
 				linea=linea,
@@ -379,7 +471,7 @@ def caricaPercorsi(percorsiFile, descrizionePercorsiFile, in_memoria=False, line
 		return ps
 			
 
-def caricaFermate(fermateFile, in_memoria=False):
+def caricaFermate(fermateFile, in_memoria=False, sovrascrivi=False):
 	dbf = Dbf()
 	dbf.openFile(fermateFile)
 	fs = {}
@@ -394,6 +486,7 @@ def caricaFermate(fermateFile, in_memoria=False):
 				palina = Palina.objects.with_latest_version().get(id_palina=row['ID_PALINA'])
 			except Palina.DoesNotExist:
 				raise Exception("%s: la palina con id %s non esiste" % (fermateFile, row['ID_PALINA']))
+			# Non è necessario eliminare le fermate vecchie perché sono già state eliminate con i vecchi percorsi
 			Fermata(
 				percorso=percorso,
 				palina=palina,
@@ -408,6 +501,33 @@ def caricaFermate(fermateFile, in_memoria=False):
 				'id_palina': row['ID_PALINA'],
 				'progressiva': row['PROG'],
 			})
+	return fs
+
+def caricaPercorsiAtac(percorsiFile, sovrascrivi=False):
+	"""
+	Carica associazione percorsi Atac - Percorsi
+
+	In fase di test il modello è aggiornato a mano
+	"""
+	dbf = Dbf()
+	dbf.openFile(percorsiFile)
+	fs = {}
+	print "Carico transcodifica percorsi Atac"
+	for row in dbf:
+		id_percorso_rsm = row['IDRSM']
+		id_percorso_atac = row['IDATAC']
+		if id_percorso_atac != '' and id_percorso_atac != '':
+			try:
+				percorso = Percorso.objects.with_latest_version().get(id_percorso=id_percorso_rsm)
+				# Non è necessario eliminare i PercorsiAtac vecchi perché sono già stati eliminati i vecchi percorsi
+				PercorsoAtac(
+					percorso=percorso,
+					id_percorso_atac=id_percorso_atac
+				).save()
+			except Percorso.DoesNotExist:
+				msg = "%s: il percorso RSM con id %s non esiste" % (percorsiFile, id_percorso_rsm)
+				print msg
+				# raise Exception(msg)
 	return fs
 
 

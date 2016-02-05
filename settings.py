@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013-2014 Roma servizi per la mobilità srl
+#    Copyright 2013-2016 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -42,13 +42,17 @@ ADMINS = (
 MANAGERS = ADMINS
 
 MERCURY_WEB = 'web'
+MERCURY_WEB_CL = 'web' #'web-cl'
 MERCURY_GIANO = 'giano'
+MERCURY_GIANO_PERCORSI = 'giano_percorsi'
+MERCURY_CL = 'cl'
 MERCURY_CPD = 'cpd'
 MERCURY_CARICA_RETE = 'carica_rete'
 LOCAL_IP = '127.0.0.1'
+MERCURY_FILE_STORE_PATH = '/data/rete/store'
 
 WS_BASE_URL = 'http://muovi.roma.it'
-DEVELOPER_KEY = 'INSERISCI_QUI_LA_TUA_CHIAVE_SVILUPPATORE'
+DEVELOPER_KEY = 'per1skopio'
 
 TROVALINEA_PATH_RETE = 'paline/rete'
 TROVALINEA_RETE_SPECIALE = os.path.join(TROVALINEA_PATH_RETE, 'special')
@@ -56,7 +60,7 @@ TROVALINEA_RETE_SPECIALE = os.path.join(TROVALINEA_PATH_RETE, 'special')
 DATABASES = {
 	'default': {
 		'ENGINE': 'django.contrib.gis.db.backends.postgis',
-		'NAME': 'muoversiaroma',
+		'NAME': 'devtest',
 		'USER': 'test',
 		'PASSWORD': 'test',
 		'OPTIONS': {'autocommit': True,}
@@ -378,7 +382,7 @@ CONSTANCE_CONFIG = {
 	'CPD_PENAL_PEDONALE_0_2': (1.4, u'Coeff. di penalilzzaz. iniz. camminatore veloce'),
 	'CPD_PENAL_PEDONALE_1_2': (1.7, u'Coeff. di penalilzzaz. camminatore veloce dopo 1 km'),
 	'CPD_PENAL_PEDONALE_EXP_2': (0.5, u'Exp. di penalilzzaz. camminatore veloce'),
-	'CPD_BICI_CAMBIO_STRADA': (25, U'Tempo di svolta in bicicletta'),
+	'CPD_BICI_CAMBIO_STRADA': (25, u'Tempo di svolta in bicicletta'),
 	'CARPOOLING_COSTO_CHILOMETRICO': (0.166, u"Costo medio per percorrere 1km in automobile"),
 }
 

@@ -2,7 +2,7 @@
 #cython: cdivision=True
 
 #
-#    Copyright 2013-2014 Roma servizi per la mobilità srl
+#    Copyright 2013-2016 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -29,6 +29,9 @@ from paline.models import StradaTomtom
 import gis.models as gis
 from pprint import pprint
 import traceback
+import settings
+import cPickle as pickle
+import os, os.path
 
 cdef extern from "stdlib.h":
 	void free(void* ptr)
@@ -213,12 +216,37 @@ cdef class SegmentRepo(object):
 	cdef Segment* r
 	cdef list s
 	cdef long n
+	cdef int caching
+	cdef int dirty_cache
+	cdef dict cache
+	cdef str caching_id
 
-	def __init__(self):
+	def __init__(self, caching_id=None):
 		object.__init__(self)
 		#self.proj = pyproj.Proj("+proj=utm +zone=33 +ellps=WGS84 +datum=WGS84 +units=m +no_defs")
 		self.s = []
-		
+		self.cache = {}
+		self.dirty_cache = 0
+		if caching_id is None:
+			self.caching = 0
+		else:
+			self.caching = 1
+			self.init_cache(caching_id)
+
+	def init_cache(self, caching_id):
+		self.caching_id = caching_id
+		try:
+			with open(os.path.join(settings.TROVALINEA_PATH_RETE, "geocoding_cache_%s.dat" % caching_id)) as f:
+				self.cache = pickle.load(f)
+		except:
+			pass
+
+	def serialize_cache(self):
+		if self.caching and self.dirty_cache:
+			print "Serializing geocoder"
+			with open(os.path.join(settings.TROVALINEA_PATH_RETE, "geocoding_cache_%s.dat" % self.caching_id), "w") as f:
+				pickle.dump(self.cache, f, protocol=-1)
+
 	def add_segment(self, p1, p2, ref):
 		self.s.append((p1, p2, ref))
 		
@@ -248,6 +276,8 @@ cdef class SegmentRepo(object):
 		cdef Segment* minpoint
 		cdef long i
 		cdef double d
+		if self.caching and (1, x, y) in self.cache:
+			return self.cache[(1, x, y)]
 		with nogil:
 			min = -1
 			minpoint = NULL
@@ -260,6 +290,9 @@ cdef class SegmentRepo(object):
 				if min == -1 or d < min:
 					minpoint = &(self.r[i])
 					min = d
+		if self.caching:
+			self.dirty_cache = 1
+			self.cache[(1, x, y)] = (minpoint.eid1, minpoint.eid2, minpoint.eid3)
 		return (minpoint.eid1, minpoint.eid2, minpoint.eid3)
 
 
@@ -267,6 +300,8 @@ cdef class SegmentRepo(object):
 		#p = self.proj(x, y)
 		cdef long i
 		cdef double d
+		if self.caching and (2, x, y, distance) in self.cache:
+			return self.cache[(2, x, y, distance)]
 		out = []
 		for i in range(0, self.n):
 			d = segment_point_dist(
@@ -276,6 +311,9 @@ cdef class SegmentRepo(object):
 			)
 			if d < distance:
 				out.append((self.r[i].eid1, self.r[i].eid2, self.r[i].eid3, d))
+		if self.caching:
+			self.dirty_cache = 1
+			self.cache[(2, x, y, distance)] = out
 		return out
 
 
@@ -286,6 +324,8 @@ cdef class SegmentRepo(object):
 		cdef Segment* minpoint = NULL
 		cdef long i
 		cdef double d
+		if self.caching and (3, x, y) in self.cache:
+			return self.cache[(3, x, y)]
 		for i in range(0, self.n):
 			d = segment_point_dist(
 				self.r[i].Ax, self.r[i].Ay,
@@ -295,6 +335,9 @@ cdef class SegmentRepo(object):
 			if min == -1 or d < min:
 				minpoint = &(self.r[i])
 				min = d
+		if self.caching:
+			self.dirty_cache = 1
+			self.cache[(3, x, y)] = (minpoint.Ax, minpoint.Ay, minpoint.Bx, minpoint.By, minpoint.eid1)
 		return (minpoint.Ax, minpoint.Ay, minpoint.Bx, minpoint.By, minpoint.eid1)
 		
 	
@@ -317,16 +360,17 @@ class SegmentGeocoder(object):
 		return (i, dist, dist + self.length[i])
 	
 	def freeze(self):
+		self.length.append(self.total_length)
 		self.repo.freeze()
 		
 
 	
 class Geocoder(object):
-	def __init__(self, graph, edge_type_id=12):
+	def __init__(self, graph, edge_type_id=12, caching_id=None):
 		object.__init__(self)
 		self.edge_type_id = edge_type_id
 		self.graph = graph
-		self.repo = SegmentRepo()
+		self.repo = SegmentRepo(caching_id=caching_id)
 		for eid in graph.archi:
 			if edge_type_id is None or edge_type_id == eid[0]:
 				e = graph.archi[eid]
@@ -341,7 +385,10 @@ class Geocoder(object):
 					if pold != e.t.get_coordinate()[0]:
 						print "t errato"				
 		self.repo.freeze()
-			
+
+	def serialize_cache(self):
+		self.repo.serialize_cache()
+
 	def _find_nearest_edge(self, point):
 		#print "Cerco"
 		eid1, eid2, i = self.repo.find_nearest_segment(point[0], point[1])

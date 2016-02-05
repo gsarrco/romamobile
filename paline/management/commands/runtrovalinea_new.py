@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013-2014 Roma servizi per la mobilità srl
+#    Copyright 2013-2016 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -34,26 +34,53 @@ class Command(BaseCommand):
 	help = 'Nuovo trovalinea'
 
 	def handle(self, *args, **options):
-		commands = ['mini', 'cpd', 'tr', 'shell', 'special', 'download']
+		"""
+		Usage: python manage.py runtrovalinea_new [arguments] [datetime]
+
+		Arguments may be the following:
+
+		mini: load reduced version of network
+		cpd: load graph to enable route planner
+		tr: get bus data from public transport operators, in real-time
+		shell: open shell
+		special: (deprecated)
+		download: download real-time data from muovi.roma.it public server
+
+		datetime is the timestamp that determines network validity
+		"""
+		commands = ['mini', 'cpd', 'tr', 'shell', 'special', 'download', 'tr_percorsi']
 		dt = None
 		for k in args:
 			if not k in commands:
 				dt = k.replace('T', ' ')
 
-		name = settings.MERCURY_CPD
+		name = settings.MERCURY_CL
+		if 'cpd' in args:
+			name = settings.MERCURY_CPD
 		if 'tr' in args:
 			name = settings.MERCURY_GIANO
-		
+		if 'tr_percorsi' in args:
+			name = settings.MERCURY_GIANO_PERCORSI
+
 		giano = PeerType.objects.get(name=name)
 		giano_daemon = Daemon.get_process_daemon(name)
-		Trovalinea = TrovalineaFactory('mini' in args, 'cpd' in args, 'tr' in args, 'shell' in args, 'special' in args, dt, 'download' in args, daemon=giano_daemon)
+		Trovalinea = TrovalineaFactory(
+			'mini' in args,
+			'cpd' in args,
+			'tr' in args,
+			'shell' in args,
+			'special' in args,
+			dt,
+			'download' in args,
+			daemon=giano_daemon,
+			tempo_reale_percorsi='tr_percorsi' in args,
+		)
 
 		m = Mercury(giano, Trovalinea, daemon=giano_daemon, watchdog_daemon=giano_daemon)
 		if not 'tr' in args:
 			try:
 				print "Richiedo serializzazione"
-				c = Mercury.rpyc_connect_any_static(settings.MERCURY_CPD)
-				Trovalinea.rete.deserializza_dinamico(pickle.loads(c.root.serializza_dinamico()))
+				Trovalinea.rete.deserializza_dinamico_db()
 				print "Serializzazione richiesta effettuata"
 			except Exception, e:
 				print "Serializzazione richiesta fallita"

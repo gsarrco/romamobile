@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013-2014 Roma servizi per la mobilità srl
+#    Copyright 2013-2016 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -30,8 +30,7 @@ urlpatterns = patterns('',
 	url('^percorso/(\w+)$', views.percorso),
 	url('^mappa/js/(\w+)/$', views.visualizza_mappa),
 	url('^mappa/static$', views.visualizza_mappa_statica),
-	url('^mappa/static/(\w)$', views.visualizza_mappa_statica),
-	url('^mappa-palina/js/(\w+)/$', views.visualizza_mappa_palina),
+	url('^mappa/static/(\w+)$', views.visualizza_mappa_statica),
 	url('^mappa-palina/static/(\w+)$', views.visualizza_mappa_statica_palina),
 	url('^mappa-palina/static/(\w+)/(\d*)/([0-9.]*)/([0-9.]*)$', views.visualizza_mappa_statica_palina),
 	url('^palina/(\d+)$', views.palina),

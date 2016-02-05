@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013-2014 Roma servizi per la mobilità srl
+#    Copyright 2013-2016 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -67,11 +67,73 @@ def percorso_orari(request, id_percorso, data, lang):
 @jsonrpc_method('stato_traffico', safe=True)
 def stato_traffico(request, verso):
 	if verso == 'out':
-		percorsi = ['13116', '53771', '2598', '502A', '11436', '11592', '52300', '766A', '2039', '12115', '7288', '53422', '53670', '53861', '52596', '53489', '11574', '53715', '53762', '53776', '50744', '10273', '50329', '53554', '51668', '13085', '50499', '53466', '50046', '52265', '701A', '52968', '51828']
+		percorsi = [
+			'53771',
+			'2598',
+			'502A',
+			'11436',
+			'11592',
+			'766A',
+			'12115',
+			'7288',
+			'53422',
+			'53670',
+			'11574',
+			'53715',
+			'53762',
+			'10273',
+			'50329',
+			'53554',
+			'51668',
+			'13085',
+			'53466',
+			'50046',
+			'52265',
+			'701A',
+			'52968',
+			'51828',
+			'55446',
+			'51907',
+			'54243',
+			'55767',
+			'55771',
+			'55449',
+		]
 	else:
-		percorsi = ['50595', '53770', '2597', '502R', '52632', '11591', '218R', '5404', '2038', '12118', '7287', '53423', '53671', '53860', '52597', '53488', '11573', '53864', '53763', '53778', '51379', '10274', '50594', '53553', '50963', '13084', '50065', '53464', '50047', '808A', '701R', '52969', '51829']
-	
-	c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB)
+		percorsi = [
+			'50595',
+			'53770',
+			'2597',
+			'502R',
+			'52632',
+			'11591',
+			'5404',
+			'12118',
+			'7287',
+			'53423',
+			'53671',
+			'11573',
+			'53864',
+			'10274',
+			'50594',
+			'53553',
+			'50963',
+			'13084',
+			'53464',
+			'50047',
+			'808A',
+			'701R',
+			'52969',
+			'51829',
+			'55444',
+			'50983',
+			'54244',
+			'55769',
+			'55770',
+			'55450',
+		]
+
+	c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB_CL)
 
 	mappa = {
 		'markers': [],
@@ -81,7 +143,7 @@ def stato_traffico(request, verso):
 	
 	for id_percorso in percorsi:
 		try:
-			m = pickle.loads(c.root.percorso_su_mappa(id_percorso, None, '/paline/s/img/', con_stato=True, con_fermate=False, con_bus=False))
+			m = pickle.loads(c.root.percorso_su_mappa(id_percorso, None, '/paline/s/img/', con_stato=True, con_fermate=False, con_bus=False, fattore_thickness=1.6))
 			mappa['markers'].extend(m['markers'])
 			mappa['polylines'].extend(m['polylines'])
 			mappa['sublayers'].append(('traffico_bus', id_percorso))			
@@ -100,14 +162,31 @@ def mappa_layer(request, nome, lang):
 	translation.activate(lang)
 	tipo = nome[0]
 	id = nome[1]
-	c = Mercury.rpyc_connect_any_static(settings.MERCURY_WEB)
+	merc = get_web_cl_mercury()
 	
 	if tipo == 'traffico_bus':
-		out = pickle.loads(c.root.percorso_su_mappa(id, None, '/paline/s/img/', con_stato=True, con_fermate=False, con_percorso=False, con_bus=False))
+		out = merc.sync_any('percorso_su_mappa_ap', {
+			'id_percorso': id,
+			'mappa': None, # TODO: Provvisorio, si può tranquillamente eliminare
+			'path_img': '/paline/s/img/',
+			'con_stato': True,
+			'con_fermate': False,
+			'con_percorso': False,
+			'con_bus': False
+		})
 		out['refresh'] = 2 * 60
 		
 	if tipo == 'traffico_bus_tiny':
-		out = pickle.loads(c.root.percorso_su_mappa(id, None, '/paline/s/img/', con_stato=True, con_fermate=False, con_percorso=False, con_bus=False, fattore_thickness=0.5))
+		out = merc.sync_any('percorso_su_mappa_ap', {
+			'id_percorso': id,
+			'mappa': None,  # TODO: Provvisorio, si può tranquillamente eliminare
+			'path_img': '/paline/s/img/',
+			'con_stato': True,
+			'con_fermate': False,
+			'con_percorso': False,
+			'con_bus': False,
+			'fattore_thickness': 0.5
+		})
 		out['refresh'] = 2 * 60		
 		
 	elif tipo == 'palina':
@@ -115,11 +194,20 @@ def mappa_layer(request, nome, lang):
 	
 	elif tipo == 'palina-singola':
 		palina = Palina.objects.by_date().get(id_palina=id)
-		out = pickle.loads(c.root.palina_su_mappa(id, None, '/paline/s/img/'))
+		out = merc.sync_any('palina_su_mappa_ap', {'id_palina': id, 'path_img': '/paline/s/img/'})
 		out['descrizione'] = u"%s (%s)" % (palina.nome_ricapitalizzato(), palina.id_palina)
 	
 	elif tipo == 'posizione_bus':
-		out = pickle.loads(c.root.percorso_su_mappa(id, None, '/paline/s/img/', con_stato=False, con_fermate=False, con_percorso=False, con_bus=False, con_bus_immediato=True))
+		out = merc.sync_any('percorso_su_mappa_ap', {
+			'id_percorso': id,
+			'mappa': None,  # TODO: Provvisorio, si può tranquillamente eliminare
+			'path_img': '/paline/s/img/',
+			'con_stato': False,
+			'con_fermate': False,
+			'con_percorso': False,
+			'con_bus': False,
+			'con_bus_immediato': True
+		})
 		out['refresh'] = 30
 		
 	elif tipo == 'arrivi_veicolo':
@@ -131,7 +219,14 @@ def mappa_layer(request, nome, lang):
 	
 	elif tipo == 'percorso':
 		p = Percorso.objects.by_date().get(id_percorso=id)
-		out = pickle.loads(c.root.percorso_su_mappa(id, None, '/paline/s/img/', con_stato=False, con_bus=False, con_fermate=True))
+		out = merc.sync_any('percorso_su_mappa_ap', {
+			'id_percorso': id,
+			'mappa': None,  # TODO: Provvisorio, si può tranquillamente eliminare
+			'path_img': '/paline/s/img/',
+			'con_stato': False,
+			'con_bus': False,
+			'con_fermate': True
+		})
 		out['sublayers'] = [
 			('traffico_bus', id),
 			('posizione_bus', id),
@@ -140,7 +235,15 @@ def mappa_layer(request, nome, lang):
 		
 	elif tipo == 'percorso_tiny':
 		p = Percorso.objects.by_date().get(id_percorso=id)
-		out = pickle.loads(c.root.percorso_su_mappa(id, None, '/paline/s/img/', con_stato=False, con_bus=False, con_fermate=False, fattore_thickness=0.3))
+		out = merc.sync_any('percorso_su_mappa_ap', {
+			'id_percorso': id,
+			'mappa': None,  # TODO: Provvisorio, si può tranquillamente eliminare
+			'path_img': '/paline/s/img/',
+			'con_stato': False,
+			'con_bus': False,
+			'con_fermate': False,
+			'fattore_thickness': 0.3
+		})
 		out['sublayers'] = [
 			('traffico_bus_tiny', id),
 			('posizione_bus', id),
@@ -157,9 +260,17 @@ def mappa_layer(request, nome, lang):
 			out = {'errore': start}
 		else:
 			max_distanza = id[2]
-			out = pickle.loads(c.root.risorse_vicine(start, tipi_ris, 5, max_distanza))
+			out = get_web_cpd_mercury().sync_any('risorse_vicine_ap', {
+				'start': start,
+				'tipi_ris': tipi_ris,
+				'num_ris': 5,
+				'max_distanza': max_distanza,
+			})
 			out['descrizione'] = 'Luoghi trovati'
-	
+
+	elif tipo == 'pannelli':
+		out = pannellibw.mappa_layer(request, nome)
+
 	# pprint(out)
 	return out
 

@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013-2014 Roma servizi per la mobilità srl
+#    Copyright 2013-2016 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -1618,7 +1618,7 @@ class Waiting(VerticalPanel):
 		self.wait = Image('wait.gif', Width='31px', Height='31px')
 		self.wait.addStyleName('waiting-image')
 		self.menu = Image('toolbar/menu.png', Width='48px', Height='48px')
-		self.focus = TextBox()
+		self.focus = Button('')
 		self.focus.addStyleName('focus-sink')
 		self.add(self.wait)
 		self.add(self.menu)

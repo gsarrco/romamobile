@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013-2014 Roma servizi per la mobilità srl
+#    Copyright 2013-2016 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -102,8 +102,55 @@ class MapPanel(SimplePanel, DeferrablePanel):
 		popup = ContextMenuPopupPanel(menu)
 		popup.showAt(x + mx, y + my)
 
+	def create_map_new(self):
+		self.retina = JS("""$wnd['L'].Browser.retina""")
+		if self.retina:
+			tms_url = 'http://172.16.0.14:8080/geoserver/gwc/service/tms/1.0.0/osm_group@EPSG%3A900913@png/{z}/{x}/{y}.png'
+		else:
+			tms_url = 'http://172.16.0.14:8080/geoserver/gwc/service/tms/1.0.0/osm_group@EPSG%3A900913@png/{z}/{x}/{y}.png'
+		mapquestAttrib = """Tiles Courtesy of <a href="http://www.mapquest.com/" target="_blank">MapQuest</a>
+		<img src="http://developer.mapquest.com/content/osm/mq_logo.png">,
+		&copy; <a href="http://www.openstreetmap.org/" target="_blank">OpenStreetMap</a>"""
+		func = self.onRightClick
+		JS("""
+			this.map = $wnd['L'].map(
+				'map-container', {
+					zoomControl: false
+				}
+			).setView([41.892055, 12.483559], 12);
+			zoom_ctrl = $wnd['L'].control.zoom({position: 'topright'});
+			this.map.addControl(zoom_ctrl);
+			/* osm = $wnd['L'].tileLayer('http://{s}.mqcdn.com/tiles/1.0.0/map/{z}/{x}/{y}.png', { */
+			osm = $wnd['L'].tileLayer(tms_url, {
+				attribution: mapquestAttrib,
+				detectRetina: true,
+				maxZoom: 18,
+				tms: true
+			});
+			osm.addTo(this.map);
+			/*
+				pcn = $wnd['L'].tileLayer.wms("http://wms.pcn.minambiente.it/ogc?map=/ms_ogc/WMS_v1.3/raster/ortofoto_colore_08.map", {
+					layers: 'OI.ORTOIMMAGINI.2008',
+					minZoom: 16,
+					format: 'image/png',
+					attribution: '<a href="http://www.pcn.minambiente.it/GN/" target="_blank">Geoportale Nazionale</a>'
+				});
+				var baseMaps = {
+					"Cartografia": osm,
+				};
+				var overlayMaps = {
+					"Immagini aeree (zoom in)": pcn
+				};
+				var layersControl = new $wnd['L'].Control.Layers(baseMaps, overlayMaps);
+				this.map.addControl(layersControl);
+			*/
+			this.map.addEventListener('contextmenu', function(e) {
+				func(e.latlng.lat, e.latlng.lng, e.containerPoint.x, e.containerPoint.y)
+			});
+		""")
 
-	def create_map(self):
+
+	def create_map_old(self):
 		mapquestAttrib = """Tiles Courtesy of <a href="http://www.mapquest.com/" target="_blank">MapQuest</a>
 		<img src="http://developer.mapquest.com/content/osm/mq_logo.png">,
 		&copy; <a href="http://www.openstreetmap.org/" target="_blank">OpenStreetMap</a>"""
@@ -144,6 +191,8 @@ class MapPanel(SimplePanel, DeferrablePanel):
 			});
 		""")
 
+	def create_map(self):
+		return self.create_map_old()
 
 	def relayout(self):
 		JS("""self.map.invalidateSize();""")
@@ -261,7 +310,7 @@ class InfoPanel(PaginatedPanelPage, ScrollPanel):
 
 
 class Layer(object):
-	def __init__(self, name, label, map_panel, owner=None):
+	def __init__(self, name, label, map_panel, owner=None, add_layer=None, function=None):
 		self.name = name
 		self.label = label
 		self.map_panel = map_panel
@@ -271,15 +320,16 @@ class Layer(object):
 		self.sub = []
 		self.owner = owner
 		self.destroyed = False
+		self.function = function
 		map = map_panel.map
 		JS("""
 			self.group = new $wnd['L'].featureGroup();
 			self.group.addTo(map);
 		""")
-		if self.owner is None:
+		if add_layer == True or (self.owner is None and add_layer != False):
 			map_panel.addLayer(self)
-		else:
-			client.mappa_layer(name, get_lang(), JsonHandler(self.onMappaLayerDone))
+		if self.owner is not None:
+			client.mappa_layer(function, get_lang(), JsonHandler(self.onMappaLayerDone))
 
 			
 	def onMappaLayerDone(self, res):
@@ -314,13 +364,17 @@ class Layer(object):
 				Polyline(self, p['points'], p['opacity'], p['color'], p['thickness'], p['zIndex'], visible=self.visible)
 		if 'sublayers' in res:
 			for s in res['sublayers']:
-				sl = Layer(s, None, self.map_panel, self)
+				sl = Layer('sublayer', None, self.map_panel, self, function=s)
 				self.sub.append(sl)
 		if 'refresh' in res:
-			Timer(res['refresh'] * 1000, self.onRefresh)
+			self.refresh = res['refresh'] * 1000
+			Timer(self.refresh, self.onRefresh)
 			
 	def onRefresh(self):
-		client.mappa_layer(self.name, get_lang(), JsonHandler(self.onMappaLayerDone))
+		client.mappa_layer(self.function, get_lang(), JsonHandler(self.onMappaLayerDone, self.onRefreshError))
+
+	def onRefreshError(self):
+		Timer(self.refresh, self.onRefresh())
 
 	def setVisible(self, visible=True):
 		self.visible = visible
@@ -426,11 +480,14 @@ class LayerPanel(VerticalPanel):
 
 
 class GeoJson:
-	def __init__(self, layer, data, visible=True):
+	def __init__(self, layer, data, visible=True, color='#0000ff'):
 		self.layer = layer
 		self.visible = False
 		JS("""
-			self.geojson = $wnd['L'].geoJson(JSON.parse(data));
+			var gjstyle = {
+				"color": color
+			}
+			self.geojson = $wnd['L'].geoJson(JSON.parse(data), {style: gjstyle});
 			layer.group.addLayer(self.geojson);
 		""")
 		self.layer.features.append(self)
@@ -595,8 +652,34 @@ class Polyline:
 			self.myPoly.addTo(map)
 		else:
 			map.removeLayer(self.myPoly)
-	
-		
+
+
+class Polygon:
+	def __init__(self, layer, points, opacity=1, color='#000000', thickness=1, zIndex=0, visible=True):
+		pt = list_to_point_array(points)
+		self.visible = visible
+		self.layer = layer
+		layer.features.append(self)
+		map = layer.getMap() if visible else None
+		JS("""
+			var myPolyOpt = {
+				color: color,
+				opacity: opacity,
+				weight: thickness,
+			}
+			self.myPoly = new $wnd['L'].polygon(pt, myPolyOpt);
+			self.myPoly.addTo(map);
+			layer.group.addLayer(self.myPoly);
+		""")
+
+	def setVisible(self, visible):
+		self.visible = visible
+		map = self.layer.getMap()
+		if visible:
+			self.myPoly.addTo(map)
+		else:
+			map.removeLayer(self.myPoly)
+
 		
 class Geocoder(KeyboardHandler):
 	def __init__(self, search, method, map=None, pin_url='partenza_percorso.png', pin_size=(32, 32), lngBox=None, latBox=None, callback=None, anchor=(16, 32)):

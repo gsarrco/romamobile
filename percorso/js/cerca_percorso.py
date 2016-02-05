@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #
-#    Copyright 2013-2014 Roma servizi per la mobilità srl
+#    Copyright 2013-2016 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
 #    This file is part of Muoversi a Roma for Developers.
@@ -514,6 +514,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 						{
 							'class': HP,
 							'width': None,
+							'name': 'selettore_modo',
 							'sub': [
 								{
 									'class': GP,
@@ -744,6 +745,12 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 								],
 							},
 							{
+								'class': VP,
+								'name': 'altre_opzioni',
+								'call_setVisible': ([False], {}),
+								'sub': []
+							},
+							{
 								'class': Label,
 								'args': [_('Quando')],
 								'style': 'indicazioni-h1',
@@ -828,13 +835,14 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 					}],
 				},
 				{
-					'class': SP,
+					'class': VP,
 					'name': 'risultati_holder',
 					'sub': [],
 				},
 				{
 					'class': HTML,
 					'style': 'indicazioni',
+					'name': 'informazioni_su',
 					'args': [
 						_("""
 						<p>
@@ -1203,6 +1211,41 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 			self.owner.showSidePanel()
 			self.cercaPercorso()
 
+	def setupDss(self):
+		parent = self.base.by_name('altre_opzioni')
+		self.dss_base =  VP(parent, [
+			{
+				'class': HP,
+				'sub': [
+					{
+						'class': HTML,
+						'args': ['k =&nbsp;'],
+						'vertical_alignment': HasAlignment.ALIGN_MIDDLE,
+					},
+					{
+						'class': TextBox,
+						'name': 'dss_k',
+						'call_setVisibleLength': ([3], {}),
+						'call_setText': (['1'], {}),
+						'vertical_alignment': HasAlignment.ALIGN_MIDDLE,
+					},
+				],
+			},
+			{
+				'class': CheckBox,
+				'args': ['Abilitato al transito nelle ZTL', True],
+				'name': 'dss_ztl',
+			},
+		])
+		parent.add(self.dss_base)
+		parent.setVisible(True)
+		self.base.by_name('opzioni_car').setVisible(False)
+		self.base.by_name('luogo').setVisible(False)
+		self.base.by_name('selettore_modo').setVisible(False)
+		self.base.by_name('informazioni_su').setVisible(False)
+		self.k_layers = []
+
+
 	def onChange(self, el):
 		el.removeStyleName('validation-error')
 		
@@ -1351,6 +1394,10 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 			}
 			if self.usa_dss and self.modo == 0:
 				opzioni['usa_dss'] = True
+				opzioni['dss_k'] = self.dss_base.by_name('dss_k').getText()
+				opzioni['dss_ztl'] = self.dss_base.by_name('dss_ztl').isChecked()
+				opzioni['dss_alg'] = 'pathrev' if self.base.by_name('quando_3').isChecked() else 'path'
+
 			if self.linee_escluse is not None:
 				opzioni['linee_escluse'] = self.linee_escluse
 			if su_mappa:
@@ -1478,7 +1525,11 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 
 
 	def onCercaDoneDss(self, res):
-		GeoJson(self.cp_layer, res['geojson'])
+		risultati_holder = self.base.by_name('risultati_holder')
+		risultati_holder.clear()
+
+		for l in self.k_layers:
+			l.destroy()
 
 		Marker(
 			self.cp_layer,
@@ -1498,37 +1549,44 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 			drop_callback=self.onRightClickA,
 		)
 
-		risultati_holder = self.base.by_name('risultati_holder')
-		if self.risultati is not None:
-			risultati_holder.remove(self.risultati)
+		i = 0
+		colors = ["#0000ff", "#ff0000", "#00ff00"]
+		for percorso in res['percorsi']:
+			color = colors[min(i, len(colors) - 1)]
+			i += 1
 
-		self.risultati = DP(
-			None,
-			[
-				{
-					'class': VP,
-					'style': 'indicazioni',
-					'sub': [
-						{
-							'class': GP,
-							'column_count': 2,
-							'name': 'proprieta',
-							'sub': [],
-						},
-					]
-				}
-			],
-			title=_('Percorso trovato'),
-		)
+			layer = Layer('k_layer_%d' % i, _('Percorso %d' % i), self.map)
+			GeoJson(layer, percorso['geojson'], color=color)
+			self.k_layers.append(layer)
 
-		prop = self.risultati.by_name('proprieta')
-		stats = res['stats']
-		for k in stats:
-			prop.add(HTML('<b>%s</b>:' % k))
-			prop.add(HTML(stats[k]))
+			risultati = DP(
+				None,
+				[
+					{
+						'class': VP,
+						'style': 'indicazioni',
+						'sub': [
+							{
+								'class': GP,
+								'column_count': 2,
+								'name': 'proprieta',
+								'sub': [],
+							},
+						]
+					}
+				],
+				title=_('Percorso %d' % i),
+			)
 
-		self.risultati.setOpen(True)
-		risultati_holder.add(self.risultati)
+			prop = risultati.by_name('proprieta')
+			stats = percorso['stats']
+			for k in stats:
+				name, value = k
+				prop.add(HTML('<b>%s</b>:' % name))
+				prop.add(HTML(value))
+
+			risultati.setOpen(False)
+			risultati_holder.add(risultati)
 
 		self.owner.center_and_zoom(self.cp_layer)
 		if self.owner.isSmall():
