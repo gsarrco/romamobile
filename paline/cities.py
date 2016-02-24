@@ -176,12 +176,15 @@ def percorsi_veicoli(r):
 
 
 class AggiornatorePercorsi(Thread):
-	def __init__(self, rete, queue, veicoli):
+	def __init__(self, rete, queue, veicoli, partenze_veicoli):
 		Thread.__init__(self)
 		self.rete = rete
 		self.queue = queue
 		self.quit_request = False
 		self.veicoli = veicoli
+		# Dizionario con le partenze dei veicoli a capolinea, indicizzato con gli id_veicolo
+		# Ogni elemento è un dizionario con chiavi 'id_palina' (in cui si trova il veicolo) e 'ora_partenza'
+		self.partenze_veicoli = partenze_veicoli
 
 
 	def run(self):
@@ -211,6 +214,20 @@ class AggiornatorePercorsi(Thread):
 								self.veicoli[id_veicolo] = el
 								self.veicoli[id_veicolo]['tutti'] = []
 							self.veicoli[id_veicolo]['tutti'].append(el)
+
+						# Partenza da capolinea
+						if el['previsione_partenza'] == 'true':
+							if id_veicolo in self.partenze_veicoli:
+								old = self.partenze_veicoli[id_veicolo]
+								if old['ora_partenza'] > el['ora_arrivo']:
+									old['ora_partenza'] = el['ora_arrivo']
+									old['id_palina'] = p.id_palina
+							else:
+								self.partenze_veicoli[id_veicolo] = {
+									'ora_partenza': el['ora_arrivo'],
+									'id_palina': p.id_palina,
+								}
+
 				except Exception, e:
 					# traceback.print_exc()
 					# print "** Timeout, %d tentativi rimasti" % tentativi_rimasti
@@ -230,6 +247,7 @@ class AggiornatorePercorsi(Thread):
 
 def percorsi_veicoli_multithread(r, num_thread=6, timeout=timedelta(minutes=3), max_tentativi=5):
 	veicoli = {'-1': 0}
+	partenze_veicoli = {}
 	s = r.capilinea
 	l = []
 	for p in s:
@@ -243,7 +261,7 @@ def percorsi_veicoli_multithread(r, num_thread=6, timeout=timedelta(minutes=3), 
 	print "Aggiorno percorsi"
 	threads = []
 	for i in range(0, num_thread):
-		t = AggiornatorePercorsi(r, q, veicoli)
+		t = AggiornatorePercorsi(r, q, veicoli, partenze_veicoli)
 		t.start()
 		threads.append(t)
 	tstop = datetime.now() + timeout
@@ -259,6 +277,7 @@ def percorsi_veicoli_multithread(r, num_thread=6, timeout=timedelta(minutes=3), 
 		t.quit()
 	print "Aggiornamento percorsi completato, %d percorsi non aggiornati, %d veicoli" % (veicoli['-1'], len(veicoli) - 1)
 	r.percorsi_veicoli_atac = veicoli
+	r.partenze_capilinea_atac = partenze_veicoli
 
 
 # Parametri:

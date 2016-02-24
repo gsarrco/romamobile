@@ -194,7 +194,7 @@ class Command(BaseCommand):
 										indirizzo = " ".join([row[g] for g in geo])
 									else:
 										indirizzo = row['indirizzo']
-									res = infopoint.geocode_place(indirizzo)
+									res = infopoint.geocode_place(None, indirizzo)
 									if res['stato'] != 'OK':
 										pprint(res)
 										print "Errore di geocoding"

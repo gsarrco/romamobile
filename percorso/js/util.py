@@ -52,6 +52,7 @@ from pyjamas.ui.FocusListener import FocusHandler
 from pyjamas.ui.Tree import Tree, TreeItem
 from pyjamas.ui.Image import Image
 from pyjamas.ui import HasAlignment, HorizontalSplitPanel, FocusListener
+from pyjamas.JSONService import JSONProxy
 from pyjamas.ui.MenuBar import MenuBar
 from pyjamas.ui.MenuItem import MenuItem
 from pyjamas.ui.Widget import Widget
@@ -62,11 +63,14 @@ from datetime import date, time, datetime, timedelta
 from DissolvingPopup import DissolvingPopup
 from pyjamas.ui.HTMLPanel import HTMLPanel
 from messages import messages
-from globals import get_user, get_control, old_android
+from globals import get_user, get_control, old_android, flavor, base_url
 
+client = JSONProxy(base_url + '/json/', [
+	'servizi_storage_set',
+])
 
 class JsonHandler():
-	def __init__(self, callback, callback_error=None, data=None):
+	def __init__(self, callback=None, callback_error=None, data=None):
 		self.callback = callback
 		self.callback_error = callback_error
 		self.data = data
@@ -1903,18 +1907,30 @@ def ask_login():
 		]
 	).show()
 
+storage_web = {}
+
 def storage_get(key, default_value=None):
-	JS("""
-		if(localStorage && localStorage[key]) {
-			ret = localStorage[key];
-		} else {
-			ret = default_value;
-		}
-	""")
-	return ret
+	if flavor == 'web':
+		if key in storage_web:
+			return storage_web[key]
+		return default_value
+	else:
+		JS("""
+			if(localStorage && localStorage[key]) {
+				ret = localStorage[key];
+			} else {
+				ret = default_value;
+			}
+		""")
+		return ret
 
 def storage_set(key, value):
-	JS("""localStorage[key] = value;""")
+	if flavor == 'web':
+		storage_web[key] = value
+		client.servizi_storage_set(key, value, JsonHandler())
+
+	else:
+		JS("""localStorage[key] = value;""")
 
 def enforce_login(f):
 	def g(*args, **kwargs):

@@ -62,7 +62,7 @@ import os, os.path
 import xmlrpclib
 from paline.geomath import gbfe_to_wgs84
 from xhtml.templatetags.format_extras import arrotonda_distanza
-from mercury.models import Mercury
+from mercury.models import Mercury, Job
 import hashlib
 from pprint import pprint
 
@@ -161,6 +161,18 @@ class PercorsoForm(forms.Form):
 def _dettaglio_paline_app(request, palina):
 	p = palina
 	prev = _dettaglio_paline(request, p.nome, [p], aggiungi=p.id_palina, as_service=True)
+	# Workaround per eliminare la prossima partenza da capolinea dai dati in forma strutturata,
+	# poiché essa è già contenuta nell'annuncio, e le vecchie versioni dell'app la mostrerebbero due volte.
+	if 'arrivi' in prev:
+		for arrivo in prev['arrivi']:
+			if 'partenza' in arrivo:
+				arrivo['partenza'] = ''
+	if 'primi_per_palina' in prev:
+		for primi in prev['primi_per_palina']:
+			if 'arrivi' in primi:
+				for arrivo in primi['arrivi']:
+					if 'partenza' in arrivo:
+						arrivo['partenza'] = ''
 	prev['collocazione'] = p.descrizione
 	if request.user.is_authenticated():
 		preferito = PalinaPreferita.objects.filter(gruppo__user=request.user, id_palina=p.id_palina).count() > 0
@@ -397,9 +409,22 @@ def _percorso(request, id_percorso, ctx=None, id_veicolo=None, giorno_partenze=N
 		# Veicoli percorso
 		veicoli = p.get_veicoli(False)
 		v2 = {}
+		veicolo_selezionato_a_capolinea = False
 		for v in veicoli:
 			id_palina = v['id_prossima_palina']
-			if v['id_veicolo'] == id_veicolo or not id_palina in v2:
+			if v['a_capolinea']:
+				if v['id_veicolo'] == id_veicolo:
+					v2[id_palina] = v
+					veicolo_selezionato_a_capolinea = True
+				elif not veicolo_selezionato_a_capolinea:
+					vold = None
+					if id_palina in v2:
+						vold = v2[id_palina]
+					if vold is None or vold['orario_partenza_capolinea'] is None or (
+						v['orario_partenza_capolinea'] is not None and vold['orario_partenza_capolinea'] > v['orario_partenza_capolinea']
+					):
+						v2[id_palina] = v
+			elif v['id_veicolo'] == id_veicolo or not id_palina in v2:
 				v2[id_palina] = v
 		for f in fermate:
 			id_palina = f['id_palina']
@@ -919,7 +944,7 @@ def _default(request, cerca, ctx, as_service, dett_paline=False):
 	# Infine, provo a considerare il testo immesso come indirizzo e cercare linee e paline vicine
 	if not is_int(cerca):
 		try:
-			res = infopoint.geocode_place(cerca)
+			res = infopoint.geocode_place(request, cerca)
 			if res['stato'] == 'Ambiguous':
 				if as_service:
 					ctx['tipo'] = 'Indirizzo ambiguo'
@@ -1012,6 +1037,7 @@ def carica_rete(request):
 			f = open(os.path.join(settings.TROVALINEA_PATH_RETE, 'temp/shp.zip'), 'wb')
 			f.write(shape.read())
 			f.close()
+			Job.objects.filter(function='paline.carica_rete').update(action='O')
 			# c = Mercury.rpyc_connect_any_static(settings.MERCURY_CARICA_RETE)
 			# caricatore = rpyc.async(c.root.carica_rete)
 			# caricatore()

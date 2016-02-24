@@ -101,9 +101,9 @@ def _validate_address(address):
 	error_messages = []
 	error_fields = []
 	correct_output = None
-	res = infopoint.geocode_place(address, geocoder='infopoint')
+	res = infopoint.geocode_place(None, address, geocoder='infopoint')
 	if address == '':
-		error_messages.append(_("indirizzo (manca)") % cosa)
+		error_messages.append(_("indirizzo (manca)"))
 		error_fields.append("address")
 	if res['stato'] == 'Ambiguous':
 		error_messages.append(_("indirizzo (molti trovati)"))

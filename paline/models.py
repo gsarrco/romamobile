@@ -52,7 +52,6 @@ from mercury.models import Mercury
 from gis.models import Polilinea
 import zlib
 
-ABILITA_CACHING = True
 INTERVALLO_IN_ARRIVO = 90 # secondi
 
 TIPI_LINEA_INFOTP = ['BU', 'TR']
@@ -238,7 +237,7 @@ TIPO_LINEA_CHOICES = (
 TIPO_LINEA_CHOICES_DICT = dict(TIPO_LINEA_CHOICES)
 
 def componi_annuncio(el, short=False):
-	if int(el['a_capolinea']):
+	if int(el['a_capolinea']) and el['prossima_partenza'] == '':
 		if short:
 			return _("Capol.")
 		else:
@@ -248,18 +247,24 @@ def componi_annuncio(el, short=False):
 	tempo = int(el['tempo_attesa'])
 	fermate = int(el['distanza_fermate'])
 	if tempo == -1:
-		tempo_s = '*'
+		tempo_s = ''
 	else:
-		tempo_s = "%d'" % int(round(tempo / 60.0))
+		tempo_s = "(%d')" % int(round(tempo / 60.0))
 	if fermate == 1:
 		if short:
-			return _("1 Ferm. (%(tempo)s)") % {'tempo': tempo_s}
+			out = _("1 Ferm. %(tempo)s") % {'tempo': tempo_s}
 		else:
-			return _("1 Fermata (%(tempo)s)") % {'tempo': tempo_s}
-	if short:
-		return _("%(fermate)d Ferm. (%(tempo)s)") % {'fermate': fermate, 'tempo': tempo_s}
+			out = _("1 Ferm. %(tempo)s") % {'tempo': tempo_s}
+	elif short:
+		out = _("%(fermate)d Ferm. %(tempo)s") % {'fermate': fermate, 'tempo': tempo_s}
 	else:
-		return _("%(fermate)d Fermate (%(tempo)s)") % {'fermate': fermate, 'tempo': tempo_s}
+		out = _("%(fermate)d Ferm. %(tempo)s") % {'fermate': fermate, 'tempo': tempo_s}
+	if el['a_capolinea']:
+		if short:
+			out = _("Capol. %(tempo)s (p.%(orario)s)") % {'tempo': tempo_s, 'orario': el['prossima_partenza'].strftime("%H:%M")}
+		else:
+			out += _(" (parte alle %(orario)s)") % {'orario': el['prossima_partenza'].strftime("%H:%M")}
+	return out
 
 class Linea(VersionatoPaline, Disabilitabile):
 	id_linea = models.CharField(max_length=30, db_index=True)
@@ -323,80 +328,8 @@ class Palina(VersionatoPaline, Disabilitabile):
 	
 	def nome_ricapitalizzato(self):
 		return ricapitalizza(self.nome)
-	
-	def getVeicoliInfoTP(self, lineas=None):
-		"""
-		Restituisce i veicoli contattando direttamente InfoTP
-		
-		lineas filtra per linea. Può essere:
-			* None: restituisce tutte le linee
-			* Una stringa: restituisce solo la linea passata
-			* Una lista di stringhe: restituisce solo le linee passate
-		"""
-		if type(lineas) == str or type(lineas) == unicode:
-			lineas = [lineas]			
-		ret = {}
-		ret['abilitata'] = self.abilitata_complessivo()
-		if ret['abilitata']:
-			ret['id_news'] = -1
-		else:
-			ret['id_news'] = self.id_news_disabilitazione_complessivo()
-		if lineas is not None:
-			ret['linea'] = ",".join(lineas)
-		ret['collocazione'] = self.descrizione
-		ret['soppressa'] = self.soppressa
-		linee = []
-		opener = urllib2.build_opener()
-		response = opener.open('http://localhost/Xml_PrevNodo.php?IdFermata=%s' % (self.id_palina), timeout=settings.INFOTP_TIMEOUT)
-		xmls = response.read()
-		xmls = re.sub('\n','',xmls)
-		xmls = re.sub('\r','',xmls)
-		xmldoc = minidom.parseString(xmls)
-		for n in xmldoc.childNodes[0].childNodes:
-			id_linea = n.getAttribute('id_linea')
-			if lineas is None or id_linea in lineas: 
-				l = {}
-				l['linea'] = id_linea
-				l['id_percorso'] = n.getAttribute('id_percorso')
-				
-				# decodifica carteggio
-				try:
-					percorso = Percorso.seleziona_con_cache(l['id_percorso'])
-					l['carteggi_dec'] = percorso.decodeCarteggio()
-					l['carteggi'] = percorso.carteggio_quoz
-					arrivo = percorso.getArrivo()
-					l['capolinea'] = arrivo['nome']
-				except Exception, e:
-					#e = errors.XMLRPC['XRE_NO_PERCORSO']
-					#e.message = "Percorso inesistente: %s, %s" % (type(l['id_percorso']), str(l['id_percorso']))
-					#raise e
-					#print e
-					l['carteggi_dec'] = ''					
-					l['capolinea'] = ''	
-					l['carteggi'] = ''
-					percorso = None				
-				l['meb'] = 1 if n.getAttribute('emettitrice_biglietti') == 'S' else 0
-				l['pedana'] = 1 if n.getAttribute('pedana_disabili') == 'S' else 0
-				l['moby'] = 1 if n.getAttribute('sistema_com_mobile') == 'S' else 0
-				l['aria'] = 1 if n.getAttribute('aria_condizionata') == 'S' else 0
-				a_capolinea = 1 if n.getAttribute('a_capolinea') == 'S' else 0
-				l['a_capolinea'] = a_capolinea
-				l['in_arrivo'] = 1 if n.getAttribute('in_arrivo') == 'S' else 0
-				l['tempo_attesa'] = n.getAttribute('tempo')
-				l['distanza_fermate'] = n.getAttribute('fermate')
-				l['id_veicolo'] = n.getAttribute('id_veicolo')
-				l['prossima_partenza'] = ''
-				if a_capolinea and percorso is not None:
-					l['prossima_partenza'] = percorso.getProssimaPartenza()
-				l['annuncio'] = componi_annuncio(l)
-				linee.append(l)
-	
-		# informazioni sulla palina
-		ret['nome'] = self.nome_ricapitalizzato()
-		ret['veicoli'] = linee
-		return ret
-	
-	def getVeicoliCaching(self, lineas=None):
+
+	def getVeicoli(self, lineas=None, caching=True):
 		"""
 		Restituisce i veicoli
 		
@@ -404,6 +337,8 @@ class Palina(VersionatoPaline, Disabilitabile):
 			* None: restituisce tutte le linee
 			* Una stringa: restituisce solo la linea passata
 			* Una lista di stringhe: restituisce solo le linee passate
+
+		caching è un parametro fittizio, presente nella segnatura per compatibilità con il passato
 		"""
 		if type(lineas) == str or type(lineas) == unicode:
 			lineas = [lineas]			
@@ -440,16 +375,19 @@ class Palina(VersionatoPaline, Disabilitabile):
 				el2['aria'] = int(el['aria'])
 				el2['meb'] = int(el['meb'])
 				el2['a_capolinea'] = int(a_capolinea)
-				el2['annuncio'] = componi_annuncio(el2)
 				el2['prossima_partenza'] = ''
 				if a_capolinea:
 					try:
-						percorso = Percorso.seleziona_con_cache(id_percorso=id_percorso)
-						prossima_partenza = percorso.getProssimaPartenza()
-						if prossima_partenza is not None:
-							el2['prossima_partenza'] = prossima_partenza
+						if 'orario_partenza_capolinea' in el:
+							el2['prossima_partenza'] = el['orario_partenza_capolinea']
+						# else:
+						# 	percorso = Percorso.seleziona_con_cache(id_percorso=id_percorso)
+						# 	prossima_partenza = percorso.getProssimaPartenza()
+						# 	if prossima_partenza is not None:
+						# 		el2['prossima_partenza'] = prossima_partenza
 					except Exception as e:
 						pass
+				el2['annuncio'] = componi_annuncio(el2)
 				try:
 					p = Percorso.seleziona_con_cache(el['id_percorso'])
 					el2['carteggi_dec'] = p.decodeCarteggio()
@@ -469,59 +407,7 @@ class Palina(VersionatoPaline, Disabilitabile):
 		ret['nome'] = self.nome_ricapitalizzato()
 
 		return ret
-	
-	def getVeicoli(self, lineas=None, no_caching=False, caching=False):
-		if caching or (ABILITA_CACHING and not no_caching):
-			return self.getVeicoliCaching(lineas)
-		return self.getVeicoliInfoTP(lineas)
-	
-	
-	def test_tempi(self, writer):
-		def cerca(vs, id_veicolo):
-			for v in vs:
-				if v['id_veicolo'] == id_veicolo:
-					return v
-			return None
-		
-		try:
-			print ""
-			n = datetime.now()
-			vs1 = self.getVeicoliInfoTP()['veicoli']
-			vs2 = self.getVeicoliCaching()['veicoli']
-			r = random.Random()
-			if len(vs1) == 0:
-				print "Nessun arrivo"
-				if writer is not None:
-					writer.writerow([n, self.id_palina, -1, -1, -1, -1, -1, -1])
-				return
-			v1 = r.choice(vs1)
-			id_veicolo = v1['id_veicolo']
-			prefix = [n, self.id_palina, v1['linea'], v1['id_percorso'], id_veicolo]
-			v2 = cerca(vs2, id_veicolo)
-			print "Palina: %s" % self.id_palina
-			print "Veicolo: %s" % id_veicolo
-			t1 = int(v1['tempo_attesa'])
-			print "Tempo InfoTP: %d" % t1
-			if v2 is None:
-				print "Veicolo non presente in cache"
-				if writer is not None:
-					writer.writerow(prefix + [t1, -1, -1])
-				return			
-			t2 = int(v2['tempo_attesa'])
-			print "Tempo Caching: %d" % t2
-			v1 = cerca(self.getVeicoliInfoTP()['veicoli'], id_veicolo)
-			while v1 is not None:
-				sleep(15)
-				v1 = cerca(self.getVeicoliInfoTP()['veicoli'], id_veicolo)
-			tvero = (datetime.now() - n).seconds
-			print "Tempo vero: %d" % tvero
-			if writer is not None:
-				writer.writerow(prefix + [t1, t2, tvero])
-		except Exception, e:
-			print e
-			writer.writerow([n, self.id_palina, -2, -1, -1, -1, -1, -1])			
 
-			
 	
 	def getVeicoliFiltraPerLinea(self, id_linea, caching=False):
 		vs = self.getVeicoli(caching=caching)
@@ -729,6 +615,8 @@ class Percorso(VersionatoPaline, Disabilitabile):
 					'lon': p[0],
 					'lat': p[1],
 					'id_prossima_palina': v['id_prossima_palina'],
+					'a_capolinea': v['a_capolinea'],
+					'orario_partenza_capolinea': v['orario_partenza_capolinea'],
 				}
 				if get_arrivi:
 					infobox = '<p><b>Veicolo %s</b></p><p>' % v['id_veicolo']
@@ -793,7 +681,6 @@ def get_primi_arrivi(paline):
 		fermate = Fermata.objects.by_date().filter(palina=palina)
 		percorsi = Percorso.objects.by_date().filter(fermata__in=fermate, soppresso=False)
 		percorsi = [p for p in percorsi if p.adesso_attivo()]
-		id_percorsi = dict([(p.id_percorso, p) for p in percorsi])
 		linee = Linea.objects.by_date().filter(percorso__in=percorsi, tipo__in=TIPI_LINEA_INFOTP).distinct()
 		ret = {}
 		# Preparazione linee
@@ -814,7 +701,6 @@ def get_primi_arrivi(paline):
 		# Aggiornamento linee con dati realtime
 		id_palina = palina.id_palina
 		v = arrivi_raw[id_palina]
-		veicoli = []
 		for el in v:
 			el2 = {}
 			id_linea = el['id_linea']
@@ -830,34 +716,22 @@ def get_primi_arrivi(paline):
 				el2['tempo_attesa'] = str(tempo)
 				el2['distanza_fermate'] = str(distanza_fermate)
 				el2['id_percorso'] = id_percorso
-				# el2['destinazione'] = id_percorsi[id_percorso].arrivo.nome_ricapitalizzato()
 				el2['id_veicolo'] = el['id_veicolo']
 				el2['in_arrivo'] = int((tempo == -1 and distanza_fermate < 1) or (not a_capolinea and tempo >= 0 and tempo <= INTERVALLO_IN_ARRIVO))
 				el2['a_capolinea'] = int(a_capolinea)
-				el2['annuncio'] = componi_annuncio(el2, short=True)
-				el2['partenza'] = ''
+				el2['prossima_partenza'] = ''
 				if a_capolinea:
 					try:
-						percorso = id_percorsi[id_percorso]
-						prossima_partenza = percorso.getProssimaPartenza()
-						if prossima_partenza is not None:
-							el2['partenza'] = str(prossima_partenza)[11:16]
+						if 'orario_partenza_capolinea' in el:
+							el2['prossima_partenza'] = el['orario_partenza_capolinea']
+						# else:
+						# 	percorso = Percorso.seleziona_con_cache(id_percorso=id_percorso)
+						# 	prossima_partenza = percorso.getProssimaPartenza()
+						# 	if prossima_partenza is not None:
+						# 		el2['prossima_partenza'] = prossima_partenza
 					except Exception as e:
 						pass
-				# try:
-				# 	p = id_percorsi[id_percorso].arrivo.nome_ricapitalizzato()
-				# 	el2['carteggi_dec'] = p.decodeCarteggio()
-				# 	el2['carteggi'] = p.carteggio_quoz
-				# 	arrivo = p.getArrivo()
-				# 	el2['capolinea'] = arrivo['nome']
-				# except Exception, e:
-				# 	#e = errors.XMLRPC['XRE_NO_PERCORSO']
-				# 	#e.message = "Percorso inesistente: %s, %s" % (type(l['id_percorso']), str(l['id_percorso']))
-				# 	#raise e
-				# 	#print e
-				# 	el2['carteggi_dec'] = ''
-				# 	el2['capolinea'] = ''
-				# 	el2['carteggi'] = ''
+				el2['annuncio'] = componi_annuncio(el2, short=True)
 				info_linee[id_linea].update(el2)
 				info_linee[id_linea]['nessun_autobus'] = False
 		veicoli = [info_linee[id_linea] for id_linea in info_linee]
@@ -943,16 +817,16 @@ def dettaglio_palina(palina, linee_escluse=set([]), nome_palina=None, caching=Fa
 			except (Percorso.DoesNotExist, Fermata.DoesNotExist()):
 				pass
 			if linea != x['linea']:
-				ultima_linea_a_capolinea = False
+				# ultima_linea_a_capolinea = False
 				if x['a_capolinea'] and x['prossima_partenza'] != '':
-					ultima_linea_a_capolinea = True
+					# ultima_linea_a_capolinea = True
 					x['partenza'] = timefilter(x['prossima_partenza'], _("H:i"))
 				if not x['disabilitata']:
 					linea = x['linea']
 					v1.append(x)
 			elif not x['disabilitata']:
-				if x['a_capolinea'] and x['prossima_partenza'] != '' and not ultima_linea_a_capolinea:
-					ultima_linea_a_capolinea = True
+				if x['a_capolinea'] and x['prossima_partenza'] != '': # and not ultima_linea_a_capolinea:
+					# ultima_linea_a_capolinea = True
 					x['partenza'] = timefilter(x['prossima_partenza'], _("H:i"))
 					v2.append(x)
 				elif not x['a_capolinea']:
@@ -999,7 +873,18 @@ def cmp_tempi_attesa(a, b):
 	elif ta != -1:
 		return ta.__cmp__(tb)
 	else:
-		return cmp(int(a['distanza_fermate']), int(b['distanza_fermate']))
+		c = cmp(int(a['distanza_fermate']), int(b['distanza_fermate']))
+		if c != 0 or not a['a_capolinea']:
+			return c
+		# Entrambi i veicoli a capolinea. Privilegio quello con orario di partenza più basso,
+		# ma prima di tutto privilegio quello con partenza nota
+		pa = a['prossima_partenza']
+		pb = b['prossima_partenza']
+		if pa != '' and pb == '':
+			return -1
+		if pb != '' and pa == '':
+			return 1
+		return cmp(pa, pb)
 
 
 def dettaglio_paline(nome, paline, linee_escluse=[], aggiungi=None, caching=False, as_service=False):

@@ -962,3 +962,29 @@ def make_temp_directory():
 	temp_dir = tempfile.mkdtemp()
 	yield temp_dir
 	shutil.rmtree(temp_dir)
+
+@contextmanager
+def mostra_avanzamento(totale):
+	"""
+	Mostra la percentuale di avanzamento di un processo
+
+	Esempio di utilizzo:
+	with mostra_avanzamento(instances.count()) as conta:
+		for i in instances:
+			conta()
+			# processa l'istanza i
+	"""
+	def _now():
+		return "[{}] ".format(datetime2mysql(datetime.now()))
+	attuale = [0.0]
+	percentuale = [0]
+	print _now() + "0% ({} elementi)".format(totale)
+	def _mostra_avanzamento():
+		attuale[0] += 1
+		p = int(100 * attuale[0] / totale)
+		if p != percentuale[0]:
+			percentuale[0] = p
+			print _now() + str(p) + "%"
+	yield _mostra_avanzamento
+	if percentuale[0] != 100:
+		print _now() + "100%"

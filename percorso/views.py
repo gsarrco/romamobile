@@ -72,7 +72,7 @@ def safe_string_to_unicode(s):
 
 def infopoint_to_cp(request, address):
 	address = sostituisci_preferiti(request, address)
-	return infopoint.geocode_place(address)
+	return infopoint.geocode_place(request, address)
 	
 def infopoint_address_to_string(add):
 	address = add['address']
