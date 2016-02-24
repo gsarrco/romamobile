@@ -52,7 +52,7 @@ LOCAL_IP = '127.0.0.1'
 MERCURY_FILE_STORE_PATH = '/data/rete/store'
 
 WS_BASE_URL = 'http://muovi.roma.it'
-DEVELOPER_KEY = 'per1skopio'
+DEVELOPER_KEY = 'INSERISCI_QUI_LA_TUA_CHIAVE_SVILUPPATORE'
 
 TROVALINEA_PATH_RETE = 'paline/rete'
 TROVALINEA_RETE_SPECIALE = os.path.join(TROVALINEA_PATH_RETE, 'special')
@@ -60,7 +60,7 @@ TROVALINEA_RETE_SPECIALE = os.path.join(TROVALINEA_PATH_RETE, 'special')
 DATABASES = {
 	'default': {
 		'ENGINE': 'django.contrib.gis.db.backends.postgis',
-		'NAME': 'devtest',
+		'NAME': 'muoversiaroma',
 		'USER': 'test',
 		'PASSWORD': 'test',
 		'OPTIONS': {'autocommit': True,}

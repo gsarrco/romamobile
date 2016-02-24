@@ -17,15 +17,19 @@
 		{% else %}	
 			<b>{% trans "Prossimi arrivi linea " %}{{linea}}</b></br>
 		{% endif %}
-		{% for v in veicoli %}
-			{{v.linea}}:
-			{% if v.a_capolinea %}
-				{% trans "Capolinea" %} ({% trans "partenza" %} {{v.partenza}})
+		{% for a in veicoli %}
+			<b>{{ a.linea }}</b>:
+			{% if a.disabilitata %}
+				{% trans "Non disponibile" %}
 			{% else %}
-				{% if v.in_arrivo %}
-					{% trans "In arrivo" %}
+				{% if a.non_monitorata %}
+					{% trans "Non monitorata" %}
 				{% else %}
-					{{v.distanza_fermate}} {% trans "Fermate" %} ({% if v.tempo_attesa != -1 %}{{v.tempo_attesa}}'{% else %}*{% endif %})
+					{% if a.nessun_autobus %}
+						{% trans "Nessun autobus" %}
+					{% else %}
+						{{ a.annuncio }}
+					{% endif %}
 				{% endif %}
 			{% endif %}
 			<br/>
@@ -33,15 +37,19 @@
 	{% endif %}
 	{% if veicoli_altrelinee|length > 0 %}
 	<b>{% trans "Prossimi arrivi altre linee"%}</b></br>
-		{% for v in veicoli_altrelinee %}
-			{{v.linea}}:
-			{% if v.a_capolinea %}
-				{% trans "Capolinea" %} ({% trans "partenza" %} {{v.partenza}})
+		{% for a in veicoli_altrelinee %}
+			<b>{{ a.linea }}</b>:
+			{% if a.disabilitata %}
+				{% trans "Non disponibile" %}
 			{% else %}
-				{% if v.in_arrivo %}
-					{% trans "In arrivo" %}
+				{% if a.non_monitorata %}
+					{% trans "Non monitorata" %}
 				{% else %}
-					{{v.distanza_fermate}} {% trans "Fermate" %} ({% if v.tempo_attesa != -1 %}{{v.tempo_attesa}}'{% else %}*{% endif %})
+					{% if a.nessun_autobus %}
+						{% trans "Nessun autobus" %}
+					{% else %}
+						{{ a.annuncio }}
+					{% endif %}
 				{% endif %}
 			{% endif %}
 			<br/>

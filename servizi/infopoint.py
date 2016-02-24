@@ -86,7 +86,7 @@ def aggiorna_ricerca_errata(ricerca, ricerca_errata=None):
 		ricerca_errata.save()
 
 def correggi_ricerca_errata(f):
-	def g(address, *args, **kwargs):
+	def g(request, address, *args, **kwargs):
 		address.strip()
 		ricerca = address
 		ricerca_errata = None
@@ -95,7 +95,7 @@ def correggi_ricerca_errata(f):
 			conversione, ricerca_errata = res
 			if conversione is not None:
 				address = conversione
-		res = f(address, *args, **kwargs)
+		res = f(request, address, *args, **kwargs)
 		if res['stato'] != 'OK':
 			aggiorna_ricerca_errata(ricerca, ricerca_errata)
 		return res
@@ -129,7 +129,82 @@ def decomponi_indirizzo_place(s):
 	return address, streetno, place
 
 
-def geocode_place_google(composite_address):
+def geocode_place_infotpdati(request, composite_address):
+	# print "Geocoding"
+	if composite_address.startswith('punto:'):
+		try:
+			lat, lng = [float(x) for x in composite_address[7:-1].split(',')]
+			x, y = wgs84_to_gbfe(lng, lat)
+			out = {
+				'stato': 'OK',
+				'indirizzo': _('Punto su mappa <punto:(%0.4f,%0.4f)>') % (lat, lng),
+				'ricerca': composite_address,
+				'streetno': '',
+				'address': _('Punto su mappa <punto:(%0.4f,%0.4f)>') % (lat, lng),
+				'place': '',
+				'y': y,
+				'x': x,
+				'nnp': '',
+			}
+			return out
+		except Exception, e:
+			return {'stato': 'Error'}
+
+	address, streetno, place = decomponi_indirizzo_place(ricapitalizza(composite_address))
+
+	serv_session = 'NONE'
+	if request is not None:
+		serv_session = request.session.session_key
+
+	params = {
+		'op': 'getStreetGeocoding',
+		'var_street': u"{} {}".format(address, streetno),
+		'var_city': place,
+		'serv_user': infotpdati_key,
+		'serv_session': serv_session,
+		'output_type': '1',
+	}
+	# pprint(params)
+	soup = requests.get(infotpdati_url, params=params).json()
+	# pprint(soup)
+
+	if soup['status'] == 'ok':
+		strade = soup['strade']
+		if len(strade) == 1:
+			s = strade[0]
+			lon, lat = float(s['long'].replace(',', '.')), float(s['lat'].replace(',', '.'))
+			x, y = wgs84_to_gbfe(lon, lat)
+			cip = componi_indirizzo_place(s['address'], streetno, place)
+			return {
+				'stato': 'OK',
+				'indirizzo': cip,
+				'ricerca': cip,
+				'streetno': streetno,
+				'address': componi_indirizzo(address, streetno),
+				'place': place,
+				'y': y,
+				'x': x,
+				'nnp': '',
+			}
+		else:
+			# Ambiguo
+			out = {
+				'stato': 'Ambiguous',
+				'indirizzi': [componi_indirizzo_place(x['address'], streetno, place) for x in strade],
+			}
+	else:
+		return {
+			'stato': 'Error',
+		}
+	if len(out['indirizzi']) > 20:
+		return {
+			'stato': 'Error',
+		}
+	return out
+
+
+
+def geocode_place_google(request, composite_address):
 	# print "Geocoding con GOOGLE"
 	address, streetno, place = decomponi_indirizzo_place(ricapitalizza(composite_address))
 	params = {
@@ -179,7 +254,7 @@ def geocode_place_google(composite_address):
 
 
 
-def geocode_place_infotp(composite_address):
+def geocode_place_infotp(request, composite_address):
 	# print "Geocoding"
 	if composite_address.startswith('punto:'):
 		try:
@@ -247,24 +322,25 @@ def geocode_place_infotp(composite_address):
 	return out
 
 
-def geocode_place_gbfe_only(address, geocoder=DEFAULT_GEOCODER):
+def geocode_place_gbfe_only(request, address, geocoder=DEFAULT_GEOCODER):
 	if len(paline.Linea.objects.by_date().filter(id_linea=address.strip())) > 0:
-		return {'stato': 'Error'}	
-	if geocoder == 'google':
+		return {'stato': 'Error'}
+	if geocoder == 'infotpdati':
+		gc = geocode_place_infotpdati
+	elif geocoder == 'google':
 		gc = geocode_place_google
 	else:
 		gc = geocode_place_infotp
-	return gc(address)
-
+	return gc(request, address)
 
 re_address = re.compile(r'.*<(.*)>')
 
 @correggi_ricerca_errata
-def geocode_place(address, geocoder=DEFAULT_GEOCODER):
+def geocode_place(request, address, geocoder=DEFAULT_GEOCODER):
 	address = address.strip()
 	address_sym = re_address.findall(address)
 	if len(address_sym) == 1:
-		r = geocode_place(address_sym[0], geocoder)
+		r = geocode_place(request, address_sym[0], geocoder)
 		r['ricerca'] = address
 		return r
 	if len(address) == 5 and address.isdigit():
@@ -333,7 +409,7 @@ def geocode_place(address, geocoder=DEFAULT_GEOCODER):
 			'x': x,
 			'y': y,
 		}	
-	res = geocode_place_gbfe_only(address, geocoder)
+	res = geocode_place_gbfe_only(request, address, geocoder)
 	if res['stato'] == 'OK':
 		res['lng'], res['lat'] = gbfe_to_wgs84(res['x'], res['y'])
 	return res

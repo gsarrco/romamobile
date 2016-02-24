@@ -63,7 +63,7 @@ from util import storage_get, storage_set, ScrollAdaptivePanel, QuestionDialogBo
 from util import get_checked_radio, HidingPanel, MyAnchor, LoadingButton, SearchBox, setAttribute
 from util import wait_init, wait_start, wait_stop, _, set_lang, get_lang, MenuPanel, GeneralMenuPanel
 from util import PaginatedPanel, MenuPanelItem, pause_all_timers, resume_all_timers, PaginatedPanelPage
-from util import PausableTimer, ImageTextButton, MessageDialog
+from util import PausableTimer, ImageTextButton, MessageDialog, storage_web
 from datetime import date, time, datetime, timedelta
 from Calendar import Calendar, DateField, TimeField
 from map import MapPanel, Layer, LayerPanel, get_location
@@ -85,6 +85,7 @@ client = JSONProxy(base_url + '/json/', [
 	'servizi_app_init_2',
 	'servizi_app_login',
 	'servizi_delete_fav',
+	'servizi_storage_init',
 	'lingua_set',
 ])
 
@@ -690,7 +691,8 @@ class ControlPanel(GeneralMenuPanel):
 
 	def onAppInit(self, res):
 		# Session
-		storage_set('session_key', res['session_key'])
+		if flavor != 'web':
+			storage_set('session_key', res['session_key'])
 
 		# User
 		self.user = res['user']
@@ -934,7 +936,8 @@ class ControlPanel(GeneralMenuPanel):
 		self.map_tab.setLargeLayout()
 
 	def onLoginWsDone(self, res):
-		storage_set('session_key', '')
+		if flavor != 'web':
+			storage_set('session_key', '')
 		self.restartApp()
 
 	def loginWs(self, url, ref):
@@ -1384,7 +1387,7 @@ control_panel = [None]
 
 framework_init_done = [False]
 
-def onFrameworkInit():
+def onFrameworkInit(res=None):
 	if not framework_init_done[0]:
 		framework_init_done[0] = True
 		raw_params = getRawParams()
@@ -1414,7 +1417,10 @@ def onFrameworkInit():
 		gp.relayout()
 
 
-		session_key = storage_get('session_key', '')
+		if flavor == 'web':
+			session_key = 'web'
+		else:
+			session_key = storage_get('session_key', '')
 		client.servizi_app_init_2({
 			'session_or_token': session_key,
 			'versione': version,
@@ -1425,12 +1431,15 @@ def onFrameworkInit():
 		Window.addWindowResizeListener(gp)
 		gp.getElement().scrollIntoView()
 
+def onStorageInit(res):
+	storage_web.update(res)
+	onFrameworkInit()
 
 wnd().onFrameworkInitJs = onFrameworkInit
 
 if __name__ == '__main__':
 	if flavor == 'web':
-		onFrameworkInit()
+		client.servizi_storage_init(JsonHandler(onStorageInit))
 	else:
 		# ready_timer = Timer(notify=onFrameworkInit)
 		# ready_timer.schedule(1500)

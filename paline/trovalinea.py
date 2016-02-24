@@ -824,7 +824,6 @@ def TrovalineaFactory(
 			#print "Servo arrivi"
 			p = self.rete.paline[id_palina]
 			arrivi = []
-			n = datetime.now()
 			for k in p.fermate:
 				f = p.fermate[k]
 				f.rete_percorso.aggiorna_posizione_veicoli()
@@ -833,6 +832,11 @@ def TrovalineaFactory(
 						a2 = copy(a)
 						if 'tratto_percorso' in a2:
 							del a2['tratto_percorso']
+						if a2['a_capolinea']:
+							id_veicolo = a2['id_veicolo']
+							v = self.rete.veicoli[id_veicolo]
+							if v.orario_partenza_capolinea is not None:
+								a2['orario_partenza_capolinea'] = v.orario_partenza_capolinea
 						arrivi.append(a2)
 			db.reset_queries()
 			return pickle.dumps(arrivi)
@@ -859,6 +863,11 @@ def TrovalineaFactory(
 						a2 = copy(a)
 						if 'tratto_percorso' in a2:
 							del a2['tratto_percorso']
+						if a2['a_capolinea']:
+							id_veicolo = a2['id_veicolo']
+							v = self.rete.veicoli[id_veicolo]
+							if v.orario_partenza_capolinea is not None:
+								a2['orario_partenza_capolinea'] = v.orario_partenza_capolinea
 						arrivi.append(a2)
 				out[id_palina] = arrivi
 			db.reset_queries()

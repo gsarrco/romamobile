@@ -160,324 +160,312 @@ msgid ""
 "%(fermate)s"
 msgstr "At stop %(palina)s (%(id)s), take %(linea)s for %(numero)d %(fermate)s"
 
-#: .\tratto.py:972
+#: tratto.py:1063
 #, python-format
 msgid "Scendi alla fermata %(palina)s (%(id)s)"
 msgstr "Get off at stop %(palina)s (%(id)s)"
 
-#: .\tratto.py:986
+#: tratto.py:1077
 #, python-format
 msgid "Scendi a %(palina)s e cambia con la %(desc)s per %(numero)d %(fermate)s"
 msgstr "Get off at %(palina)s and take %(desc)s for %(numero)d %(fermate)s"
 
-#: .\tratto.py:993
+#: tratto.py:1084
 #, python-format
 msgid "A %(palina)s, prendi la %(desc)s per %(numero)d %(fermate)s"
 msgstr "At %(palina)s, take %(desc)s for %(numero)d %(fermate)s"
 
-#: .\tratto.py:1017
+#: tratto.py:1108
 #, python-format
 msgid "Scendi a %(palina)s"
 msgstr "Get off at %(palina)s"
 
-#: .\tratto.py:1063
+#: tratto.py:1154
 msgid "Parti"
 msgstr "Departure"
 
-#: .\tratto.py:1065
+#: tratto.py:1156
 #, python-format
 msgid "Parti da %(luogo)s"
 msgstr "Departure from %(luogo)s"
 
-#: .\tratto.py:1075
+#: tratto.py:1166
 msgid "Sei arrivato"
 msgstr "Arrival"
 
-#: .\tratto.py:1077
+#: tratto.py:1168
 #, python-format
 msgid "Sei arrivato a %s"
 msgstr "Arrival at %s"
 
-#: .\views.py:205 .\views.py:551
+#: views.py:230
 #, python-format
 msgid "La palina %s non esiste"
 msgstr "The bus stop %s does not exist"
 
-#: .\views.py:216
+#: views.py:241
 msgid "La palina o il gruppo di paline richiesto non esiste"
 msgstr "Bus stop or group does not exist"
 
-#: .\views.py:317 .\views.py:319
+#: views.py:342 views.py:344
 #, python-format
 msgid "%(orario)2d di %(giorno)s"
 msgstr "%(giorno)s, h%(orario)2d"
 
-#: .\views.py:385
+#: views.py:423
 msgid "l j F"
 msgstr "l j F"
 
-#: .\views.py:397 .\views.py:467 .\views.py:533
+#: views.py:438 views.py:509 views.py:584
 #, python-format
 msgid "Il percorso %s non esiste"
 msgstr "The route %s does not exist"
 
-#: .\views.py:583
+#: views.py:545
+msgid "Spiacenti, si è verificato un errore. Ti preghiamo di riprovare."
+msgstr "We apologize, there was an error. Please try again later."
+
+#: views.py:615
 #, python-format
 msgid "La fermata %s non esiste"
 msgstr "Bus stop %s does not exist"
 
-#: .\views.py:1046
+#: views.py:1083
 msgid "Autobus non segnalato"
 msgstr "Bus not forecasted"
 
-#: .\views.py:1047
+#: views.py:1084
 msgid "L'autobus segnalato non è passato"
 msgstr "Forecasted bus did not arrive"
 
-#: .\views.py:1047
+#: views.py:1084
 msgid "Autobus diretto al deposito"
 msgstr "Bus going to bus garage"
 
-#: .\views.py:1088 .\views.py:1097
+#: views.py:1125 views.py:1134
 msgid "Grazie per la segnalazione del disservizio."
 msgstr "Thanks for reporting."
 
-#: .\views.py:1123 .\views.py:1147 .\views.py:1293
+#: views.py:1173 views.py:1197 views.py:1343
 msgid "La fermata non esiste"
 msgstr "Bus stop does not exist"
 
-#: .\views.py:1133 .\views.py:1272
+#: views.py:1183 views.py:1322
 msgid "Il gruppo non esiste"
 msgstr "Group does not exist"
 
-#: .\views.py:1172
+#: views.py:1222
 msgid "Fermata preferita impostata"
 msgstr "Favorite bus stop set"
 
-#: .\views.py:1204
+#: views.py:1254
 msgid "Nome del gruppo modificato"
 msgstr "Group name set"
 
-#: .\views.py:1224
+#: views.py:1274
 msgid "Esclusioni impostate"
 msgstr "Exclusions set"
 
-#: .\views.py:1266
+#: views.py:1316
 msgid "Notifiche impostate"
 msgstr "Notifications set"
 
-#: .\views.py:1275
+#: views.py:1325
 msgid "Confermi di voler eliminare la fermata preferita?"
 msgstr "Do you really want to delete a favorite bus stop?"
 
-#: .\views.py:1278 .\views.py:1291
+#: views.py:1328 views.py:1341
 msgid "Fermata preferita eliminata"
 msgstr "Favorite bus stop deleted"
 
-#: .\views.py:1281
+#: views.py:1331
 msgid "Confermi di voler eliminare la fermata dal gruppo?"
 msgstr "Do you really want to delete a bus stop from a group?"
 
-#: .\views.py:1288
+#: views.py:1338
 msgid "Gruppo di fermate eliminato"
 msgstr "Bus stop group deleted"
 
-#: .\templates\map-baloon.html.py:6 .\templates\paline-fermate.html.py:85
+#: templates/map-baloon.html:6 templates/paline-fermate.html:85
 msgid "Partenze dal capolinea"
 msgstr "Departures"
 
-#: .\templates\map-baloon.html.py:16
+#: templates/map-baloon.html:16
 msgid "Prossimi arrivi"
 msgstr "Arrivals"
 
-#: .\templates\map-baloon.html.py:18
+#: templates/map-baloon.html:18
 msgid "Prossimi arrivi linea "
 msgstr "Arrivals for the line"
 
-#: .\templates\map-baloon.html.py:23 .\templates\map-baloon.html.py:39
+#: templates/map-baloon.html:23 templates/map-baloon.html.py:39
 msgid "partenza"
 msgstr "departure"
 
-#: .\templates\map-baloon.html.py:26 .\templates\map-baloon.html.py:42
+#: templates/map-baloon.html:26 templates/map-baloon.html.py:42
 msgid "In arrivo"
 msgstr "Arriving"
 
-#: .\templates\map-baloon.html.py:28 .\templates\map-baloon.html.py:44
-#: .\templates\paline-fermate.html.py:121
+#: templates/map-baloon.html:28 templates/map-baloon.html.py:44
+#: templates/paline-fermate.html:125
 msgid "Fermate"
 msgstr "Bus stops"
 
-#: .\templates\map-baloon.html.py:35
+#: templates/map-baloon.html:35
 msgid "Prossimi arrivi altre linee"
 msgstr "Arrivals for other lines"
 
-#: .\templates\map-baloon.html.py:50
+#: templates/map-baloon.html:50
 msgid "Coincidenze"
 msgstr "Connections"
 
-#: .\templates\map-fullscreen.html.py:54 .\templates\map-test.html.py:38
+#: templates/map-fullscreen.html:54
 msgid "Torna indietro"
 msgstr "Back"
 
-#: .\templates\map-fullscreen.html.py:56 .\templates\map-fullscreen.html.py:59
-#: .\templates\map-fullscreen.html.py:61 .\templates\map-test.html.py:38
-#: .\templates\paline-dettaglio.html.py:149
-#: .\templates\paline-fermate.html.py:78
+#: templates/map-fullscreen.html:56 templates/map-fullscreen.html.py:59
+#: templates/map-fullscreen.html:61 templates/paline-dettaglio.html:143
+#: templates/paline-fermate.html:78
 msgid "Mappa base"
 msgstr "Basic map"
 
-#: .\templates\paline-dettaglio.html.py:9
+#: templates/paline-dettaglio.html:9
 msgid "Collocazione fermata e mappa"
 msgstr "Bus stop location"
 
-#: .\templates\paline-dettaglio.html.py:13
+#: templates/paline-dettaglio.html:13
 msgid "Aggiungi alle fermate preferite e imposta notifiche"
 msgstr "Add to your favorites bus stops and set notifications"
 
-#: .\templates\paline-dettaglio.html.py:15
+#: templates/paline-dettaglio.html:15
 msgid "Segnala un disservizio"
 msgstr "Report an issue"
 
-#: .\templates\paline-dettaglio.html.py:20
+#: templates/paline-dettaglio.html:20
 msgid "Riepilogo delle linee con i primi arrivi"
 msgstr "Overview: first arrivals by line"
 
-#: .\templates\paline-dettaglio.html.py:22
+#: templates/paline-dettaglio.html:22
 msgid "Riepilogo fermata"
 msgstr "Overview for bus stop"
 
-#: .\templates\paline-dettaglio.html.py:33
-#: .\templates\paline-dettaglio.html.py:35
+#: templates/paline-dettaglio.html:33 templates/paline-dettaglio.html.py:35
 msgid "Non disponibile"
 msgstr "Not available"
 
-#: .\templates\paline-dettaglio.html.py:39
+#: templates/paline-dettaglio.html:39
 msgid "Non monitorata"
 msgstr "Not monitored"
 
-#: .\templates\paline-dettaglio.html.py:42
-#: .\templates\paline-dettaglio.html.py:71
+#: templates/paline-dettaglio.html:42 templates/paline-dettaglio.html.py:68
 msgid "Nessun autobus"
 msgstr "No buses"
 
-#: .\templates\paline-dettaglio.html.py:46
-#: .\templates\paline-dettaglio.html.py:75
-#, python-format
-msgid "(partenza %(partenza)s)"
-msgstr "(dep. %(partenza)s)"
-
-#: .\templates\paline-dettaglio.html.py:57
+#: templates/paline-dettaglio.html:54
 msgid "Calcola un percorso da qui a"
 msgstr "Find a route from here to"
 
-#: .\templates\paline-dettaglio.html.py:60
+#: templates/paline-dettaglio.html:57
 msgid "Vai"
 msgstr "Find"
 
-#: .\templates\paline-dettaglio.html.py:66
+#: templates/paline-dettaglio.html:63
 msgid "Tutti gli arrivi"
 msgstr "All the arrivals"
 
-#: .\templates\paline-dettaglio.html.py:80
+#: templates/paline-dettaglio.html:74
 #, python-format
 msgid "<span class=\"b\">Direz.:</span> %(dest)s"
 msgstr "<span class=\"b\">Dest..:</span> %(dest)s"
 
-#: .\templates\paline-dettaglio.html.py:85
+#: templates/paline-dettaglio.html:79
 msgid "Fermata"
 msgstr "Bus stop"
 
-#: .\templates\paline-dettaglio.html.py:99
+#: templates/paline-dettaglio.html:93
 msgid "Pedana disabili"
 msgstr "Foldaway lifting device"
 
-#: .\templates\paline-dettaglio.html.py:100
+#: templates/paline-dettaglio.html:94
 msgid "Emettitrice di biglietti"
 msgstr "Ticket vending machine"
 
-#: .\templates\paline-dettaglio.html.py:101
+#: templates/paline-dettaglio.html:95
 msgid "Aria condizionata"
 msgstr "Air conditioning"
 
-#: .\templates\paline-dettaglio.html.py:102
+#: templates/paline-dettaglio.html:96
 msgid "Moby"
 msgstr "Moby"
 
-#: .\templates\paline-dettaglio.html.py:113
-#: .\templates\paline-fermate.html.py:197
+#: templates/paline-dettaglio.html:107 templates/paline-fermate.html:198
 msgid "Mostra legenda"
 msgstr "Show key"
 
-#: .\templates\paline-dettaglio.html.py:118
+#: templates/paline-dettaglio.html:112
 msgid "Informazioni sulla fermata"
 msgstr "Bus stop info"
 
-#: .\templates\paline-dettaglio.html.py:120
+#: templates/paline-dettaglio.html:114
 msgid "Nome"
 msgstr "Name"
 
-#: .\templates\paline-dettaglio.html.py:121
+#: templates/paline-dettaglio.html:115
 msgid "Collocazione"
 msgstr "Location"
 
-#: .\templates\paline-dettaglio.html.py:145
-#: .\templates\paline-dettaglio.html.py:151
-#: .\templates\paline-disambigua.html.py:57
-#: .\templates\paline-fermate.html.py:73 .\templates\paline-fermate.html.py:80
+#: templates/paline-dettaglio.html:139 templates/paline-dettaglio.html:145
+#: templates/paline-disambigua.html:57 templates/paline-fermate.html:73
+#: templates/paline-fermate.html.py:80
 msgid "Mappa interattiva"
 msgstr "Interactive map"
 
-#: .\templates\paline-disambigua.html.py:18
-#: .\templates\paline-disambigua.html.py:26
+#: templates/paline-disambigua.html:18 templates/paline-disambigua.html:26
 msgid "Fermate trovate"
 msgstr "Found bus stops"
 
-#: .\templates\paline-disambigua.html.py:37
+#: templates/paline-disambigua.html:37
 msgid "Direz."
 msgstr "Dest. "
 
-#: .\templates\paline-disambigua.html.py:41
+#: templates/paline-disambigua.html:41
 msgid "Altre linee:"
 msgstr "Other lines"
 
-#: .\templates\paline-disambigua.html.py:51
+#: templates/paline-disambigua.html:51
 msgid ""
 "Alcune fermate sono state nascoste perch&eacute; non vi transitano altre "
 "linee bus"
 msgstr "Some bus stops are hidden because no further bus lines stop there "
 
-#: .\templates\paline-disambigua.html.py:52
+#: templates/paline-disambigua.html:52
 msgid "mostra tutto"
 msgstr "show everything"
 
-#: .\templates\paline-disambigua.html.py:62
+#: templates/paline-disambigua.html:62
 msgid "Linee trovate"
 msgstr "Found lines"
 
-#: .\templates\paline-disambigua.html.py:70
-#: .\templates\paline-fermate.html.py:162
-#: .\templates\paline-percorsi.html.py:26
+#: templates/paline-disambigua.html:70 templates/paline-fermate.html:163
+#: templates/paline-percorsi.html:26
 #, python-format
 msgid "Direz. %(dest)s"
 msgstr "Dest. %(dest)s"
 
-#: .\templates\paline-disambigua.html.py:74
-#: .\templates\paline-fermate.html.py:166
+#: templates/paline-disambigua.html:74 templates/paline-fermate.html:167
 msgid "non monitorata"
 msgstr "Not monitored"
 
-#: .\templates\paline-disambigua.html.py:79
-#: .\templates\paline-disambigua.html.py:81
-#: .\templates\paline-fermate.html.py:171
-#: .\templates\paline-fermate.html.py:173
+#: templates/paline-disambigua.html:79 templates/paline-disambigua.html:81
+#: templates/paline-fermate.html:172 templates/paline-fermate.html.py:174
 msgid "non disponibile"
 msgstr "Not available"
 
-#: .\templates\paline-disservizio.html.py:6
+#: templates/paline-disservizio.html:6
 msgid "Disservizio tempi di attesa bus"
 msgstr "Bus waiting times issue"
 
-#: .\templates\paline-disservizio.html.py:8
+#: templates/paline-disservizio.html:8
 msgid ""
 "\n"
 "\t\tUsa questa sezione per segnalare un disservizio di <span class=\"b"
@@ -491,7 +479,7 @@ msgstr ""
 "You can report an issue concerning bus waiting times, for example: a bus not "
 "seen by the service, a forecasted bus that disappeared without arriving, etc."
 
-#: .\templates\paline-disservizio.html.py:15
+#: templates/paline-disservizio.html:15
 msgid ""
 "Non hai indicato un disservizio di Muoversi a Roma mobile, in quanto la "
 "linea prevista coincide con la linea effettivamente passata."
@@ -499,7 +487,7 @@ msgstr ""
 "The issue you are trying to report is not valid, because the forecasted bus "
 "line and the line that arrived are identical."
 
-#: .\templates\paline-disservizio.html.py:18
+#: templates/paline-disservizio.html:18
 msgid ""
 "E' corretto che un autobus diretto al deposito non sia segnalato da Muoversi "
 "a Roma."
@@ -507,36 +495,35 @@ msgstr ""
 "The issue you are trying to report is not valid, because buses going to the "
 "garage should not be forecasted."
 
-#: .\templates\paline-disservizio.html.py:22
-#: .\templates\paline-disservizio.html.py:38
+#: templates/paline-disservizio.html:22 templates/paline-disservizio.html:38
 msgid "Fermata:"
 msgstr "Bus stop:"
 
-#: .\templates\paline-disservizio.html.py:23
+#: templates/paline-disservizio.html:23
 msgid "Linea in arrivo secondo Muoversi a Roma mobile:"
 msgstr "Forecasted bus line:"
 
-#: .\templates\paline-disservizio.html.py:24
+#: templates/paline-disservizio.html:24
 msgid "Linea passata effettivamente:"
 msgstr "Bus line that arrived:"
 
-#: .\templates\paline-disservizio.html.py:25
+#: templates/paline-disservizio.html:25
 msgid "Numero del veicolo (facoltativo):"
 msgstr "Vehicle id (optional):"
 
-#: .\templates\paline-disservizio.html.py:26
+#: templates/paline-disservizio.html:26
 msgid "Eventuali note (facoltative):"
 msgstr "Notes (optional):"
 
-#: .\templates\paline-disservizio.html.py:27
+#: templates/paline-disservizio.html:27
 msgid "Segnala disservizio tempi di attesa"
 msgstr "Report waiting times issue"
 
-#: .\templates\paline-disservizio.html.py:30
+#: templates/paline-disservizio.html:30
 msgid "Guasto palina elettronica"
 msgstr "Failure of an electronic bus stop flag"
 
-#: .\templates\paline-disservizio.html.py:32
+#: templates/paline-disservizio.html:32
 msgid ""
 "\n"
 "\t\tUsa questa sezione per segnalare il guasto di una palina elettronica "
@@ -546,107 +533,101 @@ msgstr ""
 "\n"
 "You can report a bus stop electronic flag that is not working correctly."
 
-#: .\templates\paline-disservizio.html.py:39
+#: templates/paline-disservizio.html:39
 msgid "Segnala guasto palina elettronica"
 msgstr "Report electronic flag failure"
 
-#: .\templates\paline-fermate.html.py:45
+#: templates/paline-fermate.html:45
 #, python-format
 msgid " Percorso %(l)s %(c)s Direz. %(d)s"
 msgstr " Route %(l)s %(c)s dest. %(d)s"
 
-#: .\templates\paline-fermate.html.py:48
+#: templates/paline-fermate.html:48
 msgid "Arrivi previsti per la vettura: "
 msgstr "Arrivals for vehicle no.: "
 
-#: .\templates\paline-fermate.html.py:94
+#: templates/paline-fermate.html:94
 msgid "Nella giornata selezionata il percorso non &egrave; attivo."
 msgstr "Route is not active during the selected day."
 
-#: .\templates\paline-fermate.html.py:97
+#: templates/paline-fermate.html:97
 msgid "Altri giorni"
 msgstr "Other days"
 
-#: .\templates\paline-fermate.html.py:110
+#: templates/paline-fermate.html:110
 msgid "Oggi il percorso non &egrave; attivo."
 msgstr "Route is not active today."
 
-#: .\templates\paline-fermate.html.py:116
+#: templates/paline-fermate.html:116
 msgid "Altri orari"
 msgstr "Full timetable"
 
-#: .\templates\paline-fermate.html.py:123
+#: templates/paline-fermate.html:127
 msgid ""
 "Siamo spiacenti, il servizio temporaneamente non &egrave; disponibile per "
 "questo percorso."
 msgstr "We are sorry, the service is temporarily not available on this route."
 
-#: .\templates\paline-fermate.html.py:124
+#: templates/paline-fermate.html:128
 msgid "In ogni caso ecco le fermate:"
 msgstr "However, here's a list of the bus stops:"
 
-#: .\templates\paline-fermate.html.py:126
+#: templates/paline-fermate.html:130
 msgid "Seleziona una fermata oppure una vettura."
 msgstr "Select a bus stop or a vechicle."
 
-#: .\templates\paline-fermate.html.py:142
+#: templates/paline-fermate.html:146
 msgid "--:--"
 msgstr "--:-- --"
 
-#: .\templates\paline-fermate.html.py:147
-msgid "Mappa"
-msgstr "Map"
-
-#: .\templates\paline-fermate.html.py:153
+#: templates/paline-fermate.html:154
 msgid "Altri percorsi della linea"
 msgstr "Other routes"
 
-#: .\templates\paline-fermate.html.py:182
-#: .\templates\paline-percorsi.html.py:30
+#: templates/paline-fermate.html:183 templates/paline-percorsi.html:30
 #, python-format
 msgid "La linea %(l)s &egrave; gestita da %(g)s."
 msgstr "Line %(l)s is operated by %(g)s."
 
-#: .\templates\paline-fermate.html.py:187
+#: templates/paline-fermate.html:188
 msgid "Legenda"
 msgstr "Show key"
 
-#: .\templates\paline-fermate.html.py:189
+#: templates/paline-fermate.html:190
 msgid "Pi&ugrave di 15 km/h"
 msgstr "More than 15 km/h"
 
-#: .\templates\paline-fermate.html.py:190
+#: templates/paline-fermate.html:191
 msgid "10-15 km/h"
 msgstr "10-15 km/h"
 
-#: .\templates\paline-fermate.html.py:191
+#: templates/paline-fermate.html:192
 msgid "5-10 km/h"
 msgstr "5-10 km/h"
 
-#: .\templates\paline-fermate.html.py:192
+#: templates/paline-fermate.html:193
 msgid "Meno di 5 km/h"
 msgstr "Less than  5 km/h"
 
-#: .\templates\paline-fermate.html.py:193
+#: templates/paline-fermate.html:194
 msgid "Informazioni non disponibili"
 msgstr "Not available"
 
-#: .\templates\paline-percorsi.html.py:7
+#: templates/paline-percorsi.html:7
 #, python-format
 msgid "Linea %(l)s: seleziona un percorso"
 msgstr "Line %(l)s: choose a route"
 
-#: .\templates\paline-percorsi.html.py:10
+#: templates/paline-percorsi.html:10
 #, python-format
 msgid "Siamo spiacenti, la linea %(l)s non &egrave; monitorata."
 msgstr "We are sorry, the line %(l)s isn't monitored."
 
-#: .\templates\paline-percorsi.html.py:11
-#: .\templates\paline-percorsi.html.py:21
+#: templates/paline-percorsi.html:11 templates/paline-percorsi.html.py:21
 msgid "In ogni caso ecco i percorsi:"
 msgstr "However, here's a list of the routes:"
 
-#: .\templates\paline-percorsi.html.py:16
+#: templates/paline-percorsi.html:16
 #, python-format
 msgid ""
 "Siamo spiacenti, il servizio temporaneamente non &egrave; disponibile per la "
@@ -654,32 +635,32 @@ msgid ""
 msgstr ""
 "We are sorry, the service is temporarily not available for the line %(l)s"
 
-#: .\templates\paline-preferiti-aggiungi.html.py:6
+#: templates/paline-preferiti-aggiungi.html:6
 msgid "Aggiungi fermata ai preferiti"
 msgstr "Add bus stop to favourites"
 
-#: .\templates\paline-preferiti-aggiungi.html.py:9
+#: templates/paline-preferiti-aggiungi.html:9
 msgid "Nome della fermata"
 msgstr "Bus stop name"
 
-#: .\templates\paline-preferiti-aggiungi.html.py:13
+#: templates/paline-preferiti-aggiungi.html:13
 msgid "Fermata singola"
 msgstr "Single bus stop"
 
-#: .\templates\paline-preferiti-aggiungi.html.py:15
+#: templates/paline-preferiti-aggiungi.html:15
 msgid "Imposta fermata singola"
 msgstr "Set single bus stop"
 
-#: .\templates\paline-preferiti-aggiungi.html.py:17
-#: .\templates\paline-preferiti-aggiungi.html.py:36
+#: templates/paline-preferiti-aggiungi.html:17
+#: templates/paline-preferiti-aggiungi.html:36
 msgid "Aggiungi a gruppo di fermate"
 msgstr "Add to a bus stop group"
 
-#: .\templates\paline-preferiti-aggiungi.html.py:19
+#: templates/paline-preferiti-aggiungi.html:19
 msgid "Crea nuovo gruppo"
 msgstr "Create new group"
 
-#: .\templates\paline-preferiti-aggiungi.html.py:22
+#: templates/paline-preferiti-aggiungi.html:22
 msgid ""
 "Definendo un gruppo composto da pi&ugrave; fermate, avrai la "
 "possibilit&agrave; di visualizzare, in un'unica schermata, gli autobus in "
@@ -690,71 +671,71 @@ msgstr ""
 "single page, all the buses arriving in all the stops of the group, sorted by "
 "waiting time."
 
-#: .\templates\paline-preferiti-aggiungi.html.py:23
+#: templates/paline-preferiti-aggiungi.html:23
 msgid ""
 "Cos&igrave; facendo, se sei indeciso, potrai scegliere la fermata a cui ti "
 "conviene recarti!"
 msgstr "Thus, you can choose the best bus stop to go!"
 
-#: .\templates\paline-preferiti-aggiungi.html.py:26
+#: templates/paline-preferiti-aggiungi.html:26
 msgid "Che cos'&egrave;"
 msgstr "What's this?"
 
-#: .\templates\paline-preferiti-aggiungi.html.py:31
+#: templates/paline-preferiti-aggiungi.html:31
 msgid "Oppure aggiungi a un gruppo esistente"
 msgstr "Or add to an existent group"
 
-#: .\templates\paline-preferiti-escludi-linee.html.py:7
+#: templates/paline-preferiti-escludi-linee.html:7
 #, python-format
 msgid "Fermata %(nome)s"
 msgstr "Bus stop %(nome)s"
 
-#: .\templates\paline-preferiti-escludi-linee.html.py:9
+#: templates/paline-preferiti-escludi-linee.html:9
 #, python-format
 msgid "Gruppo %(nome)s"
 msgstr "Group %(nome)s"
 
-#: .\templates\paline-preferiti-escludi-linee.html.py:10
+#: templates/paline-preferiti-escludi-linee.html:10
 msgid "Modifica nome del gruppo"
 msgstr "Modify group name"
 
-#: .\templates\paline-preferiti-escludi-linee.html.py:14
-#: .\templates\paline.html.py:40 .\templates\paline.html.py:48
+#: templates/paline-preferiti-escludi-linee.html:14 templates/paline.html:40
+#: templates/paline.html.py:48
 msgid "Modifica"
 msgstr "Modify"
 
-#: .\templates\paline-preferiti-escludi-linee.html.py:18
+#: templates/paline-preferiti-escludi-linee.html:18
 msgid "Fermate del gruppo"
 msgstr "Group Bus stops"
 
-#: .\templates\paline-preferiti-escludi-linee.html.py:22
-#: .\templates\paline.html.py:41 .\templates\paline.html.py:49
+#: templates/paline-preferiti-escludi-linee.html:22 templates/paline.html:41
+#: templates/paline.html.py:49
 msgid "Elimina"
 msgstr "Delete"
 
-#: .\templates\paline-preferiti-escludi-linee.html.py:27
+#: templates/paline-preferiti-escludi-linee.html:27
 msgid "Escludi linee"
 msgstr "Exclude lines"
 
-#: .\templates\paline-preferiti-escludi-linee.html.py:30
+#: templates/paline-preferiti-escludi-linee.html:30
 msgid ""
 "Alcune linee non ti interessano? Ora hai la possibilit&agrave; di escluderle!"
 msgstr "Not interested in some lines? You can exclude them!"
 
-#: .\templates\paline-preferiti-escludi-linee.html.py:37
+#: templates/paline-preferiti-escludi-linee.html:37
 msgid "Imposta esclusioni"
 msgstr "Set exclusions"
 
-#: .\templates\paline-preferiti-escludi-linee.html.py:40
-#: .\templates\paline-preferiti-escludi-linee.html.py:56
+#: templates/paline-preferiti-escludi-linee.html:40
+#: templates/paline-preferiti-escludi-linee.html:56
 msgid "Imposta notifiche"
 msgstr "Set notifications"
 
-#: .\templates\paline-preferiti-escludi-linee.html.py:43
+#: templates/paline-preferiti-escludi-linee.html:43
 msgid "Notifiche attivate"
 msgstr "Notifications on"
 
-#: .\templates\paline-preferiti-escludi-linee.html.py:46
+#: templates/paline-preferiti-escludi-linee.html:46
 #, python-format
 msgid ""
 "\n"
@@ -767,23 +748,23 @@ msgstr ""
 "and %(max)s minutes.\n"
 "\t"
 
-#: .\templates\paline-preferiti-escludi-linee.html.py:52
+#: templates/paline-preferiti-escludi-linee.html:52
 msgid "Impostazioni avanzate notifiche"
 msgstr "Advanced notifications settings"
 
-#: .\templates\paline.html.py:10
+#: templates/paline.html:10
 msgid "Nessun risultato trovato."
 msgstr "No results found."
 
-#: .\templates\paline.html.py:15
+#: templates/paline.html:15
 msgid "Cerca per numero o nome della fermata, per linea o per indirizzo"
 msgstr "Search by bus stop id or name, line number, or address"
 
-#: .\templates\paline.html.py:15
+#: templates/paline.html:15
 msgid "Esempi"
 msgstr "Examples"
 
-#: .\templates\paline.html.py:18
+#: templates/paline.html:18
 msgid ""
 "\n"
 "\t\t\t<span class=\"b\">Esempi</span><br/>\n"
@@ -812,19 +793,19 @@ msgstr ""
 "address\n"
 "\t\t"
 
-#: .\templates\paline.html.py:30
+#: templates/paline.html:30
 msgid "Cerca"
 msgstr "Search"
 
-#: .\templates\paline.html.py:35
+#: templates/paline.html:35
 msgid "Fermate preferite"
 msgstr "Favorite bus stops"
 
-#: .\templates\paline.html.py:54
+#: templates/paline.html:54
 msgid "Ancora non hai impostato alcuna fermata come preferita."
 msgstr "You have not set any favorites bus stops yet."
 
-#: .\templates\paline.html.py:57
+#: templates/paline.html:57
 msgid ""
 "<a href='http://login.muoversiaroma.it/Login.aspx?IdSito=1'>Registrati o "
 "accedi</a> per impostare le tue fermate preferite, ottenere notifiche e "
@@ -834,11 +815,11 @@ msgstr ""
 "login</a> to set your favorite bus stops, notifications, and to report an "
 "issue."
 
-#: .\templates\paline.html.py:63
+#: templates/paline.html:63
 msgid "Lo sapevi?"
 msgstr "Did you know?"
 
-#: .\templates\paline.html.py:65
+#: templates/paline.html:65
 msgid ""
 "\n"
 "\t\t\tPuoi saltare questa pagina! Nella <a href=\"/\">home page\n"
@@ -853,6 +834,18 @@ msgstr ""
 "simply insert the item you are interested in, such as a bus stop, a bus "
 "line, or an address, in <b>I'm here</b> box. You'll get directly to the bus "
 "waiting times service."
+
+#~ msgid "(partenza %(partenza)s)"
+#~ msgstr "(dep. %(partenza)s)"
+
+#~ msgid "1 Fermata (%(tempo)s)"
+#~ msgstr "1 Bus stop (%(tempo)s)"
+
+#~ msgid "%(fermate)d Fermate (%(tempo)s)"
+#~ msgstr "%(fermate)d Bus stops (%(tempo)s)"
+
+#~ msgid "Mappa"
+#~ msgstr "Map"
 
 #~ msgid "Parti da %(partenza)s"
 #~ msgstr "Departure from %(partenza)s"

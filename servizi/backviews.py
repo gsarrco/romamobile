@@ -37,6 +37,7 @@ import importlib
 from carpooling import models as carpooling
 session_engine = importlib.import_module(settings.SESSION_ENGINE)
 from django.contrib.auth import login, authenticate, logout, get_user
+from django.core.cache import cache
 from servizi.autocomplete import find_in_list
 from mercury.models import Mercury
 import traceback
@@ -131,6 +132,8 @@ def _servizi_app_init(request, session_or_token, urlparams):
 		logout(request)
 		out['session_key'] = request.session.session_key
 	# Restore session, if any
+	elif session_or_token == 'web':
+		out['session_key'] = request.session.session_key
 	elif session_or_token == '':
 		# La sessione è stata aperta implicitamente (tramite cookie). Se l'utente è autenticato,
 		# rendila persistente generando un token_app
@@ -233,10 +236,13 @@ def servizi_app_init_2(request, opzioni, urlparams):
 	u = risposta['user']
 	if not u.is_authenticated():
 		u = None
+	session_key = request.session.session_key
+	if 'session_key' in res and res['session_key'] is not None:
+		session_key = res['session_key']
 	l = LogAppInit(
 		orario=n,
 		versione=v,
-		session_key=res['session_key'],
+		session_key=session_key,
 		user=u,
 	)
 	# l.save()
@@ -259,7 +265,22 @@ def app_login(request, temp_token):
 		pass
 	return 'KO'
 
+
 @jsonrpc_method('servizi_delete_fav', safe=True)
 def servizi_delete_fav(request, pk):
 	delete_fav(request, pk)
 	return 'OK'
+
+
+@jsonrpc_method('servizi_storage_init', safe=True)
+def servizi_storage_init(request):
+	if not 'storage' in request.session:
+		request.session['storage'] = {}
+	return request.session['storage']
+
+
+@jsonrpc_method('servizi_storage_set', safe=True)
+def servizi_storage_set(request, key, value):
+	if not 'storage' in request.session:
+		request.session['storage'] = {}
+	request.session['storage'][key] = value

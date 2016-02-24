@@ -222,9 +222,9 @@ class RiepilogoPalinaPanel(ScrollPanel, PaginatedPanelPage):
 					msg = _("Nessun bus")
 				else:
 					msg = l['annuncio']
-					partenza = getdefault(l, 'partenza', '')
-					if partenza != '':
-						msg += _(" (p. %s)") % partenza
+					# partenza = getdefault(l, 'partenza', '')
+					# if partenza != '':
+					# 	msg += _(" (p. %s)") % partenza
 				html.setHTML(msg)
 
 	def update(self, arrivi):
@@ -696,9 +696,9 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 				msg = _("Nessun autobus")
 			else:
 				msg = l['annuncio']
-				partenza = getdefault(l, 'partenza', '')
-				if partenza != '':
-					msg += _(" (partenza %s)") % partenza
+				# partenza = getdefault(l, 'partenza', '')
+				# if partenza != '':
+				# 	msg += _(" (partenza %s)") % partenza
 			h = HTML(msg)
 			h.addStyleName('clickable')
 			h.getElement().onclick = clicklistener
@@ -727,9 +727,9 @@ class CercaLineaPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Deferr
 			vp = VerticalPanel()
 			vp.setWidth('100%')
 			msg = l['annuncio']
-			partenza = getdefault(l, 'partenza', '')
-			if partenza != '':
-				msg += _(" (partenza %s)") % partenza
+			# partenza = getdefault(l, 'partenza', '')
+			# if partenza != '':
+			# 	msg += _(" (partenza %s)") % partenza
 			vp.add(HTML(msg))
 			hp2 = HorizontalPanel()
 			vp.add(hp2)

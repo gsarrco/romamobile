@@ -42,9 +42,6 @@
 					{% trans "Nessun autobus" %}
 				{% else %}
 					{{ a.annuncio }}
-					{% if a.partenza %}
-						{% blocktrans with partenza=a.partenza %}(partenza {{ partenza }}){% endblocktrans %}
-					{% endif %}
 				{% endif %}
 			{% endif %}
 		{% endif %}
@@ -71,10 +68,7 @@
 			{% trans "Nessun autobus" %}
 		{% else %}
 			{{ a.annuncio }}
-			{% if a.partenza %}
-				{% blocktrans with partenza=a.partenza %}(partenza {{ partenza }}){% endblocktrans %}
-			{% endif %}
-		{% endif %}		
+		{% endif %}
 		{% if a.destinazione %}
 			<br />
 			{% blocktrans with dest=a.destinazione %}<span class="b">Direz.:</span> {{ dest }}{% endblocktrans %}

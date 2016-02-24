@@ -24,7 +24,7 @@ from django.db import models
 from django.db.models import Q
 from django.contrib.contenttypes import models as contenttypes
 from datetime import datetime, timedelta, time
-from utils import oggetto_con_min, oggetto_con_max, ora_breve, weekday2string
+from utils import oggetto_con_min, oggetto_con_max, ora_breve, weekday2string, datetime2date, date2mysql
 from django.contrib.auth.models import User, Group
 import cPickle as pickle
 import hashlib
@@ -133,6 +133,11 @@ class Festivita(models.Model):
 			d = dt + timedelta(days=1)
 		else:
 			d = dt
+		d = datetime2date(dt)
+		cache_key = "get_weekday_%s_%d" % (date2mysql(d), 1 if compatta_feriali else 0)
+		r = cache.get(cache_key)
+		if r is not None:
+			return r
 		f = cls.find_festivita(d)
 		if f is None:
 			wd = d.weekday()
@@ -143,6 +148,7 @@ class Festivita(models.Model):
 				wd = 6
 		if compatta_feriali and wd < 5:
 			wd = 0
+		cache.set(cache_key, wd)
 		return wd
 
 
