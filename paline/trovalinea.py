@@ -671,8 +671,6 @@ def TrovalineaFactory(
 								tempo=int(percorso.get_tempo_totale()),
 							)
 							l.save()
-							self.docit_logger.log(l, json.dumps(indicazioni_icona.indicazioni))
-
 
 						start = punti[0]
 						stop = punti[-1]
