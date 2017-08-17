@@ -1047,7 +1047,7 @@ class FrequenzaPercorso(models.Model):
 		return -1
 	
 class PartenzeCapilinea(models.Model):
-	id_percorso = models.CharField(db_index=True, max_length=30, primary_key=True)
+	id_percorso = models.CharField(db_index=True, max_length=30)
 	orario_partenza = models.DateTimeField(db_index=True)
 		
 	class Meta:
