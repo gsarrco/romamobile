@@ -2879,9 +2879,9 @@ class ArcoPercorrenzaFC(ArcoPercorrenzaBus):
 		idl = p.id_linea
 		n = len(p.tratti_percorso)
 		tempo = {
-			'FC1': 103,
-			'FC2': 185,
-			'FC3': 94,
+			'RMG': 103,
+			'RL': 185,
+			'RMVT': 94,
 		}[idl] * n * self.rete_tratto_percorso.rete_tratto_percorsi.dist / p.dist
 		return (tempo, tempo)
 
@@ -2890,9 +2890,9 @@ class ArcoPercorrenzaFC(ArcoPercorrenzaBus):
 		idl = p.id_linea
 		n = len(p.tratti_percorso)
 		return ({
-			'FC1': 103,
-			'FC2': 185,
-			'FC3': 94,
+			'RMG': 103,
+			'RL': 185,
+			'RMVT': 94,
 		}[idl] * n * self.rete_tratto_percorso.rete_tratto_percorsi.dist / p.dist), 'D'
 
 	def costruisci_percorso(self, t, opzioni):
