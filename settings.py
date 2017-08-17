@@ -60,6 +60,7 @@ TROVALINEA_RETE_SPECIALE = os.path.join(TROVALINEA_PATH_RETE, 'special')
 DATABASES = {
 	'default': {
 		'ENGINE': 'django.contrib.gis.db.backends.postgis',
+		'HOST': '127.0.0.1',
 		'NAME': 'muoversiaroma',
 		'USER': 'test',
 		'PASSWORD': 'test',
