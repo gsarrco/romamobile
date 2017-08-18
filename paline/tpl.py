@@ -2422,10 +2422,11 @@ class AggiornatoreDownload(Thread):
 					ciclo += 1
 					if ciclo >= self.cicli_logging:
 						ciclo = 0
+						dt = datetime.now()
 						for k in self.rete.tratti_percorsi:
-							self.rete.tratti_percorsi[k].log_per_statistiche(ua)
+							self.rete.tratti_percorsi[k].log_per_statistiche(dt)
 						for id_palina in self.rete.capilinea:
-							self.rete.paline[id_palina].log_arrivi()
+							self.rete.paline[id_palina].log_arrivi(dt)
 
 					print "Log effettuato"
 			sleep(self.intervallo.seconds)
