@@ -121,14 +121,16 @@ class RetePalina(object):
 		self.x = res['x']
 		self.y = res['y']
 
-	def log_arrivi(self):
+	def log_arrivi(self, dt=None):
 		if settings.CPD_LOG_PER_STATISTICHE:
+			if dt is None:
+				dt = datetime.now()
 			for k in self.fermate:
 				f = self.fermate[k]
 
 				if f.tratto_percorso_successivo is None:
 					#print "Capolinea percorso " + k
-					f.log_arrivi()
+					f.log_arrivi(dt)
 
 	def distanza(self, p):
 		if self.x == -1 or p.x == -1:
@@ -736,15 +738,17 @@ class ReteTrattoPercorsi(object):
 			n = datetime.now()
 			self.ultimo_aggiornamento = n
 			if logging and settings.CPD_LOG_PER_STATISTICHE:
-				self.log_per_statistiche()
+				self.log_per_statistiche(n)
 		#print "Calcolato tempo percorrenza:", cnt, self.tempo_percorrenza
 
-	def log_per_statistiche(self):
+	def log_per_statistiche(self, dt=None):
+		if dt is None:
+			dt = datetime.now()
 		LogTempoArco(
 			id_palina_s=self.s.id_palina,
 			id_palina_t=self.t.id_palina,
-			data=datetime2date(n),
-			ora=datetime2time(n),
+			data=datetime2date(dt),
+			ora=datetime2time(dt),
 			tempo=velocita,
 			peso=cnt,
 		).save()
@@ -853,7 +857,9 @@ class ReteFermata(object):
 	def is_capolinea_partenza(self):
 		return self.tratto_percorso_precedente is None
 
-	def log_arrivi(self):
+	def log_arrivi(self, dt=None):
+		if dt is None:
+			dt = datetime.now()
 		logged = set()
 		for a in self.arrivi_temp:
 			idp = a['id_percorso']
@@ -863,7 +869,7 @@ class ReteFermata(object):
 				LogTempoAttesaPercorso(
 					id_percorso=idp,
 					data=date.today(),
-					ora=datetime2time(datetime.now()),
+					ora=datetime2time(dt),
 					tempo=t,
 				).save()
 
@@ -2417,7 +2423,7 @@ class AggiornatoreDownload(Thread):
 					if ciclo >= self.cicli_logging:
 						ciclo = 0
 						for k in self.rete.tratti_percorsi:
-							self.rete.tratti_percorsi[k].log_per_statistiche()
+							self.rete.tratti_percorsi[k].log_per_statistiche(ua)
 						for id_palina in self.rete.capilinea:
 							self.rete.paline[id_palina].log_arrivi()
 
