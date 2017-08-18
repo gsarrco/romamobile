@@ -744,14 +744,17 @@ class ReteTrattoPercorsi(object):
 	def log_per_statistiche(self, dt=None):
 		if dt is None:
 			dt = datetime.now()
-		LogTempoArco(
-			id_palina_s=self.s.id_palina,
-			id_palina_t=self.t.id_palina,
-			data=datetime2date(dt),
-			ora=datetime2time(dt),
-			tempo=velocita,
-			peso=cnt,
-		).save()
+		tp = self.tempo_percorrenza
+		if tp > 0:
+			velocita = self.dist / tp
+			LogTempoArco(
+				id_palina_s=self.s.id_palina,
+				id_palina_t=self.t.id_palina,
+				data=datetime2date(dt),
+				ora=datetime2time(dt),
+				tempo=velocita,
+				peso=cnt,
+			).save()
 
 	def get_velocita(self):
 		if self.ultimo_aggiornamento is None or datetime.now() - self.ultimo_aggiornamento > VALIDITA_TEMPO_ARCHI:
