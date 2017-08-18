@@ -738,10 +738,10 @@ class ReteTrattoPercorsi(object):
 			n = datetime.now()
 			self.ultimo_aggiornamento = n
 			if logging and settings.CPD_LOG_PER_STATISTICHE:
-				self.log_per_statistiche(n)
+				self.log_per_statistiche(n, cnt)
 		#print "Calcolato tempo percorrenza:", cnt, self.tempo_percorrenza
 
-	def log_per_statistiche(self, dt=None):
+	def log_per_statistiche(self, dt=None, peso=1):
 		if dt is None:
 			dt = datetime.now()
 		tp = self.tempo_percorrenza
@@ -753,7 +753,7 @@ class ReteTrattoPercorsi(object):
 				data=datetime2date(dt),
 				ora=datetime2time(dt),
 				tempo=velocita,
-				peso=cnt,
+				peso=peso,
 			).save()
 
 	def get_velocita(self):
