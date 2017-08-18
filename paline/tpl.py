@@ -736,15 +736,18 @@ class ReteTrattoPercorsi(object):
 			n = datetime.now()
 			self.ultimo_aggiornamento = n
 			if logging and settings.CPD_LOG_PER_STATISTICHE:
-				LogTempoArco(
-					id_palina_s=self.s.id_palina,
-					id_palina_t=self.t.id_palina,
-					data=datetime2date(n),
-					ora=datetime2time(n),
-					tempo=velocita,
-					peso=cnt,
-				).save()
+				self.log_per_statistiche()
 		#print "Calcolato tempo percorrenza:", cnt, self.tempo_percorrenza
+
+	def log_per_statistiche(self):
+		LogTempoArco(
+			id_palina_s=self.s.id_palina,
+			id_palina_t=self.t.id_palina,
+			data=datetime2date(n),
+			ora=datetime2time(n),
+			tempo=velocita,
+			peso=cnt,
+		).save()
 
 	def get_velocita(self):
 		if self.ultimo_aggiornamento is None or datetime.now() - self.ultimo_aggiornamento > VALIDITA_TEMPO_ARCHI:
@@ -2381,11 +2384,12 @@ class AggiornatoreDownload(Thread):
 	"""
 	Aggiornatore dinamico della rete. Scarica periodicamente la rete serializzata.
 	"""
-	def __init__(self, rete, intervallo):
+	def __init__(self, rete, intervallo, cicli_logging=24):
 		Thread.__init__(self)
 		self.rete = rete
 		self.intervallo = intervallo
 		self.stopped = False
+		self.cicli_logging = cicli_logging
 
 	def stop(self):
 		self.stopped = True
@@ -2395,6 +2399,7 @@ class AggiornatoreDownload(Thread):
 		sp = xmlrpclib.Server('%s/ws/xml/paline/7' % settings.WS_BASE_URL)
 		token = sa.autenticazione.Accedi(settings.DEVELOPER_KEY, '')
 		ultimo_aggiornamento = None
+		ciclo = 0
 		while not self.stopped:
 			print "Verifico ora ultimo aggiornamento rete dinamica"
 			res = sp.paline.GetOrarioUltimoAggiornamentoArrivi(token)
@@ -2406,6 +2411,17 @@ class AggiornatoreDownload(Thread):
 				print "Deserializzo ultimo aggiornamento"
 				self.rete.deserializza_dinamico(pickle.loads(res['stato_rete'].data))
 				print "Rete dinamica aggiornata"
+				if settings.CPD_LOG_PER_STATISTICHE:
+					print "Log per statistiche"
+					ciclo += 1
+					if ciclo >= self.cicli_logging:
+						ciclo = 0
+						for k in self.rete.tratti_percorsi:
+							self.rete.tratti_percorsi[k].log_per_statistiche()
+						for id_palina in self.rete.capilinea:
+							self.rete.paline[id_palina].log_arrivi()
+
+					print "Log effettuato"
 			sleep(self.intervallo.seconds)
 
 
