@@ -2406,34 +2406,41 @@ class AggiornatoreDownload(Thread):
 	def run(self):
 		sa = xmlrpclib.Server('%s/ws/xml/autenticazione/1' % settings.WS_BASE_URL)
 		sp = xmlrpclib.Server('%s/ws/xml/paline/7' % settings.WS_BASE_URL)
-		token = sa.autenticazione.Accedi(settings.DEVELOPER_KEY, '')
+		token = None
 		ultimo_aggiornamento = None
 		ciclo = 0
 		while not self.stopped:
-			print "Verifico ora ultimo aggiornamento rete dinamica"
-			res = sp.paline.GetOrarioUltimoAggiornamentoArrivi(token)
-			ua = res['risposta']['ultimo_aggiornamento']
-			if ultimo_aggiornamento is None or ua > ultimo_aggiornamento:
-				print "Scarico ultimo aggiornamento"
-				res = sp.paline.GetStatoRete(token)['risposta']
-				ultimo_aggiornamento = res['ultimo_aggiornamento']
-				print "Deserializzo ultimo aggiornamento"
-				self.rete.deserializza_dinamico(pickle.loads(res['stato_rete'].data))
-				print "Rete dinamica aggiornata"
-				if settings.CPD_LOG_PER_STATISTICHE:
-					print "Log per statistiche"
-					ciclo += 1
-					if ciclo >= self.cicli_logging:
-						ciclo = 0
-						dt = datetime.now()
-						d = datetime2date(dt)
-						t = datetime2time(dt)
-						for k in self.rete.tratti_percorsi:
-							self.rete.tratti_percorsi[k].log_per_statistiche(dt)
-						for id_percorso in self.rete.percorsi:
-							self.rete.percorsi[id_percorso].log_tempo_attesa(d, t)
+			try:
+				print "Verifico ora ultimo aggiornamento rete dinamica"
+				if token is None:
+					token = sa.autenticazione.Accedi(settings.DEVELOPER_KEY, '')
+				res = sp.paline.GetOrarioUltimoAggiornamentoArrivi(token)
+				ua = res['risposta']['ultimo_aggiornamento']
+				if ultimo_aggiornamento is None or ua > ultimo_aggiornamento:
+					print "Scarico ultimo aggiornamento"
+					res = sp.paline.GetStatoRete(token)['risposta']
+					ultimo_aggiornamento = res['ultimo_aggiornamento']
+					print "Deserializzo ultimo aggiornamento"
+					self.rete.deserializza_dinamico(pickle.loads(res['stato_rete'].data))
+					print "Rete dinamica aggiornata"
+					if settings.CPD_LOG_PER_STATISTICHE:
+						print "Log per statistiche"
+						ciclo += 1
+						if ciclo >= self.cicli_logging:
+							ciclo = 0
+							dt = datetime.now()
+							d = datetime2date(dt)
+							t = datetime2time(dt)
+							for k in self.rete.tratti_percorsi:
+								self.rete.tratti_percorsi[k].log_per_statistiche(dt)
+							for id_percorso in self.rete.percorsi:
+								self.rete.percorsi[id_percorso].log_tempo_attesa(d, t)
 
-					print "Log effettuato"
+						print "Log effettuato"
+			except:
+				print "Errore aggiornamento rete dinamica"
+				traceback.print_exc()
+				token = None
 			sleep(self.intervallo.seconds)
 
 
