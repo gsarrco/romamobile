@@ -6,8 +6,8 @@
 		<meta name="mobile-web-app-capable" content="yes">
 		<link rel="shortcut icon" sizes="196x196" href="icon.png">
 		<link rel='stylesheet' href='index-red.css'>
-		<link rel="stylesheet" href="leaflet/leaflet.css" />
-		<title>Muoversi a Roma</title>
+		<!--<link rel="stylesheet" href="leaflet/leaflet.css" />-->
+		<title>Roma mobile</title>
 	</head>
 	<body bgcolor="#ffffff">
 		<script type="text/javascript">
@@ -15,27 +15,30 @@
 		</script>
 		<script type="text/javascript" charset="utf-8" src="iab.js"></script>
 		<script language="javascript" src="bootstrap.js"></script>
-		<script src="leaflet/leaflet.js"></script>
+		 <!-- Load Leaflet from CDN-->
+	  <link rel="stylesheet" href="https://cdn.jsdelivr.net/leaflet/1.0.0-beta.2/leaflet.css" />
+	  <script src="https://cdn.jsdelivr.net/leaflet/1.0.0-beta.2/leaflet.js"></script>
+	  <!-- Load Esri Leaflet from CDN -->
+	  <script src="https://cdn.jsdelivr.net/leaflet.esri/2.0.0-beta.8/esri-leaflet.js"></script>
 		<div id="Loading-Message">
 			<img id="Loading-Icon" width="196" height="196" src="icon.png" />
 			<div id="Loading-Text">
 				<p>
-					Roma Servizi per la Mobilit&agrave; s.r.l.
+					Roma mobile
 				</p>
 			</div>
 		</div>
 		
 		<div><iframe id='__pygwt_historyFrame' style='width:0;height:0;border:0'></iframe></div>
-		<script type="text/javascript">
-			var _gaq = _gaq || [];
-			_gaq.push(['_setAccount', 'UA-6461187-4']);
-			_gaq.push(['_trackPageview']);
+		<script>
+	  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+	  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+	  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+	  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
 
-			(function() {
-				var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-				ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-				var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-			})();
+	  ga('create', 'UA-75835092-1', 'auto');
+	  ga('send', 'pageview');
+
 		</script>
 	</body>
 </html>

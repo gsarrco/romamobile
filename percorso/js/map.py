@@ -100,17 +100,11 @@ class MapPanel(SimplePanel, DeferrablePanel):
 		for opt, cb in self.right_click_options:
 			menu.addItem(opt, MenuCmd(self.rightClickHandlerFactory(cb, lat, lng)))
 		popup = ContextMenuPopupPanel(menu)
+		popup.addStyleName('context-menu-popup')
 		popup.showAt(x + mx, y + my)
 
+
 	def create_map_new(self):
-		self.retina = JS("""$wnd['L'].Browser.retina""")
-		if self.retina:
-			tms_url = 'http://172.16.0.14:8080/geoserver/gwc/service/tms/1.0.0/osm_group@EPSG%3A900913@png/{z}/{x}/{y}.png'
-		else:
-			tms_url = 'http://172.16.0.14:8080/geoserver/gwc/service/tms/1.0.0/osm_group@EPSG%3A900913@png/{z}/{x}/{y}.png'
-		mapquestAttrib = """Tiles Courtesy of <a href="http://www.mapquest.com/" target="_blank">MapQuest</a>
-		<img src="http://developer.mapquest.com/content/osm/mq_logo.png">,
-		&copy; <a href="http://www.openstreetmap.org/" target="_blank">OpenStreetMap</a>"""
 		func = self.onRightClick
 		JS("""
 			this.map = $wnd['L'].map(
@@ -120,30 +114,7 @@ class MapPanel(SimplePanel, DeferrablePanel):
 			).setView([41.892055, 12.483559], 12);
 			zoom_ctrl = $wnd['L'].control.zoom({position: 'topright'});
 			this.map.addControl(zoom_ctrl);
-			/* osm = $wnd['L'].tileLayer('http://{s}.mqcdn.com/tiles/1.0.0/map/{z}/{x}/{y}.png', { */
-			osm = $wnd['L'].tileLayer(tms_url, {
-				attribution: mapquestAttrib,
-				detectRetina: true,
-				maxZoom: 18,
-				tms: true
-			});
-			osm.addTo(this.map);
-			/*
-				pcn = $wnd['L'].tileLayer.wms("http://wms.pcn.minambiente.it/ogc?map=/ms_ogc/WMS_v1.3/raster/ortofoto_colore_08.map", {
-					layers: 'OI.ORTOIMMAGINI.2008',
-					minZoom: 16,
-					format: 'image/png',
-					attribution: '<a href="http://www.pcn.minambiente.it/GN/" target="_blank">Geoportale Nazionale</a>'
-				});
-				var baseMaps = {
-					"Cartografia": osm,
-				};
-				var overlayMaps = {
-					"Immagini aeree (zoom in)": pcn
-				};
-				var layersControl = new $wnd['L'].Control.Layers(baseMaps, overlayMaps);
-				this.map.addControl(layersControl);
-			*/
+			$wnd['L'].esri.basemapLayer("Streets", {detectRetina: true}).addTo(this.map);
 			this.map.addEventListener('contextmenu', function(e) {
 				func(e.latlng.lat, e.latlng.lng, e.containerPoint.x, e.containerPoint.y)
 			});
@@ -192,7 +163,7 @@ class MapPanel(SimplePanel, DeferrablePanel):
 		""")
 
 	def create_map(self):
-		return self.create_map_old()
+		return self.create_map_new()
 
 	def relayout(self):
 		JS("""self.map.invalidateSize();""")
@@ -347,7 +318,7 @@ class Layer(object):
 				name = m['name'] if 'name' in m else None
 				open = m['open'] if 'open' in m else False
 				dc = None
-				if 'drop_callback' in m and m['drop_callback'] != '':
+				if callbacks is not None and 'drop_callback' in m and m['drop_callback'] != '':
 					dc = callbacks[m['drop_callback']]
 				infobox = "<b>%s</b>" % m['infobox']
 				if m['desc'] != '':
