@@ -215,7 +215,7 @@ def TrovalineaFactory(
 				aggiorna_percorsi.start()
 				
 			if download:
-				aggiorna_download = tpl.AggiornatoreDownload(r, timedelta(seconds=40))
+				aggiorna_download = tpl.AggiornatoreDownload(r, timedelta(seconds=20))
 				aggiorna_download.start()
 
 			print "Inizializzo supporto autocompletamento"
