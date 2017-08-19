@@ -11,11 +11,11 @@
 		<meta http-equiv="refresh" content="{{ autorefresh }}" />
 		{% endif %}
 		<meta name="robots" content="nofollow" />
-		<meta name="description" content="Muoversi a Roma nasce per informare e aggiornare sulla mobilità pubblica e privata i cittadini, i turisti, i pendolari, i city user" />
+		<meta name="description" content="Roma mobile nasce per informare e aggiornare sulla mobilità pubblica e privata i cittadini, i turisti, i pendolari, i city user" />
 		<meta name="keywords" content="muoversi, roma, mobilità, trasporto pubblico, informazione, infomobilità, mobile, atacmobile, tempi di attesa, trovalinea, calcolo del percorso, mappa" />
-		<title>{% if servizio %}{{ servizio.descrizione }}{% if sottotitolo %} - {{ sottotitolo }}{% endif %} | {% endif %}Muoversi a Roma mobile</title>
+		<title>{% if servizio %}{{ servizio.descrizione }}{% if sottotitolo %} - {{ sottotitolo }}{% endif %} | {% endif %}Roma mobile</title>
 		<link href="/xhtml/s/css/screen{{request.session.theme}}.css" rel="stylesheet" type="text/css" />
-		<link rel="search" type="application/opensearchdescription+xml" title="Muoversi a Roma" href="xhtml/s/opensearch.xml" />
+		<link rel="search" type="application/opensearchdescription+xml" title="Roma mobile" href="xhtml/s/opensearch.xml" />
 		{% block InternalStyle %}
 		{% endblock %}{% block fullscript %}{% endblock %}
 		{% if platform == 'iOS' %}
@@ -26,8 +26,8 @@
 			<script src="/xhtml/s/sb/sb.js"></script>
 			<script type="text/javascript">
 				$(function () { $.smartbanner({
-					title: '{% trans "Muoversi a Roma" %}',
-					author: 'Roma Servizi per la Mobilit&agrave;',
+					title: '{% trans "Roma mobile" %}',
+					author: 'Roma mobile',
 					price: '{% trans "App ufficiale" %}',
 					inAppStore: '{% trans "Gratis" %}',
 					inGooglePlay: '{% trans "Gratis" %}',
@@ -45,8 +45,8 @@
 			<script src="/xhtml/s/sb/sb.js"></script>
 			<script type="text/javascript">
 				$(function () { $.smartbanner({
-					title: '{% trans "Muoversi a Roma" %}',
-					author: 'Roma Servizi per la Mobilit&agrave;',
+					title: '{% trans "Roma mobile" %}',
+					author: 'Roma mobile',
 					price: '{% trans "App ufficiale" %}',
 					inAppStore: '{% trans "Gratis" %}',
 					inGooglePlay: '{% trans "Gratis" %}',
@@ -65,25 +65,29 @@
 
 	</head>
 	{% block custombody %}<body>{% endblock %}
-	<div style="position: absolute; width: 100%">
+	<div style="position: absolute; width: 100%;">
 		{% if not request.GET.onlycontent %}
 			<div id="header">
-				<div id="rsm-sx"><a class="nound" href="/?nav=0&amp;back=1"><img src="/xhtml/s/img/muoversiaroma.png" width="153" height="50" alt="logo" /></a></div>
+				<div id="rsm-sx"><a class="nound" href="/?nav=0&amp;back=1"><img src="/xhtml/s/img/rm.png" height="50" alt="logo" /></a></div>
 				<div id="rsm-dx"></div>
 				<div id="orario">{{ DateTime }}</div>
 				{% if beta %}<div id="beta">Versione BETA</div>{% endif %}
 			</div>
 
+			{% block title %}
+				{% if servizio %}
+					<h1>
+						<span id="indietro"><a class="nound" href="{{ history_1 }}">&laquo;</a></span>
+						<a href="{{ history_service_url }}">{{ servizio.descrizione }}{% if sottotitolo %} - {{ sottotitolo }}{% endif %}</a>
+						<span id="aggiorna"><a href="{{ refresh }}" class="nound"><img src="/xhtml/s/img/reload{{request.session.theme}}.png"/></a></span>
+					</h1>
+				{% else %}
+					<h1>Roma mobile</h1>
+				{% endif %}
+			{% endblock %}
+
+
 			<div id="main">
-				{% block title %}
-					{% if servizio %}
-						<div id="title">
-							<span id="indietro"><a class="nound" href="{{ history_1 }}">&laquo;</a></span>
-							<a href="{{ history_service_url }}">{{ servizio.descrizione }}{% if sottotitolo %} - {{ sottotitolo }}{% endif %}</a>
-							<span id="aggiorna"><a href="{{ refresh }}" class="nound"><img src="/xhtml/s/img/reload{{request.session.theme}}.png"/></a></span>
-						</div>
-					{% endif %}
-				{% endblock %}
 
 				{% if notifiche %}
 					<div class="notifiche">
@@ -108,7 +112,7 @@
 		{% endif %}
 
 				{% block content %}
-				Benvenuto in Muoversi a Roma!
+				Benvenuto in Roma mobile!
 				{% endblock %}
 
 				{% block didyouknow %}
@@ -116,31 +120,18 @@
 					<p>
 						{% if rnd_didyouknow == 0 %}
 							{% blocktrans %}
-								I dati e i servizi di Muoversi a Roma, compresi quelli in tempo reale, sono
-								<a href="http://www.agenziamobilita.roma.it/it/progetti/open-data/">liberamente accessibili come Open Data</a>.
+								I dati e i servizi di Roma mobile, compresi quelli in tempo reale, sono
+								<a href="https://bitbucket.org/lallulli/muoversi-a-roma">accessibili mediante API</a>.
 							{% endblocktrans %}
 						{% elif rnd_didyouknow ==  1 %}
 							{% blocktrans %}
-								Muoversi a Roma &egrave; open source.
-								<a href="http://www.agenziamobilita.roma.it/it/progetti/open-data/codice-sorgente.html">Scarica il codice sorgente</a>
+								Roma mobile &egrave; open source.
+								<a href="https://bitbucket.org/lallulli/muoversi-a-roma">Scarica il codice sorgente</a>
 								e contribuisci anche tu allo sviluppo del sito mobile, del cerca percorso, cerca linea e cerca luogo.
 							{% endblocktrans %}
 						{% elif rnd_didyouknow ==  2 %}
 							{% blocktrans %}
-								Hai un sito web? Puoi <a href="http://www.agenziamobilita.roma.it/it/progetti/open-data/strumenti-per-i-webmaster.html">incorporare
-								una versione personalizzata</a> dei servizi di infomobilit&agrave;
-								di Muoversi a Roma: cerca percorso, cerca linea e cerca luogo.
-							{% endblocktrans %}
-						{% elif rnd_didyouknow ==  3 %}
-							{% blocktrans %}
-								Muoversi a Roma &egrave; sviluppato da <a href="http://www.agenziamobilita.roma.it">Roma
-								servizi per la mobilit&agrave;</a>, l'Agenzia per la Mobilit&agrave; di Roma Capitale.
-								Ci trovi anche su <a href="http://muovi.roma.it/facebook">Facebook</a> e
-								<a href="http://muovi.roma.it/twitter">Twitter</a>.
-							{% endblocktrans %}
-						{% elif rnd_didyouknow ==  4 %}
-							{% blocktrans %}
-								Il <a href="http://muovi.roma.it/percorso">cerca percorso di Muoversi a Roma</a> funziona
+								Il <a href="http://romamobile.it/percorso">cerca percorso di Roma mobile</a> funziona
 								con i dati in tempo reale. Conosce la posizione degli autobus e lo stato del traffico,
 								e calcola, momento per momento, il percorso pi&ugrave; conveniente
 								con i mezzi Atac, Roma TPL, la metropolitana e le ferrovie regionali.
@@ -165,21 +156,10 @@
 				<div id="info">
 					<table style="width: 100%; border: none; padding: 0px; margin: 0px; border-collapse: collapse;">
 						<tr>
-							<td style="padding-left: 5px; vertical-align: middle">
-								<p>
-									<a alt="App Android" href="https://play.google.com/store/apps/details?id=com.realtech.romamobilita"><img src="/xhtml/s/img/android-app.png"/></a>
-									<a alt="App iOS" href="https://itunes.apple.com/app/id820255342"><img src="/xhtml/s/img/ios-app.png"/></a>
-								</p>
-								<p>
-									<a href="http://www.muoversiaroma.it/muoversiaroma/home.aspx?version=marclassic" class="nound"><img src="/xhtml/s/img/ico-pc.png" alt="Versione PC"/></a>
-									<a href="/facebook" class="nound"><img src="/xhtml/s/img/ico-fb.png" alt="Facebook"/></a>
-									<a href="/twitter" class="nound"><img src="/xhtml/s/img/ico-tw.png" alt="Twitter"/></a>
-								</p>
-							</td>
 							<td style="padding-right: 5px; text-align: right; vertical-align:top;">
 									{{ DebugString }}
 									{{ Nota }}
-									&copy; {{ now|date:"Y" }} Roma servizi per la mobilit&agrave; s.r.l.
+									&copy; {{ now|date:"Y" }} Roma mobile
 							</td>
 						</tr>
 					</table>
