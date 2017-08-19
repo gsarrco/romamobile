@@ -271,7 +271,7 @@ class Middleware:
 		response.context_data['history_1'] = get_back_url(request, len(request.session['history']) - 2)
 		response.context_data['refresh'] = get_back_url(request, len(request.session['history']) - 1)
 		response.context_data['history_main_menu'] = '/?%s=%s' % (settings.SESSION_COOKIE_NAME, request.session.session_key) if request.does_not_accept_cookies else '/'
-		response.context_data['rnd_didyouknow'] = rnd.randint(0, 4)
+		response.context_data['rnd_didyouknow'] = rnd.randint(0, 2)
 		response.context_data['id_sito'] = settings.ID_SITO
 		response.context_data['formaction'] = mark_safe('action="%s"' % request.path_info)
 		response.context_data['id_sito'] = settings.ID_SITO		
