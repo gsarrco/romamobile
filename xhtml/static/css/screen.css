@@ -39,10 +39,10 @@ a img {
 	text-decoration: none;
 }
 h3 {
-	color: #B8E0CF;
+	color: #f84f00;
 }
 a {
-	color: #333333;
+	color: #f84f00;
 	font-weight: bold;
 	text-decoration: none;
 	border-bottom: 1px dotted;	
@@ -61,6 +61,7 @@ select, select option {
 }
 .b {
 	font-weight: bold;
+	font-color: #f84f00
 }
 .i {
 	font-style:italic;
@@ -210,7 +211,8 @@ select, select option {
 }
 .menulink {
 	vertical-align: middle;
-	border-bottom: 1px dotted;	
+	border-bottom: 1px dotted;
+	color: #f84f00;
 }
 .menuitem {
 	padding: 2px 0px 2px 0px;
@@ -219,8 +221,8 @@ select, select option {
 	vertical-align: middle;
 }
 .emph {
-	color: #13985F;
-	background-color:#B8E0CF;
+	color: #f84f00;
+	background-color:#dddddd;
 }
 .banda0, .banda1, .banda2 {
 	margin-left: -0.5em;
@@ -231,9 +233,10 @@ select, select option {
 
 .banda1 {
 	border-left: #f84f00 solid 0.3em;
+	background-color: #dddddd;
 }
 .banda2, .banda0 {
-	border-left: #B8E0CF solid 0.3em;
+	border-left: #999999 solid 0.3em;
 }
 
 
@@ -273,7 +276,7 @@ select, select option {
 }
 .notifiche {
 	background-color: #ffffff;
-	color: #13985F;
+	color: #333333;
 	margin-top: 0.8em;
 	margin-bottom: 0.6em;
 	padding: 0.2em;
@@ -283,12 +286,12 @@ select, select option {
 	border-width: 1px 0px 1px 5px;
 }
 .notifiche a {
-	color: #009b48;
+	color: #f84f00;
 	text-decoration: none;
 }
 .infobox {
 	background-color: #E8E8E8;
-	color: #13985F;
+	color: #333333;
 	font-size: 0.8em;
 	padding: 0.4em;
 	margin-top: 0.7em;
@@ -314,7 +317,7 @@ select, select option {
 	border-left: #f84f00 solid 2px;
 }
 .selected a {
-	color: #13985F;
+	color: #f84f00;
 }
 .category {
 	font-weight: bold;
@@ -351,7 +354,7 @@ select, select option {
 	color:black
 	}
 a.abilita:hover{
-	color:#B2FF99;
+	color:#999999;
 	
 	}
 a.disabilita:hover{

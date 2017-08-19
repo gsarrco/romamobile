@@ -32,29 +32,31 @@
  </form>
 </p>
 
-<h3>{% trans "Fermate preferite" %}</h3>
-{% if request.user.is_authenticated %}
-	{% for g in gruppi_preferiti %}
-		<img class="icon" src="/paline/s/img/paline_gruppo.gif" height="16" width="16" alt="*" /> <a href='{% hist %}/paline/gruppo/{{ g.pk }}{% endhist %}'>{{ g.nome }}</a>
-		{% if not request.user|in_group:"readonly" %}
-			(<a href='{% hist %}/paline/preferiti/escludi_linee/{{ g.pk }}{% endhist %}'>{% trans "Modifica" %}</a> |
-			<a href='{% hist %}/paline/preferiti/elimina/{{ g.pk }}{% endhist %}'>{% trans "Elimina" %}</a>)
+{% if False %}
+	<h3>{% trans "Fermate preferite" %}</h3>
+	{% if request.user.is_authenticated %}
+		{% for g in gruppi_preferiti %}
+			<img class="icon" src="/paline/s/img/paline_gruppo.gif" height="16" width="16" alt="*" /> <a href='{% hist %}/paline/gruppo/{{ g.pk }}{% endhist %}'>{{ g.nome }}</a>
+			{% if not request.user|in_group:"readonly" %}
+				(<a href='{% hist %}/paline/preferiti/escludi_linee/{{ g.pk }}{% endhist %}'>{% trans "Modifica" %}</a> |
+				<a href='{% hist %}/paline/preferiti/elimina/{{ g.pk }}{% endhist %}'>{% trans "Elimina" %}</a>)
+			{% endif %}
+			<br />
+		{% endfor %}
+		{% for p in paline_preferite %}
+			<img class="icon" src="/paline/s/img/icon.gif" height="16" width="16" alt="*" /> <a href='{% hist %}/paline/gruppo/{{ p.gruppo.pk }}{% endhist %}'>{{ p.nome }}</a>
+			{% if not request.user|in_group:"readonly" %}
+				(<a href='{% hist %}/paline/preferiti/escludi_linee/{{ p.gruppo.pk }}{% endhist %}'>{% trans "Modifica" %}</a> |
+				<a href='{% hist %}/paline/preferiti/elimina/{{ p.gruppo.pk }}{% endhist %}'>{% trans "Elimina" %}</a>)
+			{% endif %}
+			<br />
+		{% endfor %}
+		{% if nessun_preferito %}
+			{% trans "Ancora non hai impostato alcuna fermata come preferita." %}
 		{% endif %}
-		<br />
-	{% endfor %}
-	{% for p in paline_preferite %}
-		<img class="icon" src="/paline/s/img/icon.gif" height="16" width="16" alt="*" /> <a href='{% hist %}/paline/gruppo/{{ p.gruppo.pk }}{% endhist %}'>{{ p.nome }}</a>
-		{% if not request.user|in_group:"readonly" %}
-			(<a href='{% hist %}/paline/preferiti/escludi_linee/{{ p.gruppo.pk }}{% endhist %}'>{% trans "Modifica" %}</a> |
-			<a href='{% hist %}/paline/preferiti/elimina/{{ p.gruppo.pk }}{% endhist %}'>{% trans "Elimina" %}</a>)
-		{% endif %}
-		<br />
-	{% endfor %}
-	{% if nessun_preferito %}
-		{% trans "Ancora non hai impostato alcuna fermata come preferita." %}
+	{% else %}
+		{% trans "<a href='http://login.muoversiaroma.it/Login.aspx?IdSito=1'>Registrati o accedi</a> per impostare le tue fermate preferite, ottenere notifiche e segnalare disservizi." %}
 	{% endif %}
-{% else %}
-	{% trans "<a href='http://login.muoversiaroma.it/Login.aspx?IdSito=1'>Registrati o accedi</a> per impostare le tue fermate preferite, ottenere notifiche e segnalare disservizi." %}
 {% endif %}
 
 {% endblock %}

@@ -30,6 +30,7 @@
 	<input type="submit" name="Inverti" value="{% trans "Ritorno" %}" />
 </p>
 
+{% if False %}
 <h3>{% trans "Luoghi preferiti" %}</h3>
 {% if request.user.is_authenticated %}
 	{% for l in luoghi_preferiti %}
@@ -44,6 +45,7 @@
 	{% endif %}
 {% else %}
 	{% trans "<a href='http://login.muoversiaroma.it/Login.aspx?IdSito=1'>Registrati o accedi</a> per impostare i tuoi luoghi preferiti." %}
+{% endif %}
 {% endif %}
 
 <h2 class="vskip">{%trans "Come" %}</h2>
