@@ -704,9 +704,9 @@ class PercorsoBaseForm(forms.Form):
 		choices=(
 			(0, _("Mezzo privato")),
 			(1, _("Mezzi pubblici")),
-			(2, _("Park and ride")),
+			#(2, _("Park and ride")),
 			(3, _("Bike and ride")),
-			(4, _("Car sharing")),
+			#(4, _("Car sharing")),
 		),
 		widget=BrRadioSelect,
 	)
