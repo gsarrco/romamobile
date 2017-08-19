@@ -1,11 +1,10 @@
 * {
 	font-family: Tahoma, Lucida Grande, Verdana, sans-serif;
-	color: #FFFFFF;
+	color: #333333;
 }
 body {
 	margin: 0em;
-	background-color:#13985F;
-	background-image:url('/xhtml/s/img/bg.png');
+	background-color:white;
 	background-attachment: fixed;
 	background-position: 0px 50px;
 }
@@ -18,15 +17,16 @@ h1,h2,h3,h4,h5,h6,.date {
   margin: 0.6em 0em 0.5em 0em;
 }
 h2 {
-	color: #8e001c;
-	background-color: white;
+	color: #ffffff;
+	background-color: #888888;
 	-ms-filter:"progid:DXImageTransform.Microsoft.Alpha(Opacity=70)";
 	filter: alpha(opacity=70);
 	opacity: .7;
 }
 h1 {
-	color: #8E001C;
-	padding-left: 0.5em;
+	background-color: #f84f00;
+	color: white;
+	padding-left: 5px;
 	padding-top: 0em;
 	margin: 0em;
 }
@@ -42,17 +42,17 @@ h3 {
 	color: #B8E0CF;
 }
 a {
-	color: #ffffff;
+	color: #333333;
 	font-weight: bold;
 	text-decoration: none;
 	border-bottom: 1px dotted;	
 }
 input, textarea {
-	color: #000000;
+	color: #333333;
 }
 
 select, select option {
-	color: #000000;
+	color: #333333;
 }
 .right-head {
 	width: 100%;
@@ -77,7 +77,7 @@ select, select option {
 
 /* Blocco stili header */
 #header {
-	margin-bottom: 0px;
+	padding: 5px;
 	height: 50px;
 }
 #rsm-dx {
@@ -86,14 +86,12 @@ select, select option {
 	left:0px;
 	width: 100%;
 	height: 50px;
-	background-image: url(/xhtml/s/img/sfondo-logo.png);
-	background-repeat: repeat-x;
 	z-index: -2;
 }
 #rsm-sx {
 	position:absolute;
-	top:0px;
-	left:0px;
+	top:5px;
+	left:5px;
 	height:50px;
 	width:153px;
 }
@@ -102,7 +100,7 @@ select, select option {
 		position: absolute;
 		right: 15px;
 		top: 31px;
-		color: #ffffff;
+		color: #333333;
 		font-weight: bold;
 		font-size: small;
 		font-stretch: condensed;
@@ -112,15 +110,15 @@ select, select option {
 		right: 10px;
 		top: 2px;
 		padding: 0px 2px 0px 2px;
-		border-top: #84132D solid 1px;
-		border-bottom: #84132D solid 1px;
-		color: #84132D;
+		border-top: #f84f00 solid 1px;
+		border-bottom: #f84f00 solid 1px;
+		color: #f84f00;
 		background-color: #ffffff;
 		font-weight: bold;
 		font-size: small;
 }
 #beta a {
-	color: #84132D;
+	color: #f84f00;
 }
 .navtop {
 	position: absolute;
@@ -141,8 +139,8 @@ select, select option {
 	padding-bottom: 0.5em;
 	padding-right: 0.5em;
 	padding-top: 0em;
-	border-bottom:#13985F solid 0.3em;
-	background-color: #13985f;
+	border-bottom:white solid 0.3em;
+	background-color: white;
 }
 
 #main a {
@@ -156,8 +154,8 @@ select, select option {
 		margin-bottom: 15px;
 }
 #title #indietro a {
-		/*color: #8E001C;*/
-		color: white;
+		/*color: #f84f00;*/
+		color: #333333;
 		margin-left: 3px;
 }
 #title a {
@@ -181,13 +179,13 @@ select, select option {
 
 /* blocco stili footer */
 #footer {
-		border-top: 3px solid #8e001c;
+		border-top: 3px solid #f84f00;
 }
 
 #footer #info {
 		padding-top: 6px;
 		padding-bottom: 6px;
-		color: #ffffff;
+		color: #333333;
 		font-size: small;
 		font-stretch: condensed;
 		height: 24px;
@@ -226,12 +224,12 @@ select, select option {
 .banda0, .banda1, .banda2 {
 	margin-left: -0.5em;
 	margin-right: -0.5em;
-	border-bottom: #84132D dashed 0.1em;
+	border-bottom: #f84f00 dashed 0.1em;
 	padding: 0.3em;
 }
 
 .banda1 {
-	border-left: #84132D solid 0.3em;
+	border-left: #f84f00 solid 0.3em;
 }
 .banda2, .banda0 {
 	border-left: #B8E0CF solid 0.3em;
@@ -239,7 +237,7 @@ select, select option {
 
 
 .banda0 {
-	border-top: #84132D dashed 0.1em;
+	border-top: #f84f00 dashed 0.1em;
 }
 .nota {
 	margin-top: 3em;
@@ -247,7 +245,7 @@ select, select option {
 }
 .ak {
   background-color: #999999;
-  color: #FFFFFF;
+  color: #333333;
   border-left: #999999 solid 0.2em;
   border-right: #999999 solid 0.2em;
   border-top: #999999 solid 0.1em;
@@ -267,7 +265,7 @@ select, select option {
 	margin-top: 0.8em;
 }
 .hid, .hid1 {
-	color: #FFFFFF;
+	color: #333333;
 }
 .hid0, .hid2 {
 	color: #E8E8E8;
@@ -280,7 +278,7 @@ select, select option {
 	padding: 0.2em;
 	text-align:left;
 	border-style: solid;
-	border-color: #84132D;
+	border-color: #f84f00;
 	border-width: 1px 0px 1px 5px;
 }
 .notifiche a {
@@ -294,11 +292,11 @@ select, select option {
 	padding: 0.4em;
 	margin-top: 0.7em;
 	margin-bottom: 0.7em;
-	border-left: #84132D solid 2px;	
+	border-left: #f84f00 solid 2px;	
 }
 
 .infobox .b {
-	color: #822433;
+	color: #f84f00;
 }
 
 .hlform {
@@ -312,14 +310,14 @@ select, select option {
 }
 .selected {
 	background-color: #E8E8E8;
-	border-left: #84132D solid 2px;
+	border-left: #f84f00 solid 2px;
 }
 .selected a {
 	color: #13985F;
 }
 .category {
 	font-weight: bold;
-	color: #822433;
+	color: #f84f00;
 	margin-top: 12px;
 }
 .percorso .indicazioni td {
@@ -330,8 +328,8 @@ select, select option {
 }
 .percorso .indicazioni .icon {
 	background-color: #999999;
-	border-left: #84132D solid 5px;
-	color: #8E001C;
+	border-left: #f84f00 solid 5px;
+	color: #f84f00;
 	font-weight: bold;
 	padding: 2px;
 }
@@ -356,7 +354,7 @@ a.abilita:hover{
 	
 	}
 a.disabilita:hover{
-	color:red;
+	color:#f84f00;
 	}
 .inactive:hover {
     background-color: white;
