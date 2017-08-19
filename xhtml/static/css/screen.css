@@ -237,6 +237,7 @@ select, select option {
 }
 .banda2, .banda0 {
 	border-left: #999999 solid 0.3em;
+	background-color: #ffc7ad
 }
 
 
@@ -339,7 +340,7 @@ select, select option {
 }
 
 .percorso .indicazioni .nodo .icon {
-	background-color: #FFFFFF;
+	background-color: #ffc7ad;
 }
 
 .percorso .indicazioni .tratto .icon {
