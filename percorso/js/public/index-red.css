@@ -1,9 +1,9 @@
 /*
 	rgb(222, 126, 28): Arancione
 	rgb(131, 9, 43): Rosso
-	#62b290: Verde chiaro
-	#13985F: Verde scuro
-	#B6D9CA: Verde molto chiaro
+	#ffc7ad: Verde chiaro
+	#f84f00: Verde scuro
+	#ffc7ad: Verde molto chiaro
 */
 
 
@@ -44,7 +44,7 @@ label {
 	padding-right: 3px;
 	text-decoration: none;
 	border: medium none;
-	background: url("btn-arrows.png") no-repeat scroll right 8px #13985F;
+	background: url("btn-arrows.png") no-repeat scroll right 8px #f84f00;
 }
 .gwt-Canvas {
 }
@@ -70,11 +70,11 @@ padding:3px;
 .gwt-Frame {
 }
 .gwt-HorizontalSplitter .Bar {
-background-color:#13985F;
+background-color:#f84f00;
 width:5px;
 }
 .gwt-VerticalSplitter .Bar {
-background-color:#13985F;
+background-color:#f84f00;
 height:5px;
 }
 .gwt-HorizontalSplitPanel {
@@ -82,13 +82,13 @@ height:5px;
 .gwt-HorizontalSplitPanel .hsplitter {
 	cursor: move;
 	width: 5px;
-	background-color: #13985F
+	background-color: #f84f00
 }
 .gwt-VerticalSplitPanel {
 	background: rgb(250,250,250);
 }
 .hidePanel {
-	background-color: #13985F;
+	background-color: #f84f00;
 }
 .gwt-VerticalSplitPanel .vsplitter {
 	cursor: move;
@@ -148,7 +148,7 @@ background-color:#ffffff;
 
 .gwt-TabBar {
 	font-weight: bold;
-	background-color: #13985F;
+	background-color: #f84f00;
 }
 
 .gwt-TabPanelBottom {
@@ -180,7 +180,7 @@ background-color:#ffffff;
 
 .gwt-TabBar .gwt-TabBarItem-selected {
 	color: rgb(131, 9, 43);
-	background-color: #62b290;
+	background-color: #ffc7ad;
 }
 
 .gwt-TabBar .selectedText {
@@ -243,11 +243,11 @@ background-color:#ffffff;
 	cursor:pointer;
 }
 .gwt-StackPanel .gwt-StackPanelItem:hover {
-	background-color: #62b290;
+	background-color: #ffc7ad;
 	color: white;
 }
 .gwt-StackPanel .gwt-StackPanelItem-selected {
-	background-color: #62b290;
+	background-color: #ffc7ad;
 	color: white;
 }
 .gwt-StackPanel	{
@@ -392,13 +392,13 @@ div.calendar-top-panel a:hover { background: #5b80b2; color:white; }
 	background-color: #EEEEEE;
 }
 .right_panel {
-	border: 8px solid #007F0E;
+	border: 8px solid #f84f00;
 	background-color: #D1FFD9;
 	padding: 6px;
 }
 .selected {
 	font-weight: bold;
-	background-color: #007F0E;
+	background-color: #f84f00;
 	color: #FFFFFF;
 }
 .selected a, .selected a:visited {
@@ -508,14 +508,14 @@ a, a:visited {
 }*/
 
 .menu-item:hover {
-	background-color: #62b290;
+	background-color: #ffc7ad;
 }
 
 .menu-item:hover * {
 	color: white;
 }
 .menu-header:hover {
-	background-color: #13985F;
+	background-color: #f84f00;
 }
 
 /*
@@ -564,7 +564,7 @@ a, a:visited {
 	padding-bottom: 0px;
 }
 .manager-panel-menu a.menu-item-green, .manager-panel-menu a.menu-item-green:visited {
-	background-color: #86c076;
+	background-color: #ffc7ad;
 	color: white;
 	display: block;
 	padding-left: 5px;
@@ -916,7 +916,7 @@ table.bollettino th.primo {
 }
 
 .linea-label {
-	background-color: #B6D9CA;
+	background-color: #ffc7ad;
 }
 .linea-label-sx {
 	padding-left: 3px;
@@ -991,7 +991,7 @@ color: white;
 }
 .hiding-label {
 	color: white;
-	background-color: #13985F;
+	background-color: #f84f00;
 	position: absolute;
 	z-index: 1;
 	top: 0px;
@@ -1012,7 +1012,7 @@ color: white;
 	color: white;
 }
 .modo-active {
-	background-color: #62b290;
+	background-color: #ffc7ad;
 	border-radius: 10px;
 	margin: 5px;
 }
@@ -1061,7 +1061,7 @@ color: white;
 	width: 40px;
 	padding: 0px;
 	margin-left: 2px;
-	background: #13985F;
+	background: #f84f00;
 }
 .leaflet-control-attribution a {
 	font-size: 11px;
@@ -1174,7 +1174,7 @@ color: white;
 	margin-right: 15px;
 }
 .menu-header {
-	background-color: #13985F;
+	background-color: #f84f00;
 }
 .menu-header .gwt-HTML {
 	color: white;
@@ -1187,7 +1187,7 @@ color: white;
 	margin-bottom: -42px;
 	z-index: 2000;
 	padding: 5px;
-	border: 1px solid #13985F;
+	border: 1px solid #f84f00;
 	border-radius: 4px;
 	background-color: #FFFFFF;
 }
@@ -1214,7 +1214,7 @@ color: white;
 	z-index: 2000;
 }
 .pannello-carpooling {
-	background-color: #B6D9CA;
+	background-color: #ffc7ad;
 }
 .pannello-carpooling div {
 	padding: 5px;
@@ -1234,14 +1234,14 @@ color: white;
 	color: black;
 }
 .news:hover {
-	background-color: #62b290;
+	background-color: #ffc7ad;
 	color: white;
 }
 .news:hover .news-titolo{
 	color: white;
 }
 .news .news-titolo:hover {
-	background-color: #62b290;
+	background-color: #ffc7ad;
 	color:white;
 }
 .news-selected {
@@ -1271,14 +1271,14 @@ color: white;
 	cursor: pointer;
 }
 .matrix-choice-selected * {
-	background-color: #62b290;
+	background-color: #ffc7ad;
 	border-radius: 4px;
 	margin: 1px;
 	padding: 3px;
 	font-size: 18px;
 }
 .timepicker-label {
-	background-color: #62b290;
+	background-color: #ffc7ad;
 	border-radius: 4px;
 	margin: 1px;
 	padding: 3px;
@@ -1294,7 +1294,7 @@ color: white;
 	font-size: 13px;
 }
 .paginated-arrow {
-	background: #62b290;
+	background: #ffc7ad;
 	border-radius: 5px;
 	margin: 2px;
 	text-decoration: none;
@@ -1304,7 +1304,7 @@ color: white;
 	visibility: hidden;
 }
 .paginated-title {
-	background: #13985F;
+	background: #f84f00;
 	color: #FFFFFF;
 	font-size: 1em;
 	text-transform: uppercase;
@@ -1316,7 +1316,7 @@ color: white;
 	padding: 5px;
 }
 .text-image-button {
-	background: #13985F;
+	background: #f84f00;
 	border-radius: 5px;
 	margin: 2px;
 	text-decoration: none;
@@ -1328,7 +1328,7 @@ color: white;
 }
 .bottom-popup {
 	background-color: #FFFFFF;
-	border: 1px solid #13985F;
+	border: 1px solid #f84f00;
 	right: 6px; bottom: 20px;
 }
 .orari-open {
@@ -1353,7 +1353,7 @@ color: white;
 }
 .tip-balloon-vp2 {
 	background-color: #FFFFFF;
-	border: 1px solid #13985F;
+	border: 1px solid #f84f00;
 	z-index: 13;
 	width: 100%;
 }
