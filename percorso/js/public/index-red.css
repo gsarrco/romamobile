@@ -462,14 +462,14 @@ background-color: #87be77;
 	width: 100%;
 	height: 100%;
 	text-align: center;
-	background-color: #62b290;
+	background-color: #dddddd;
 }
 
 #Loading-Icon {
 	position:relative;
 	display: block;
-	width: 196px;
-	height: 196px;
+	width: 290px;
+	height: 100px;
 	top: 50%;
 	left: 50%;
 	margin:-98px 0 0 -98px;
