@@ -2206,10 +2206,10 @@ class CarPoolingOffriPassaggioPanel(SimplePanel):
 				{
 					'class': HTML,
 					'args': [_("""
-						Fai car pooling, offri un passaggio! Se vuoi condividere il tuo viaggio, Muoversi a Roma lo proporr&agrave;
+						Fai car pooling, offri un passaggio! Se vuoi condividere il tuo viaggio, Roma mobile lo proporr&agrave;
 						ad altri utenti che cercano un percorso, proprio come se la tua auto diventasse un autobus.
 						Potrai anche accordarti con le persone a cui offri un passaggio per ricevere un contributo
-						alle spese di viaggio, suggerito da Muoversi a Roma.
+						alle spese di viaggio, suggerito da Roma mobile.
 					""")],
 					'height': None,
 					'name': 'main',

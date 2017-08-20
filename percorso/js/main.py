@@ -99,18 +99,20 @@ class AboutPanel(VerticalPanel):
 		self.header = MenuPanelItem(
 			self,
 			id='header',
-			text=_('Muoversi a Roma'),
+			text=_('Roma mobile'),
 			icon='toolbar/back.png',
 		)
 		self.header.addStyleName('menu-header')
 		self.add(self.header)
 		self.html = HTMLPanel(_("""
-			<p><b>Muoversi a Roma %(version)s</b><br />
-			&copy; %(year)d Roma servizi per la mobilit&agrave; s.r.l.</p>
+			<p><b>Roma mobile %(version)s</b><br />
+			&copy; %(year)d Roma mobile</p>
 			<p>
-				Muoversi a Roma &egrave; un progetto open source sviluppato da Roma Servizi per la Mobilit&agrave;,
+				Roma mobile &egrave; un progetto open source derivato da Muoversi a Roma.
+				Muoversi a Roma &egrave; stato sviluppato da Roma Servizi per la Mobilit&agrave;,
 				Agenzia per la Mobilit&agrave;
-				di Roma Capitale. I dati che alimentano il servizio sono liberamente disponibili come open data.
+				di Roma Capitale. I dati che alimentano il servizio sono open data di
+				Roma Servizi per la Mobilit&agrave;.
 			</p>
 		""") % {'version': version, 'year':  datetime.now().year})
 		self.html.addStyleName('about')
@@ -578,7 +580,7 @@ class ControlPanel(GeneralMenuPanel):
 			},
 			{
 			'id': 'about',
-			'text': _("Informazioni su Muoversi a Roma"),
+			'text': _("Informazioni su Roma mobile"),
 			'listener': self.onAbout,
 			},
 			], icon = 'toolbar/back.png',)

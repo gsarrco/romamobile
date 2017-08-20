@@ -1361,7 +1361,7 @@ class SearchBox(TextBox, KeyboardHandler, FocusListener):
 
 class FavSearchBox(SearchBox):
 	"""
-	SearchBox con sostituzione dei preferiti, per Muoversi a Roma
+	SearchBox con sostituzione dei preferiti, per Roma mobile
 	"""
 	def getText(self):
 		if self.pk != -1 and not str(self.pk).startswith('A'):
