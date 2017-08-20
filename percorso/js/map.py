@@ -114,7 +114,7 @@ class MapPanel(SimplePanel, DeferrablePanel):
 			).setView([41.892055, 12.483559], 12);
 			zoom_ctrl = $wnd['L'].control.zoom({position: 'topright'});
 			this.map.addControl(zoom_ctrl);
-			$wnd['L'].esri.basemapLayer("Streets", {detectRetina: true}).addTo(this.map);
+			$wnd['L'].esri.basemapLayer("Streets", {detectRetina: false}).addTo(this.map);
 			this.map.addEventListener('contextmenu', function(e) {
 				func(e.latlng.lat, e.latlng.lng, e.containerPoint.x, e.containerPoint.y)
 			});
