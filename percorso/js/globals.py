@@ -4,9 +4,9 @@ flavors = ['app', 'web']
 flavor_id = JS("""$wnd.flavor_id""")
 flavor = flavors[flavor_id]
 
-version = '2.7.2'
+version = '2.7.3'
 
-base_url = ['http://muovi.roma.it', ''][flavor_id]
+base_url = ['http://beta.romamobile.it', ''][flavor_id]
 
 
 def make_absolute(url):
