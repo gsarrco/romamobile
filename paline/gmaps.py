@@ -21,6 +21,7 @@
 
 import cgpolyencode as gpolyenc
 import uuid
+import settings
 
 class BoundingBox(object):
 	def __init__(self):
@@ -664,10 +665,9 @@ class Map(RPyCAllowRead):
 	
 			
 		params.append("""center=%(x)f,%(y)f""" % {'x': center[0], 'y': center[1]})
-		
 		params.append('%s=%s' % ('markers', '|'.join(markers_str)))
-		
 		params.append('sensor=false')
+		params.append('key={}'.format(settings.GOOGLE_MAPS_API_KEY))
 		
 		
 		return {
