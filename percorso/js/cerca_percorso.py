@@ -589,12 +589,12 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 								'style': 'indicazioni-h1',
 								'height': None,
 							},
-							{
-								'class': CheckBox,
-								'args': [_('Cerca un luogo lungo il percorso'), True],
-								'name': 'luogo',
-								'click_listener': self.onCercaLuogo,
-							},
+							# {
+							# 	'class': CheckBox,
+							# 	'args': [_('Cerca un luogo lungo il percorso'), True],
+							# 	'name': 'luogo',
+							# 	'click_listener': self.onCercaLuogo,
+							# },
 							{
 								'class': ListBox,
 								'name': 'risorse',
@@ -975,9 +975,9 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 		self.base.by_name('opzioni_pnr').setVisible(pnr)
 		self.base.by_name('opzioni_car').setVisible(car)
 		if not luoghi:
-			self.base.by_name('luogo').setChecked(False)
+			# self.base.by_name('luogo').setChecked(False)
 			self.base.by_name('risorse').setVisible(False)
-		self.base.by_name('luogo').setVisible(luoghi)
+		# self.base.by_name('luogo').setVisible(luoghi)
 		self.base.by_name('come_header').setText(_("Come: %s") % come[self.modo])
 		if car:
 			self.getZtl()
@@ -1130,18 +1130,18 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 		return icona, out, linea, quanto, escludi
 
 		
-	def onCercaLuogo(self):
-		v = self.base.by_name('luogo').isChecked()
-		self.base.by_name('opzioni_avanzate').setOpen(True)
-		self.base.by_name('risorse').setVisible(v)
-		q3 = self.base.by_name('quando_3')
-		if v and q3.isChecked():
-			self.base.by_name('quando_0').setChecked(True)
-		if not self.cercaLuogoInit:
-			self.cercaLuogoInit = True
-			if self.tipi_risorse_init is None:
-				self.tipi_risorse_init = []
-			client.risorse_lista_tipi(self.tipi_risorse_init, JsonHandler(self.onRisorsaListaTipiDone))
+	# def onCercaLuogo(self):
+	# 	v = self.base.by_name('luogo').isChecked()
+	# 	self.base.by_name('opzioni_avanzate').setOpen(True)
+	# 	self.base.by_name('risorse').setVisible(v)
+	# 	q3 = self.base.by_name('quando_3')
+	# 	if v and q3.isChecked():
+	# 		self.base.by_name('quando_0').setChecked(True)
+	# 	if not self.cercaLuogoInit:
+	# 		self.cercaLuogoInit = True
+	# 		if self.tipi_risorse_init is None:
+	# 			self.tipi_risorse_init = []
+	# 		client.risorse_lista_tipi(self.tipi_risorse_init, JsonHandler(self.onRisorsaListaTipiDone))
 		
 
 	def availableParams(self):
@@ -1240,7 +1240,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 		parent.add(self.dss_base)
 		parent.setVisible(True)
 		self.base.by_name('opzioni_car').setVisible(False)
-		self.base.by_name('luogo').setVisible(False)
+		# self.base.by_name('luogo').setVisible(False)
 		self.base.by_name('selettore_modo').setVisible(False)
 		self.base.by_name('informazioni_su').setVisible(False)
 		self.k_layers = []
@@ -1353,11 +1353,11 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 			mdb.addStyleName('validation-error')
 			return
 		tipi_ris = []
-		if self.base.by_name('luogo').isChecked():
-			if tipi_risorse is not None:
-				tipi_ris = tipi_risorse
-			else:
-				tipi_ris = self.base.by_name('risorse').getSelectedValues()
+		# if self.base.by_name('luogo').isChecked():
+		# 	if tipi_risorse is not None:
+		# 		tipi_ris = tipi_risorse
+		# 	else:
+		# 		tipi_ris = self.base.by_name('risorse').getSelectedValues()
 		da_in = self.getIndirizzo(False)
 		a_in = self.getIndirizzo(True)
 		
@@ -1454,17 +1454,17 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 				panel.w = h
 		return onInfoEstese
 	
-	def cercaPercorsoRisorse(self, da, tipi, a=None):
-		self.base.by_name('da').setText(da)
-		if self.cercaLuogoInit:
-			self.selectRisorse(tipi)
-		else:
-			self.tipi_risorse_init = tipi
-		self.base.by_name('luogo').setChecked(True)
-		self.onCercaLuogo()
-		if a is not None:
-			self.base.by_name('a').setText(a)
-			self.cercaPercorso(self.tipi_risorse_init)
+	# def cercaPercorsoRisorse(self, da, tipi, a=None):
+	# 	self.base.by_name('da').setText(da)
+	# 	if self.cercaLuogoInit:
+	# 		self.selectRisorse(tipi)
+	# 	else:
+	# 		self.tipi_risorse_init = tipi
+	# 	self.base.by_name('luogo').setChecked(True)
+	# 	self.onCercaLuogo()
+	# 	if a is not None:
+	# 		self.base.by_name('a').setText(a)
+	# 		self.cercaPercorso(self.tipi_risorse_init)
 	
 	def getWidgets(self, arrivo):
 		if arrivo:
