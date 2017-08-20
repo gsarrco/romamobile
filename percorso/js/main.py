@@ -69,7 +69,7 @@ from Calendar import Calendar, DateField, TimeField
 from map import MapPanel, Layer, LayerPanel, get_location
 from cerca_percorso import CercaPercorsoPanel
 from cerca_linea import CercaLineaPanel
-from cerca_luogo import CercaLuogoPanel
+# from cerca_luogo import CercaLuogoPanel
 from info_traffico import InfoTraffico
 from news import NewsPanel
 from globals import base_url, make_absolute, flavor, set_user, set_control, ios, version, android, old_android, get_os
@@ -533,9 +533,9 @@ class ControlPanel(GeneralMenuPanel):
 		self.cerca_linea.setSize('100%', '100%')
 		self.tab.add(self.cerca_linea,Image(_('toolbar/linea.png'), Width='48px', Height='48px'))
 
-		self.cerca_luogo = CercaLuogoPanel(self)
-		self.cerca_luogo.setSize('100%', '100%')
-		self.tab.add(self.cerca_luogo, Image(_('toolbar/luogo.png'), Width='48px', Height='48px'))
+		# self.cerca_luogo = CercaLuogoPanel(self)
+		# self.cerca_luogo.setSize('100%', '100%')
+		# self.tab.add(self.cerca_luogo, Image(_('toolbar/luogo.png'), Width='48px', Height='48px'))
 
 		self.preferiti_tab = PreferitiPanel(self)
 		self.preferiti_tab.setSize('100%', '100%')
@@ -596,7 +596,7 @@ class ControlPanel(GeneralMenuPanel):
 		self.map_tab.setSize('100%', '100%')
 		self.cerca_percorso.setMap(self.map)
 		self.cerca_linea.setMap(self.map)
-		self.cerca_luogo.setMap(self.map)
+		# self.cerca_luogo.setMap(self.map)
 
 		raw_params = getRawParams()
 
@@ -649,7 +649,7 @@ class ControlPanel(GeneralMenuPanel):
 		if width != self.old_width or height > self.old_height:
 			self.cerca_percorso.do_or_defer(self.cerca_percorso.relayout)
 			self.cerca_linea.do_or_defer(self.cerca_linea.relayout)
-			self.cerca_luogo.do_or_defer(self.cerca_luogo.relayout)
+			# self.cerca_luogo.do_or_defer(self.cerca_luogo.relayout)
 		# self.preferiti_tab.do_or_defer(self.preferiti_tab.relayout)
 		self.old_width = width
 		self.old_height = height
@@ -752,17 +752,17 @@ class ControlPanel(GeneralMenuPanel):
 		for p in cl_params:
 			if p in params:
 				self.cerca_linea.setParam(p, params[p])
-		cr_params = self.cerca_luogo.availableParams()
-		for p in cr_params:
-			if p in params:
-				self.cerca_luogo.setParam(p, params[p])
+		# cr_params = self.cerca_luogo.availableParams()
+		# for p in cr_params:
+		# 	if p in params:
+		# 		self.cerca_luogo.setParam(p, params[p])
 		if 'cl' in params and not ('query' in params or 'id_percorso' in params):
 			self.tab.selectTab(1)
-		if ('cr' in params or 'cr_da' in params or 'cr_lista_tipi' in params) and not 'cr_a' in params:
-			if 'cr' in params and 'cr_da' in params and not 'cr_a' in params:
-				self.setTabMappaLuogo()
-			else:
-				self.tab.selectTab(2)
+		# if ('cr' in params or 'cr_da' in params or 'cr_lista_tipi' in params) and not 'cr_a' in params:
+		# 	if 'cr' in params and 'cr_da' in params and not 'cr_a' in params:
+		# 		self.setTabMappaLuogo()
+		# 	else:
+		# 		self.tab.selectTab(2)
 
 
 	def setTabCercaPercorso(self):
@@ -775,14 +775,14 @@ class ControlPanel(GeneralMenuPanel):
 		if not self.small:
 			self.owner.hide(False)
 
-	def setTabCercaLuogo(self):
-		self.tab.selectTab(2)
-		if not self.small:
-			self.owner.hide(False)
+	# def setTabCercaLuogo(self):
+	# 	self.tab.selectTab(2)
+	# 	if not self.small:
+	# 		self.owner.hide(False)
 
 	def setTabMappaPercorso(self):
 		if self.small:
-			self.tab.selectTab(4)
+			self.tab.selectTab(3)
 			self.tab.star_tab(0)
 		else:
 			self.tab.selectTab(0)
@@ -790,14 +790,14 @@ class ControlPanel(GeneralMenuPanel):
 	def setTabPercorsoMappa(self):
 		if self.small:
 			self.tab.selectTab(0)
-			self.tab.star_tab(4)
+			self.tab.star_tab(3)
 		else:
 			self.tab.selectTab(0)
 			self.owner.hide(False)
 
 	def setTabMappaLinea(self):
 		if self.small:
-			self.tab.selectTab(4)
+			self.tab.selectTab(3)
 			self.tab.star_tab(1)
 		else:
 			self.tab.selectTab(1)
@@ -805,21 +805,21 @@ class ControlPanel(GeneralMenuPanel):
 	def setTabLineaMappa(self):
 		if self.small:
 			self.tab.selectTab(1)
-			self.tab.star_tab(4)
+			self.tab.star_tab(3)
 		else:
 			self.tab.selectTab(1)
 			self.owner.hide(False)
 
-	def setTabMappaLuogo(self):
-		if self.small:
-			self.tab.selectTab(4)
-			self.tab.star_tab(2)
-		else:
-			self.tab.selectTab(2)
+	# def setTabMappaLuogo(self):
+	# 	if self.small:
+	# 		self.tab.selectTab(3)
+	# 		self.tab.star_tab(2)
+	# 	else:
+	# 		self.tab.selectTab(2)
 
 	def setTabMappa(self):
 		if self.small:
-			self.tab.selectTab(4)
+			self.tab.selectTab(3)
 
 	def cercaPercorsoRisorse(self, da, tipi, a=None):
 		self.setTabCercaPercorso()
@@ -908,9 +908,9 @@ class ControlPanel(GeneralMenuPanel):
 		else:
 			self.setTabCercaPercorso()
 
-	def cercaLuogo(self, luogo):
-		self.cerca_luogo.cercaLuogo(luogo, set_input=True)
-		self.setTabCercaLuogo()
+	# def cercaLuogo(self, luogo):
+	# 	self.cerca_luogo.cercaLuogo(luogo, set_input=True)
+	# 	self.setTabCercaLuogo()
 
 	def onBeforeTabSelected(self, sender, index):
 		return True
@@ -925,12 +925,12 @@ class ControlPanel(GeneralMenuPanel):
 		self.relayout()
 		self.setTabCercaPercorso()
 		self.setTabCercaLinea()
-		self.setTabCercaLuogo()
+		# self.setTabCercaLuogo()
 		self.setTabMappa()
 
 	def setLargeLayout(self):
 		self.small = False
-		if self.tab.getTabBar().getSelectedTab() == 4: # Map
+		if self.tab.getTabBar().getSelectedTab() == 3: # Map
 			self.setTabCercaPercorso()
 		self.tab.remove(self.map_tab)
 		self.map_tab.setLargeLayout()
