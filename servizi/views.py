@@ -4,19 +4,19 @@
 #    Copyright 2013-2016 Roma servizi per la mobilità srl
 #    Developed by Luca Allulli and Damiano Morosi
 #
-#    This file is part of Muoversi a Roma for Developers.
+#    This file is part of Roma mobile.
 #
-#    Muoversi a Roma for Developers is free software: you can redistribute it
+#    Roma mobile is free software: you can redistribute it
 #    and/or modify it under the terms of the GNU General Public License as
 #    published by the Free Software Foundation, version 2.
 #
-#    Muoversi a Roma for Developers is distributed in the hope that it will be useful,
+#    Roma mobile is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
 #    or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
 #    for more details.
 #
 #    You should have received a copy of the GNU General Public License along with
-#    Muoversi a Roma for Developers. If not, see http://www.gnu.org/licenses/.
+#    Roma mobile. If not, see http://www.gnu.org/licenses/.
 #
 
 from models import *
@@ -261,17 +261,17 @@ def servizi_new(request):
 	if 'theme' not in request.session:
 		request.session['theme'] = ''
 
-	fav = get_fav(request)
-	fav_list = [fav[k] for k in fav]
-	fav_list = [('-', _('Ricerche recenti:'))] + fav_list	
+	# fav = get_fav(request)
+	# fav_list = [fav[k] for k in fav]
+	# fav_list = [('-', _('Ricerche recenti:'))] + fav_list
 
 
 			
 	class CercaForm(AtacMobileForm):
 		start_address = forms.CharField(widget=forms.TextInput(attrs={'size':'24'}))
-		start_fav = forms.TypedChoiceField(choices=fav_list)
+		# start_fav = forms.TypedChoiceField(choices=fav_list)
 		stop_address = forms.CharField(widget=forms.TextInput(attrs={'size':'24'}))
-		stop_fav = forms.TypedChoiceField(choices=fav_list)
+		# stop_fav = forms.TypedChoiceField(choices=fav_list)
 		
 	f = populate_form(request, CercaForm,
 		start_address='',
@@ -340,11 +340,11 @@ def servizi_new(request):
 	
 	if f.is_bound and ('Submit' in request.GET or 'Inverti' in request.GET):
 		cd = f.data
-		if cd['start_fav'] != '-':
+		if False: #cd['start_fav'] != '-':
 			start_address = from_fav(request, cd['start_fav'])
 		else:
 			start_address = cd['start_address'].strip()
-		if cd['stop_fav'] != '-':
+		if False: #cd['stop_fav'] != '-':
 			stop_address = from_fav(request, cd['stop_fav'])
 		else:			
 			stop_address = cd['stop_address'].strip()
