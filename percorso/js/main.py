@@ -548,47 +548,47 @@ class ControlPanel(GeneralMenuPanel):
 		self.old_height = Window.getClientHeight()
 		self.waiting = wait_init(self.tab_holder)
 		self.mp = MenuPanel(self, [
-			{
-			'id': 'login',
-			'text': _("Caricamento account utente"),
-			'listener': self.onLogin,
-			},
-			{
-			'id': 'news',
-			'text': _("News"),
-			'listener': self.onNews,
-			},
-			{
-			'id': 'legacy',
-			'text': _("Versione precedente"),
-			'listener': self.onLegacy,
-			},
-			{
-			'id': 'feedback',
-			'text': _("Invia il tuo feedback"),
-			'listener': self.onFeedback,
-			},
+			# {
+			# 'id': 'login',
+			# 'text': _("Caricamento account utente"),
+			# 'listener': self.onLogin,
+			# },
+			# {
+			# 'id': 'news',
+			# 'text': _("News"),
+			# 'listener': self.onNews,
+			# },
+			# {
+			# 'id': 'legacy',
+			# 'text': _("Versione precedente"),
+			# 'listener': self.onLegacy,
+			# },
+			# {
+			# 'id': 'feedback',
+			# 'text': _("Invia il tuo feedback"),
+			# 'listener': self.onFeedback,
+			# },
 			{
 			'id': 'language',
 			'text': _("Language"),
 			'listener': self.onLanguage,
 			},
-			{
-			'id': 'logout',
-			'text': _("Esci"),
-			'listener': self.onLogout,
-			},
+			# {
+			# 'id': 'logout',
+			# 'text': _("Esci"),
+			# 'listener': self.onLogout,
+			# },
 			{
 			'id': 'about',
 			'text': _("Informazioni su Roma mobile"),
 			'listener': self.onAbout,
 			},
 			], icon = 'toolbar/back.png',)
-		self.mp.by_id('logout').setVisible(False)
-		if flavor == 'app':
-			self.mp.by_id('legacy').setVisible(False)
-		if get_lang() != 'it':
-			self.mp.by_id('news').setVisible(False)
+		# self.mp.by_id('logout').setVisible(False)
+		# if flavor == 'app':
+		# 	self.mp.by_id('legacy').setVisible(False)
+		# if get_lang() != 'it':
+		# 	self.mp.by_id('news').setVisible(False)
 		self.setMenuPanel(self.mp)
 		self.waiting.setGeneralMenuPanel(self)
 
@@ -696,19 +696,19 @@ class ControlPanel(GeneralMenuPanel):
 		if flavor != 'web':
 			storage_set('session_key', res['session_key'])
 
-		# User
-		self.user = res['user']
-		set_user(self.user)
-		if self.user is not None:
-			l = self.mp.by_id('login')
-			l.setText(_("Ciao, %s (Gestisci account)") % self.user['nome'])
-			l.setListener(self.onGestisciAccount)
-			self.mp.by_id('logout').setVisible(True)
-		else:
-			l = self.mp.by_id('login')
-			l.setText(_("Accedi"))
-			l.setListener(self.onLogin)
-			self.mp.by_id('logout').setVisible(False)
+		# # User
+		# self.user = res['user']
+		# set_user(self.user)
+		# if self.user is not None:
+		# 	l = self.mp.by_id('login')
+		# 	l.setText(_("Ciao, %s (Gestisci account)") % self.user['nome'])
+		# 	l.setListener(self.onGestisciAccount)
+		# 	self.mp.by_id('logout').setVisible(True)
+		# else:
+		# 	l = self.mp.by_id('login')
+		# 	l.setText(_("Accedi"))
+		# 	l.setListener(self.onLogin)
+		# 	self.mp.by_id('logout').setVisible(False)
 
 		self.setPreferiti(res['fav'])
 

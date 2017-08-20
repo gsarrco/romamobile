@@ -13,7 +13,7 @@
 		<meta name="robots" content="nofollow" />
 		<meta name="description" content="Roma mobile nasce per informare e aggiornare sulla mobilità pubblica e privata i cittadini, i turisti, i pendolari, i city user" />
 		<meta name="keywords" content="muoversi, roma, mobilità, trasporto pubblico, informazione, infomobilità, mobile, atacmobile, tempi di attesa, trovalinea, calcolo del percorso, mappa" />
-		<title>{% if servizio %}{{ servizio.descrizione }}{% if sottotitolo %} - {{ sottotitolo }}{% endif %} | {% endif %}Roma mobile</title>
+		<title>{% if servizio %}{{ servizio.descrizione }}{% if sottotitolo %} - {{ sottotitolo }}{% endif %} | {% endif %}Roma mobile{% if not servizio %} - Muoversi a Roma con Atac, Roma TPL e Trenitalia{% endif %}</title>
 		<link href="/xhtml/s/css/screen{{request.session.theme}}.css" rel="stylesheet" type="text/css" />
 		<link rel="search" type="application/opensearchdescription+xml" title="Roma mobile" href="xhtml/s/opensearch.xml" />
 		<link rel="icon" type="image/png" href="/favicon.png" />
