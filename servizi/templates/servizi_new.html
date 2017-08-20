@@ -24,17 +24,17 @@
 		{% endif %}
 	</div>
 	
-	<h2 class="vskip">{% trans "Cerca linea e cerca percorso" %}</h2>
+	<h2 class="vskip">{% trans "Tempi di attesa bus e calcola percorso" %}</h2>
 	<form id="cerca" method="get" {{ formaction }}>
 		<p>
 			<span class="b">{% trans "Sono qui" %}</span> ({% trans "indirizzo, fermata o linea" %}):<br />
 			{{ form.start_address }}<br />
-			{{ form.start_fav }}
+			{% if False %}{{ form.start_fav }}{% endif %}
 		<p>
 		<p>
 			<span class="b">{% trans "Vado qui" %}</span> ({% trans "facoltativo" %}):<br />
 			{{ form.stop_address }}<br />
-			{{ form.stop_fav }}
+			{% if False %}{{ form.stop_fav }}{% endif %}
 		</p>
 		<p class="vskip">
 			<input type="submit" name="Submit" value="{% trans "Cerca" %}" />

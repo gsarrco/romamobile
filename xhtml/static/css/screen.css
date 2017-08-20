@@ -49,6 +49,7 @@ a {
 }
 input, textarea {
 	color: #333333;
+	background-color: #eeeeee;
 }
 
 select, select option {
