@@ -69,8 +69,8 @@ pattern_list = [
 	url(r'^atacmobile.php$', 'servizi.views.servizi_new'),	
 	url(r'^$', 'servizi.views.servizi_new'),
 	url(r'^i18n/', include('django.conf.urls.i18n')),
-	url('^favicon.ico', django.views.static.serve,
-		{'document_root': os.path.join(os.path.dirname(__file__), 'xhtml/static').replace('\\','/'), 'path': 'img/favicon.ico'},
+	url('^favicon.png', django.views.static.serve,
+		{'document_root': os.path.join(os.path.dirname(__file__), 'xhtml/static').replace('\\','/'), 'path': 'img/favicon.png'},
 	),
 	url(r'^xhtml/ga$', google_analytics),
 	url(r'^ws/xml/lingue/', include('lingua.wsurls')), # Workaround temporaneo
