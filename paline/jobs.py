@@ -22,7 +22,7 @@
 from stats.models import get_data_limite
 from servizi.models import RicercaRecente
 from paline.models import LogTempoArco, LogTempoAttesaPercorso, LogPercorsoCities, LogChiamataCities, ArcoRimosso
-from paline.models import LogCities, LogCitiesLineaPreservata
+from paline.models import LogCities, LogCitiesLineaPreservata, PartenzeCapilinea
 from paline import tpl
 from datetime import datetime, date, time, timedelta
 from django.db import connections, transaction
@@ -31,7 +31,7 @@ from servizi.utils import datetime2date, date2datetime, mysql2datetime, date2mys
 from servizi.utils import transaction_commit_manually, template_to_mail
 from autenticazione.models import LogAutenticazioneServizi
 from log_servizi.models import Invocazione
-from paline.caricamento_rete.caricamento_rete import carica_rete_auto
+from paline.caricamento_rete.caricamento_rete import carica_rete_auto, scarica_orari_partenza_giorno, scarica_rete
 import os, os.path, shutil
 import settings
 
@@ -54,7 +54,6 @@ def _aggrega_stat_data(job=None, data=None):
 		group by hour(ora), id_palina_s, id_palina_t;
 	''', (data, ))
 	transaction.commit()
-
 
 
 def aggrega_stat(job=None, data_limite=None):
@@ -148,4 +147,21 @@ def elimina_log_cities_obsoleti(job=None, data_limite=None):
 			_elimina_log_cities_obsoleti_data(job, d)
 		else:
 			esci = True
+	return (0, 'OK')
+
+
+def scarica_orari_partenze_capilinea(job=None):
+	d = date.today()
+	d_canc = d - timedelta(days=7)
+	PartenzeCapilinea.objects.filter(orario_partenza__lt=d_canc).delete()
+	for i in range(10):
+		print d
+		scarica_orari_partenza_giorno(d)
+		d += timedelta(days=1)
+	return(0, 'OK')
+
+
+def scarica_rete_tpl(job=None):
+	scarica_rete()
+	carica_rete()
 	return (0, 'OK')
