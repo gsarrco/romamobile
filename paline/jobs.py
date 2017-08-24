@@ -91,12 +91,12 @@ def carica_rete(job=None):
 
 def elimina_file_rete_obsoleti(job=None):
 	"""
-	Elimina i file della rete più vecchi di un mese.
+	Elimina i file della rete più vecchi di 15 giorni.
 
-	Mantiene comunque le ultime 20 reti
+	Mantiene comunque le ultime 5 reti
 	"""
-	RETI_DA_MANTENERE = 20
-	GIORNI_DA_MANTENERE = 30
+	RETI_DA_MANTENERE = 5
+	GIORNI_DA_MANTENERE = 15
 
 	path = settings.TROVALINEA_PATH_RETE
 	fs = os.listdir(path)
