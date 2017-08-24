@@ -114,7 +114,7 @@ def elimina_file_rete_obsoleti(job=None):
 	return (0, 'OK')
 
 
-@transaction_commit_manually()
+@transaction_commit_manually
 def _elimina_log_cities_obsoleti_data(job=None, data=None):
 	"""
 	Metodo interno invocato da aggrega_stat
