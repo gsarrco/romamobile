@@ -6,7 +6,8 @@ flavor = flavors[flavor_id]
 
 version = '2.8'
 
-base_url = ['http://beta.romamobile.it', ''][flavor_id]
+web_prefix = 'http://beta.romamobile.it'
+base_url = [web_prefix, ''][flavor_id]
 
 
 def make_absolute(url):

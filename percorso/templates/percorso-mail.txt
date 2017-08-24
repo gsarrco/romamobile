@@ -1,6 +1,6 @@
 {% load i18n %}
 {% load history %}
-Muoversi a Roma <no-reply@agenziamobilita.roma.it>
+Roma mobile <no-reply@romamobile.it>
 
 {% blocktrans with sa=infopoint.start.address sp=infopoint.start.place ta=infopoint.stop.address tp=infopoint.stop.place %}
 	Percorso da {{sa}} ({{sp}}) a {{ta}} ({{tp}})
@@ -82,4 +82,4 @@ Muoversi a Roma <no-reply@agenziamobilita.roma.it>
 {% endfor %}
 
 
-http://muovi.roma.it/percorso/js?{{ params }}
+http://beta.romamobile.it/percorso/js?{{ params }}

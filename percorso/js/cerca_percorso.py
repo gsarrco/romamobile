@@ -64,7 +64,7 @@ from util import wait_start, wait_stop, _, get_lang, TimeBox, PaginatedPanelPage
 from datetime import date, time, datetime, timedelta
 from Calendar import Calendar, DateField, TimeField
 from map import MapPanel, Layer, LayerPanel, Marker, get_location, GeoJson
-from globals import base_url, make_absolute
+from globals import base_url, make_absolute, web_prefix
 from DissolvingPopup import DissolvingPopup
 from util import JsonHandler, JsonInteractiveHandler, redirect
 
@@ -518,7 +518,7 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 							'sub': [
 								{
 									'class': GP,
-									'column_count': 3,
+									'column_count': 4,
 									'sub': [
 										{
 											'class': ToggleImage,
@@ -536,15 +536,15 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 											'call_setTooltip': ([_("Bike and ride")], {}),
 											'call_setSize': (['79px', '40px'], {}),
 										},
-										{
-											'class': ToggleImage,
-											'args': ['modo_carpooling.png', 'modo-inactive', 'modo-active', self.onModo, 5, False],
-											'name': 'modo_carpooling',
-											'expand': False,
-											'call_setTooltip': ([_("Car pooling")], {}),
-											'call_setSize': (['39px', '40px'], {}),
-											'call_setVisible': ([False], {}),
-										},
+										# {
+										# 	'class': ToggleImage,
+										# 	'args': ['modo_carpooling.png', 'modo-inactive', 'modo-active', self.onModo, 5, False],
+										# 	'name': 'modo_carpooling',
+										# 	'expand': False,
+										# 	'call_setTooltip': ([_("Car pooling")], {}),
+										# 	'call_setSize': (['39px', '40px'], {}),
+										# 	'call_setVisible': ([False], {}),
+										# },
 										{
 											'class': ToggleImage,
 											'args': ['modo_auto.png', 'modo-inactive', 'modo-active', self.onModo, 0, False],
@@ -553,22 +553,22 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 											'call_setTooltip': ([_("Trasporto privato")], {}),
 											'call_setSize': (['39px', '40px'], {}),
 										},
-										{
-											'class': ToggleImage,
-											'args': ['modo_pnr.png', 'modo-inactive', 'modo-active', self.onModo, 2, False],
-											'name': 'modo_pnr',
-											'expand': False,
-											'call_setTooltip': ([_("Park and ride")], {}),
-											'call_setSize': (['79px', '40px'], {}),
-										},
-										{
-											'class': ToggleImage,
-											'args': ['modo_carsharing.png', 'modo-inactive', 'modo-active', self.onModo, 4, False],
-											'name': 'modo_carsharing',
-											'expand': False,
-											'call_setTooltip': ([_("Car sharing")], {}),
-											'call_setSize': (['39px', '40px'], {}),
-										},
+										# {
+										# 	'class': ToggleImage,
+										# 	'args': ['modo_pnr.png', 'modo-inactive', 'modo-active', self.onModo, 2, False],
+										# 	'name': 'modo_pnr',
+										# 	'expand': False,
+										# 	'call_setTooltip': ([_("Park and ride")], {}),
+										# 	'call_setSize': (['79px', '40px'], {}),
+										# },
+										# {
+										# 	'class': ToggleImage,
+										# 	'args': ['modo_carsharing.png', 'modo-inactive', 'modo-active', self.onModo, 4, False],
+										# 	'name': 'modo_carsharing',
+										# 	'expand': False,
+										# 	'call_setTooltip': ([_("Car sharing")], {}),
+										# 	'call_setSize': (['39px', '40px'], {}),
+										# },
 									],
 								},
 							],
@@ -852,13 +852,12 @@ class CercaPercorsoPanel(ScrollAdaptivePanel, KeyboardHandler, FocusHandler, Def
 							del traffico e della posizione degli autobus.
 						<p>
 						</p>
-							Il software, sviluppato dall'Agenzia per la Mobilit&agrave;
-							di Roma, &egrave; <a href="http://www.agenziamobilita.roma.it/servizi/open-data/codice-sorgente.html" target="_blank">rilasciato
-							con licenza open source.</a>
+							Roma mobile deriva da Muoversi a Roma (muovi.roma.it),
+							originariamente sviluppato dall'Agenzia per la Mobilit&agrave;
+							di Roma, e <a href="https://bitbucket.org/lallulli/muoversi-a-roma" target="_blank">pubblicato con licenza open source.</a>
 						</p>
 						<p>
-							&copy; %d
-							<a class="inl" href="http://www.agenziamobilita.roma.it">Roma servizi per la mobilit&agrave; s.r.l.</a>
+							&copy; %d Roma mobile</a>
 						</p>
 						""") % datetime.now().year
 					],
@@ -1955,7 +1954,7 @@ class LinkDialog(DialogBox, FocusHandler):
 		self.hide()
 
 	def onPercorsoGetParams(self, res):
-		base_url = 'http://muovi.roma.it/percorso/js/?'
+		base_url = web_prefix + '/percorso/js/?'
 		self.base.by_name('route').setText(base_url + res['route'])
 		self.base.by_name('to').setText(base_url + res['to'])
 
@@ -2017,7 +2016,7 @@ class EmailDialog(DialogBox):
 		self.hide()
 
 	def onPercorsoGetParams(self, res):
-		base_url = 'http://muovi.roma.it/percorso/js/?'
+		base_url = web_prefix + '/percorso/js/?'
 		self.base.by_name('route').setText(base_url + res['route'])
 		self.base.by_name('to').setText(base_url + res['to'])
 
