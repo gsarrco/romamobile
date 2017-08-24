@@ -7,28 +7,25 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2013-04-17 16:43+0200\n"
+"POT-Creation-Date: 2017-08-24 16:11+0200\n"
 "PO-Revision-Date: 2013-12-17 12:23+0100\n"
 "Last-Translator: Muoversi a Roma <infomobilita@agenziamobilita.roma.it>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "X-Generator: Poedit 1.5.4\n"
 
-#: views.py:87
+#: views.py:106
 msgid "indirizzo (manca)"
 msgstr "address (empty)"
 
-#: views.py:93
-msgid "comune (molti trovati)"
-msgstr "city (choose one)"
-
-#: views.py:96
+#: views.py:109
 msgid "indirizzo (molti trovati)"
 msgstr "address (choose one)"
 
-#: views.py:109
+#: views.py:122
 msgid "indirizzo (errato)"
 msgstr "address (wrong)"
 
@@ -49,13 +46,15 @@ msgstr "Please correct the following data:"
 msgid "Rivendite vicine al seguente indirizzo (con civico):"
 msgstr "Ticket offices located near the following address:"
 
-#: templates/risorse.html:17
-msgid "Comune o <span class='i'>localit&agrave;</span>:"
-msgstr "City"
-
-#: templates/risorse.html:20
+#: templates/risorse.html:18
 msgid "Cerca"
 msgstr "Search"
+
+#~ msgid "comune (molti trovati)"
+#~ msgstr "city (choose one)"
+
+#~ msgid "Comune o <span class='i'>localit&agrave;</span>:"
+#~ msgstr "City"
 
 #~ msgid "Mezzo privato"
 #~ msgstr "Private transport"

@@ -5,177 +5,174 @@
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: PACKAGE VERSION\n"
+"Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2014-12-03 09:42+0100\n"
-"PO-Revision-Date: 2014-12-03 09:42+0100\n"
+"POT-Creation-Date: 2017-08-24 16:11+0200\n"
+"PO-Revision-Date: 2017-08-24 16:16+0200\n"
 "Last-Translator: \n"
-"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: en\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Generator: Poedit 1.5.4\n"
+"X-Generator: Poedit 2.0.3\n"
+"Language-Team: \n"
 
-#: .\infopoint.py:172 .\infopoint.py:175
+#: infopoint.py:140 infopoint.py:143 infopoint.py:265 infopoint.py:268
 #, python-format
 msgid "Punto su mappa <punto:(%0.4f,%0.4f)>"
 msgstr "Point on map <punto:(%0.4f,%0.4f)>"
 
-#: .\infopoint.py:258 .\infopoint.py:261
+#: infopoint.py:354 infopoint.py:357
 #, python-format
 msgid "Punto su mappa <punto:(%s,%s)>"
 msgstr "Point on map <punto:(%s,%s)>"
 
-#: .\infopoint.py:440
+#: infopoint.py:536
 msgid "ita"
 msgstr "eng"
 
-#: .\utils.py:205
+#: utils.py:233
 msgid "Lu"
 msgstr "Mon"
 
-#: .\utils.py:205
+#: utils.py:233
 msgid "Ma"
 msgstr "Tue"
 
-#: .\utils.py:205
+#: utils.py:233
 msgid "Me"
 msgstr "Wed"
 
-#: .\utils.py:205
+#: utils.py:233
 msgid "Gi"
 msgstr "Thu"
 
-#: .\utils.py:205
+#: utils.py:233
 msgid "Ve"
 msgstr "Fri"
 
-#: .\utils.py:205
+#: utils.py:233
 msgid "Sa"
 msgstr "Sat"
 
-#: .\utils.py:205
+#: utils.py:233
 msgid "Do"
 msgstr "Sun"
 
-#: .\utils.py:207
+#: utils.py:235
 msgid "lu"
 msgstr "mo"
 
-#: .\utils.py:207
+#: utils.py:235
 msgid "ma"
 msgstr "tu"
 
-#: .\utils.py:207
+#: utils.py:235
 msgid "me"
 msgstr "we"
 
-#: .\utils.py:207
+#: utils.py:235
 msgid "gi"
 msgstr "th"
 
-#: .\utils.py:207
+#: utils.py:235
 msgid "ve"
 msgstr "fr"
 
-#: .\utils.py:207
+#: utils.py:235
 msgid "sa"
 msgstr "sa"
 
-#: .\utils.py:207
+#: utils.py:235
 msgid "do"
 msgstr "su"
 
-#: .\utils.py:209
+#: utils.py:237
 msgid "Lunedì"
 msgstr "Monday"
 
-#: .\utils.py:209
+#: utils.py:237
 msgid "Martedì"
 msgstr "Tuesday"
 
-#: .\utils.py:209
+#: utils.py:237
 msgid "Mercoledì"
 msgstr "Wednesday"
 
-#: .\utils.py:209
+#: utils.py:237
 msgid "Giovedì"
 msgstr "Thursday"
 
-#: .\utils.py:209
+#: utils.py:237
 msgid "Venerdì"
 msgstr "Friday"
 
-#: .\utils.py:209
+#: utils.py:237
 msgid "Sabato"
 msgstr "Saturday"
 
-#: .\utils.py:209
+#: utils.py:237
 msgid "Domenica"
 msgstr "Sunday"
 
-#: .\utils.py:211
+#: utils.py:239
 msgid "lunedì"
 msgstr "monday"
 
-#: .\utils.py:211
+#: utils.py:239
 msgid "martedì"
 msgstr "tuesday"
 
-#: .\utils.py:211
+#: utils.py:239
 msgid "mercoledì"
 msgstr "wednesday"
 
-#: .\utils.py:211
+#: utils.py:239
 msgid "giovedì"
 msgstr "thursday"
 
-#: .\utils.py:211
+#: utils.py:239
 msgid "venerdì"
 msgstr "friday"
 
-#: .\utils.py:211
+#: utils.py:239
 msgid "sabato"
 msgstr "saturday"
 
-#: .\utils.py:211
+#: utils.py:239
 msgid "domenica"
 msgstr "sunday"
 
-#: .\utils.py:234
+#: utils.py:262
 msgid "H:i"
 msgstr "h:i A"
 
-#: .\utils.py:397
+#: utils.py:458
 msgid "Conferma"
 msgstr "Ok"
 
-#: .\utils.py:398
+#: utils.py:459
 msgid "Annulla"
 msgstr "Cancel"
 
-#: .\views.py:165
+#: views.py:184
 #, python-format
 msgid "Bentornato, %(nome)s"
 msgstr "Welcome back, %(nome)s"
 
-#: .\views.py:244
-msgid "Ricerche recenti:"
-msgstr "Recently searched:"
-
-#: .\views.py:379
+#: views.py:401
 msgid "Accesso effettuato"
 msgstr "Logged in"
 
-#: .\views.py:469 .\views.py:510
+#: views.py:491 views.py:532
 msgid "La notifica non esiste"
 msgstr "Notification does not exist"
 
-#: .\views.py:501
+#: views.py:523
 msgid "La fascia non esiste"
 msgstr "Time slot does not exist"
 
-#: .\templates\login_richiesto.html.py:10
+#: templates/login_richiesto.html:10
 #, python-format
 msgid ""
 "\n"
@@ -185,15 +182,15 @@ msgid ""
 "\t\t"
 msgstr ""
 "\n"
-"\t\t\t<a href=\"http://login.muoversiaroma.it/GestioneAccount.aspx?IdSito=%"
-"(id_sito)s\">Please login</a>.\n"
+"\t\t\t<a href=\"http://login.muoversiaroma.it/GestioneAccount.aspx?IdSito="
+"%(id_sito)s\">Please login</a>.\n"
 "\t\t"
 
-#: .\templates\notifiche_fasce.html.py:6
+#: templates/notifiche_fasce.html:6
 msgid "Impostazioni avanzate notifiche"
 msgstr "Advanced notification settings"
 
-#: .\templates\notifiche_fasce.html.py:9
+#: templates/notifiche_fasce.html:9
 msgid ""
 "La notifica richiesta &egrave; sempre attiva. Puoi limitare le fasce orarie "
 "in cui vuoi ricevere le notifiche."
@@ -201,11 +198,11 @@ msgstr ""
 "Your notification is continuously active now. You can define some time "
 "slots, and limit the validity of your notification to them."
 
-#: .\templates\notifiche_fasce.html.py:12
+#: templates/notifiche_fasce.html:12
 msgid "Fasce orarie in cui ricevi la notifica:"
 msgstr "Time slots when you receive your notification:"
 
-#: .\templates\notifiche_fasce.html.py:16
+#: templates/notifiche_fasce.html:16
 #, python-format
 msgid ""
 "\n"
@@ -216,90 +213,93 @@ msgstr ""
 "\t\tFrom  %(oi)s to %(of)s of %(g)s\n"
 "\t\t"
 
-#: .\templates\notifiche_fasce.html.py:23
+#: templates/notifiche_fasce.html:23
 msgid "Aggiungi un'altra fascia oraria"
 msgstr "Add another time slot"
 
-#: .\templates\notifiche_fasce.html.py:27
+#: templates/notifiche_fasce.html:27
 msgid "Dalle ore"
 msgstr "From"
 
-#: .\templates\notifiche_fasce.html.py:28
+#: templates/notifiche_fasce.html:28
 msgid "alle ore"
 msgstr "to"
 
-#: .\templates\notifiche_fasce.html.py:35
+#: templates/notifiche_fasce.html:35
 msgid "Aggiungi fascia"
 msgstr "Add time slot"
 
-#: .\templates\richiedi-conferma.html.py:4
+#: templates/richiedi-conferma.html:4
 msgid "Conferma azione"
 msgstr "Confirm"
 
-#: .\templates\servizi_new.html.py:11
+#: templates/servizi_new.html:11
 msgid "Web App"
 msgstr "Web App"
 
-#: .\templates\servizi_new.html.py:13 .\templates\servizi_new.html.py:20
+#: templates/servizi_new.html:14
 msgid "Accedi"
 msgstr "Login"
 
-#: .\templates\servizi_new.html.py:15
+#: templates/servizi_new.html:16
 #, python-format
 msgid ""
 "\n"
-"\t\t\t\t\t<a href=\"http://login.muoversiaroma.it/GestioneAccount.aspx?"
+"\t\t\t\t\t\t<a href=\"http://login.muoversiaroma.it/GestioneAccount.aspx?"
 "IdSito=%(id_sito)s\">%(nome)s</a> (<a href=\"/servizi/logout\">Logout</a>)\n"
-"\t\t\t\t"
+"\t\t\t\t\t"
 msgstr ""
 "\n"
 "\t\t\t\t\t<a href=\"http://login.muoversiaroma.it/GestioneAccount.aspx?"
 "IdSito=%(id_sito)s\">%(nome)s</a> (<a href=\"/servizi/logout\">Logout</a>)\n"
 "\t\t\t\t"
 
-#: .\templates\servizi_new.html.py:27
-msgid "Cerca linea e cerca percorso"
-msgstr "Routes and bus waiting times"
+#: templates/servizi_new.html:27
+msgid "Tempi di attesa bus e calcola percorso"
+msgstr "Bus waiting times and journey planner"
 
-#: .\templates\servizi_new.html.py:30
+#: templates/servizi_new.html:30
 msgid "Sono qui"
 msgstr "I'm here"
 
-#: .\templates\servizi_new.html.py:30
+#: templates/servizi_new.html:30
 msgid "indirizzo, fermata o linea"
 msgstr "address, bus stop or line"
 
-#: .\templates\servizi_new.html.py:35
+#: templates/servizi_new.html:35
 msgid "Vado qui"
 msgstr "I'm going here"
 
-#: .\templates\servizi_new.html.py:35
+#: templates/servizi_new.html:35
 msgid "facoltativo"
 msgstr "optional"
 
-#: .\templates\servizi_new.html.py:40
+#: templates/servizi_new.html:40
 msgid "Cerca"
 msgstr "Search"
 
-#: .\templates\servizi_new.html.py:41
+#: templates/servizi_new.html:41
 msgid "Ritorno"
 msgstr "Way back"
 
-#: .\templates\servizi_new.html.py:46
-msgid "Mobilit&agrave; pubblica o sostenibile"
-msgstr "Public transport"
+#: templates/servizi_new.html:46
+msgid "Servizi"
+msgstr "Services"
 
-#: .\templates\servizi_new.html.py:62
-msgid "Mobilit&agrave; privata"
-msgstr "Private transport"
+#~ msgid "Ricerche recenti:"
+#~ msgstr "Recently searched:"
 
-#: .\templates\servizi_new.html.py:78
-msgid "Altro"
-msgstr "Other"
+#~ msgid "Mobilit&agrave; pubblica o sostenibile"
+#~ msgstr "Public transport"
 
-#: .\templates\servizi_new.html.py:97
-msgid "Scarica l'app Chiama Taxi"
-msgstr "Download Chiama Taxi app"
+#~ msgid "Mobilit&agrave; privata"
+#~ msgstr "Private transport"
+
+#~ msgid "Altro"
+#~ msgstr "Other"
+
+#~ msgid "Scarica l'app Chiama Taxi"
+#~ msgstr "Download Chiama Taxi app"
 
 #~ msgid "Percorsi e tempi di attesa bus"
 #~ msgstr "Bus routes and waiting times"
