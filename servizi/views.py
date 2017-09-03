@@ -358,7 +358,7 @@ def servizi_new(request):
 				if 'Submit' in request.GET:
 					return hist_redirect(request, '/paline/?cerca=%s' % (start_address, ), offset=0)
 				else:
-					return HttpResponseRedirect('/percorso/js?cl=1&query={}'.format(start_address))
+					return HttpResponseRedirect('/percorso/js/?cl=1&query={}'.format(start_address))
 
 				# return _default(request, start_address, ctx, False)
 
@@ -366,9 +366,7 @@ def servizi_new(request):
 			if 'Submit' in request.GET:
 				return hist_redirect(request, '/percorso/?start_address=%s&stop_address=%s&Submit=Cerca&bus=on&metro=on&fr=on&fc=on&mezzo=1&piedi=1&quando=0&max_distanza_bici=5' % (start_address, stop_address), offset=0)
 			else:
-				return HttpResponseRedirect('percorso/js?start_address={}&stop_address={}&Submit=Cerca&bus=on&metro=on&fr=on&fc=on&mezzo=1&piedi=1&quando=0&max_distanza_bici=5'.format(
-					start_address, stop_address
-				))
+				return HttpResponseRedirect('/percorso/js/?cp=1&da={}&a={}'.format(start_address, stop_address))
 		
 	ctx['form'] = f
 	middleware.set_menu_nav(request)
