@@ -23,6 +23,7 @@
 from django.db import models, reset_queries
 import rpyc
 from rpyc.utils.server import ThreadedServer
+import os, subprocess, signal
 from threading import Thread
 from Queue import Queue, Empty
 import cPickle as pickle
@@ -30,7 +31,6 @@ from django.db.models import Q, F
 from time import sleep
 from datetime import date, time, datetime, timedelta
 from contextlib import contextmanager
-import os
 import random
 import settings
 import zlib as compressor
@@ -610,6 +610,7 @@ control_action_choices = [
 	('R', 'Restart all'),
 ]
 
+
 class DaemonControl(models.Model):
 	name = models.CharField(max_length=31, db_index=True, unique=True)
 	instances = models.IntegerField()
@@ -619,15 +620,37 @@ class DaemonControl(models.Model):
 	max_restart_time = models.IntegerField(default=3)
 	command = models.CharField(max_length=1023)
 	action = models.CharField(max_length=1, default='F', choices=control_action_choices)
-	
+
+	@contextmanager
+	def suspend_all_daemons(self):
+		print "Closing existing daemons"
+		old_action = self.action
+		self.action = 'F'
+		self.save()
+		ss_istanziati = self.daemon_set.all()
+		for s in ss_istanziati:
+			print "Chiudo il processo ", self.name, s.pid
+			try:
+				os.kill(s.pid, signal.SIGTERM)
+			except Exception:
+				pass
+			s.delete()
+		print "All existing daemons closed"
+		yield
+		print "Restoring old daemon status"
+		self.action = old_action
+		self.save()
+
 	def __unicode__(self):
 		return self.name
+
 
 daemon_action_choices = [
 	('N', 'Normal mode'),
 	('F', 'Freeze (suspend restart)'),
 	('R', 'Restart'),
 ]
+
 
 class Daemon(models.Model):
 	control = models.ForeignKey(DaemonControl)
