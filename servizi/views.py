@@ -337,8 +337,7 @@ def servizi_new(request):
 			'minute': (n.minute / 10) * 10,
 		}, offset=0)
 
-	
-	if f.is_bound and ('Submit' in request.GET or 'Inverti' in request.GET):
+	if f.is_bound and ('Submit' in request.GET or 'SubmitMap' in request.GET):
 		cd = f.data
 		if False: #cd['start_fav'] != '-':
 			start_address = from_fav(request, cd['start_fav'])
@@ -349,23 +348,31 @@ def servizi_new(request):
 		else:			
 			stop_address = cd['stop_address'].strip()
 		
-		if 'Inverti' in request.GET:
-			start_address, stop_address = stop_address, start_address		
+		# if 'Inverti' in request.GET:
+		# 	start_address, stop_address = stop_address, start_address
 		
 		if stop_address == '':
 			if start_address == '':
 				f.set_error(['start_address'])
 			else:
-				return hist_redirect(request, '/paline/?cerca=%s' % (start_address, ), offset=0)
+				if 'Submit' in request.GET:
+					return hist_redirect(request, '/paline/?cerca=%s' % (start_address, ), offset=0)
+				else:
+					return HttpResponseRedirect('/percorso/js?cl=1&query={}'.format(start_address))
+
 				# return _default(request, start_address, ctx, False)
 
 		else:
-			return hist_redirect(request, '/percorso/?start_address=%s&stop_address=%s&Submit=Cerca&bus=on&metro=on&fr=on&fc=on&mezzo=1&piedi=1&quando=0&max_distanza_bici=5' % (start_address, stop_address), offset=0)
+			if 'Submit' in request.GET:
+				return hist_redirect(request, '/percorso/?start_address=%s&stop_address=%s&Submit=Cerca&bus=on&metro=on&fr=on&fc=on&mezzo=1&piedi=1&quando=0&max_distanza_bici=5' % (start_address, stop_address), offset=0)
+			else:
+				return HttpResponseRedirect('percorso/js?start_address={}&stop_address={}&Submit=Cerca&bus=on&metro=on&fr=on&fc=on&mezzo=1&piedi=1&quando=0&max_distanza_bici=5'.format(
+					start_address, stop_address
+				))
 		
 	ctx['form'] = f
 	middleware.set_menu_nav(request)
 	return TemplateResponse(request, 'servizi_new.html', ctx)
-
 
 
 # Autenticazione
