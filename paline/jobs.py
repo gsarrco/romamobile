@@ -31,6 +31,7 @@ from servizi.utils import datetime2date, date2datetime, mysql2datetime, date2mys
 from servizi.utils import transaction_commit_manually, template_to_mail
 from mercury.models import DaemonControl
 from paline.caricamento_rete.caricamento_rete import carica_rete_auto, scarica_orari_partenza_giorno, scarica_rete
+import traceback
 import os, os.path, shutil
 import settings
 
@@ -162,7 +163,13 @@ def scarica_orari_partenze_capilinea(job=None):
 
 def scarica_rete_tpl(job=None):
 	dc = DaemonControl.objects.get(name=settings.MERCURY_CPD)
+	code = '0'
+	msg = ''
 	with dc.suspend_all_daemons():
-		scarica_rete()
-		carica_rete()
-	return (0, 'OK')
+		try:
+			scarica_rete()
+			carica_rete()
+		except:
+			code = -1
+			msg = traceback.format_exc()
+	return code, msg
