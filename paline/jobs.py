@@ -158,6 +158,7 @@ def scarica_orari_partenze_capilinea(job=None):
 		print d
 		scarica_orari_partenza_giorno(d)
 		d += timedelta(days=1)
+	tpl.calcola_frequenze()
 	return(0, 'OK')
 
 
