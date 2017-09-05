@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2017-09-03 20:21+0200\n"
-"PO-Revision-Date: 2017-09-03 20:22+0200\n"
+"POT-Creation-Date: 2017-09-05 21:50+0200\n"
+"PO-Revision-Date: 2017-09-05 21:54+0200\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "Language: en\n"
@@ -160,15 +160,15 @@ msgstr "Cancel"
 msgid "Bentornato, %(nome)s"
 msgstr "Welcome back, %(nome)s"
 
-#: views.py:408
+#: views.py:406
 msgid "Accesso effettuato"
 msgstr "Logged in"
 
-#: views.py:498 views.py:539
+#: views.py:496 views.py:537
 msgid "La notifica non esiste"
 msgstr "Notification does not exist"
 
-#: views.py:530
+#: views.py:528
 msgid "La fascia non esiste"
 msgstr "Time slot does not exist"
 
@@ -275,19 +275,22 @@ msgid "facoltativo"
 msgstr "optional"
 
 #: templates/servizi_new.html:40
-msgid "Cerca (solo testo)"
-msgstr "Search (text)"
+msgid "Cerca"
+msgstr "Search"
 
 #: templates/servizi_new.html:41
-msgid "Cerca (testo e mappa)"
-msgstr "Search (text with map)"
+msgid "Mappa"
+msgstr "Map"
 
 #: templates/servizi_new.html:46
 msgid "Servizi"
 msgstr "Services"
 
-#~ msgid "Cerca"
-#~ msgstr "Search"
+#~ msgid "Cerca (solo testo)"
+#~ msgstr "Search (text)"
+
+#~ msgid "Cerca (testo e mappa)"
+#~ msgstr "Search (text with map)"
 
 #~ msgid "Ritorno"
 #~ msgstr "Way back"
