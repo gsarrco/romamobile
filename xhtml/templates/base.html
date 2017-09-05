@@ -11,7 +11,7 @@
 		<meta http-equiv="refresh" content="{{ autorefresh }}" />
 		{% endif %}
 		<meta name="robots" content="nofollow" />
-		<meta name="description" content="Tempi di attesa bus e calcola percorso Atac, Roma TPL e Trenitalia: viaggia con un biglietto Metrebus a Roma!" />
+		<meta name="description" content="Tempi di attesa bus e calcola percorso Atac, Roma TPL e Trenitalia: viaggia con i mezzi pubblici, basta un biglietto Metrebus!" />
 		<meta name="keywords" content="muoversi, roma, mobilità, trasporto pubblico, informazione, infomobilità, mobile, atacmobile, tempi di attesa, trovalinea, calcolo del percorso, mappa" />
 		<title>{% if servizio %}{{ servizio.descrizione }}{% if sottotitolo %} - {{ sottotitolo }}{% endif %} | {% endif %}Roma mobile{% if not servizio %} - Muoversi a Roma con Atac: cerca linea e cerca percorso{% endif %}</title>
 		<link href="/xhtml/s/css/screen{{request.session.theme}}.css" rel="stylesheet" type="text/css" />
@@ -146,8 +146,11 @@
 							I dati sulla posizione degli autobus sono open data di
 							<a href="http://muovi.roma.it">Muoversi a Roma</a> (muovi.roma.it),
 							il servizio di infomobilit&agrave; di
-							<a href="http://romamobilita.it">Roma servizi per la mobilit&agrave;</a>,
-							agenzia della mobilit&agrave; di <a href="http://www.comune.roma.it">Roma Capitale</a>.
+							<a href="https://romamobilita.it/it/azienda/open-data/api-real-time">Roma
+							servizi per la mobilit&agrave;</a>, agenzia della mobilit&agrave; di
+							<a href="http://www.comune.roma.it">Roma Capitale</a>.
+							Sono rilasciati con licenza
+							<a href="http://creativecommons.org/licenses/by/3.0/it/">CC BY 3.0 IT</a>.
 						</p>
 						<p>
 								Roma mobile non &egrave; un servizio di Atac, Roma TPL, Trenitalia o di Roma servizi per la mobilit&agrave;.
