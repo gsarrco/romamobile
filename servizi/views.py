@@ -58,6 +58,7 @@ from collections import OrderedDict
 
 from django.views.defaults import page_not_found, server_error
 
+
 login_ws_url = ''
 login_url = 'http://login.muoversiaroma.it/Login.aspx?IdSito=%d' % settings.ID_SITO
 logout_url = 'http://login.muoversiaroma.it/Logout.aspx?IdSito=%d' % settings.ID_SITO
@@ -68,15 +69,19 @@ gettext.bindtextdomain('views', 'locale')
 
 servizi3 = ServerVersione("servizi", 3)
 
+
 def get_translator(lang):
 	t = gettext.translation('views', 'servizi/locale', [lang], fallback=True)
 	return t.gettext
-			
+
+
 servicesToHide = {
 	'en': {
 		'news': True,
 	},
 }
+
+
 def serviceHidden(service, lang):
 	return (lang in servicesToHide) and (service in servicesToHide[lang]) and (servicesToHide[lang][service] == True)
 
@@ -99,6 +104,7 @@ def stato(request, token, prodotto, lingua):
 		})
 	
 	return ret
+
 
 @servizi3.metodo('Menu')
 def menu(request, token, prodotto, lingua):
@@ -137,7 +143,8 @@ def info_utente(request, token):
 		return {
 			'fav': fav_list,
 		}
-		
+
+
 @servizi3.metodo('LoginApp')
 def login_app(request, dummy, temp_token):
 	try:
@@ -155,7 +162,6 @@ def login_app(request, dummy, temp_token):
 	return 'KO'
 
 
-
 @servizi3.metodo("Servizio")
 def servizio(request, token, prodotto, servizio, lingua, apertoDalMenu):
 	
@@ -170,6 +176,7 @@ def servizio(request, token, prodotto, servizio, lingua, apertoDalMenu):
 		'nome': s.descrizione,
 		'servizio': s.servizio.servizio.nome,
 	}
+
 
 def app_login_by_token(request, token):
 	"""
@@ -212,6 +219,7 @@ def get_fav(request):
 
 	return fav
 
+
 def delete_fav(request, id_fav):
 	u = request.user
 	t = id_fav[0]
@@ -222,6 +230,7 @@ def delete_fav(request, id_fav):
 		IndirizzoPreferito.objects.filter(user=u, pk=pk).delete()
 	elif t == 'R':
 		RicercaRecente.by_request(request, limit=False).filter(pk=pk).delete()
+
 
 def sostituisci_preferiti(request, address):
 	if address.startswith('fav:'):
@@ -244,9 +253,11 @@ def base(request):
 	request.session['js_version'] = False
 	return HttpResponseRedirect('/')
 
+
 def webapp(request):
 	request.session['js_version'] = True
 	return HttpResponseRedirect('/percorso/js?hl=%s' % request.lingua.codice)
+
 
 def servizi_new(request):
 	# if getdef(request.session, 'js_version', True):
@@ -265,8 +276,6 @@ def servizi_new(request):
 	# fav_list = [fav[k] for k in fav]
 	# fav_list = [('-', _('Ricerche recenti:'))] + fav_list
 
-
-			
 	class CercaForm(AtacMobileForm):
 		start_address = forms.CharField(widget=forms.TextInput(attrs={'size':'24'}))
 		# start_fav = forms.TypedChoiceField(choices=fav_list)
@@ -277,7 +286,6 @@ def servizi_new(request):
 		start_address='',
 		stop_address='',
 	)
-
 
 	ctx = cache.get('servizi-menu-%s' % request.lingua)
 
@@ -304,14 +312,9 @@ def servizi_new(request):
 		# 		'messaggio': u'Regular public transport service on Thursday 28',
 		# 	})
 
-
-
 		request.ctx['notifiche'].extend(us)
 
 		cache.set('servizi-menu-%s' % request.lingua, ctx, 60)
-
-
-
 
 	# Percorsi salvati
 	try:
@@ -321,8 +324,6 @@ def servizi_new(request):
 	except UtenteGenerico.DoesNotExist:
 		pass
 
-	
-	
 	error_messages = []
 	error_fields = []
 		
@@ -353,7 +354,10 @@ def servizi_new(request):
 		
 		if stop_address == '':
 			if start_address == '':
-				f.set_error(['start_address'])
+				if 'Sumbit' in request.GET:
+					f.set_error(['start_address'])
+				else:
+					return HttpResponseRedirect('/percorso/js')
 			else:
 				if 'Submit' in request.GET:
 					return hist_redirect(request, '/paline/?cerca=%s' % (start_address, ), offset=0)
@@ -395,6 +399,7 @@ def login_ws(request):
 	ss = Sottosito.objects.get(id_sottosito=id)
 	return HttpResponseRedirect(ss.url_login)
 
+
 def login_page(request):
 	id = None
 	if 'IdSubSito' in request.GET:
@@ -402,8 +407,10 @@ def login_page(request):
 	request.session['login_id_sub_sito'] = id
 	return HttpResponseRedirect(login_url)
 
+
 def login_app_landing(request):
 	return messaggio(request, _("Accesso effettuato"))
+
 
 def logout(request):
 	auth.logout(request)
@@ -412,6 +419,7 @@ def logout(request):
 		id = request.GET['IdSubSito']
 	request.session['login_id_sub_sito'] = id	
 	return HttpResponseRedirect(logout_url)
+
 
 def logout_return(request):
 	id = None
@@ -422,6 +430,7 @@ def logout_return(request):
 		return HttpResponseRedirect('/')
 	ss = Sottosito.objects.get(id_sottosito=id)	
 	return HttpResponseRedirect(ss.url_logout)
+
 
 def backend(request):
 	ctx = {}
@@ -466,9 +475,11 @@ def backend(request):
 	#print menu
 	return TemplateResponse(request, 'backend.html', ctx)
 
+
 def backend_logout(request):
 	auth.logout(request)
 	return HttpResponseRedirect('/backend')
+
 
 # Notifiche
 def notifiche_fasce(request, id_notifica):
@@ -518,6 +529,7 @@ def notifiche_fasce(request, id_notifica):
 	ctx['form'] = f
 	return TemplateResponse(request, 'notifiche_fasce.html', ctx)
 
+
 def notifiche_fasce_elimina(request, id):
 	try:
 		f = FasciaRichiestaNotifica.objects.get(con_fasce__user=request.user, pk=id)
@@ -526,6 +538,7 @@ def notifiche_fasce_elimina(request, id):
 		return hist_redirect(request, '/servizi/notifiche/fasce/%d' % id_notifica, msg=(u"Fascia oraria eliminata"))
 	except FasciaRichiestaNotifica.DoesNotExist: 
 		return messaggio(request, _("La fascia non esiste"))
+
 
 def notifiche(request, pk):
 	try:
