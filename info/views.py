@@ -37,3 +37,7 @@ lingue1 = ServerVersione("lingue", 1)
 
 def cookies(request):
 	return TemplateResponse(request, 'info-cookies.html', {})
+
+
+def dev(request):
+	return TemplateResponse(request, 'info-dev.html', {})
