@@ -24,4 +24,5 @@ import views
 
 urlpatterns = patterns('',
 	url('^info-cookies$', views.cookies),
+	url('dev$', views.dev),
 )
