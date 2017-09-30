@@ -548,20 +548,34 @@ def scarica_orari_partenza_giorno(giorno):
 	print "Autenticazione"
 	sa = xmlrpclib.Server('%s/ws/xml/autenticazione/1' % settings.WS_BASE_URL)
 	sp = xmlrpclib.Server('%s/ws/xml/paline/7' % settings.WS_BASE_URL)
-	token = sa.autenticazione.Accedi(settings.DEVELOPER_KEY, '')	
+	token = sa.autenticazione.Accedi(settings.DEVELOPER_KEY, '')
 	print "Download orari", giorno
-	orari = sp.paline.GetPartenzeCapilinea(token, date2mysql(giorno))['risposta']
-	print "Caricamento orari nel database"	
+	os2 = sp.paline.GetPartenzeCapilinea(token, date2mysql(giorno))['risposta']
+	print "Aggiornamento orari nel database"
+	ok = 0
+	added = 0
+	deleted = 0
 	with autotransaction():
 		giorno_succ = giorno + timedelta(days=1)
-		PartenzeCapilinea.objects.filter(orario_partenza__gte=giorno, orario_partenza__lt=giorno_succ).delete()
-		for o in orari:
-			# pprint(o)
-			PartenzeCapilinea(
-				id_percorso=o['id_percorso'],
-				orario_partenza=xmlrpc2datetime(o['orario_partenza']),
-			).save()
-		
+		os1 = PartenzeCapilinea.objects.filter(orario_partenza__gte=giorno, orario_partenza__lt=giorno_succ)
+		os1 = set([(o.id_percorso, o.orario_partenza) for o in os1])
+		for o in os2:
+			k = (o['id_percorso'], xmlrpc2datetime(o['orario_partenza']))
+			if k in os1:
+				del os1[k]
+				ok += 1
+			else:
+				PartenzeCapilinea(
+					id_percorso=k[0],
+					orario_partenza=k[1],
+				).save()
+				added += 1
+		for k in os1:
+			PartenzeCapilinea.objects.filter(id_percorso=k[0], orario_partenza=k[1]).delete()
+			deleted += 1
+	print "Aggiornamento completato: {} invariati, {} inseriri, {} eliminati".format(ok, added, deleted)
+
+
 def scarica_orari_partenza():
 	def cerca_giorno(i):
 		if i < 0 or i > 6:
