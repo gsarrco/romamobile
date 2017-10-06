@@ -32,10 +32,13 @@ import inspect
 from django.contrib.auth import get_user
 import errors
 from servizi.models import Servizio, Versione
+from autenticazione.models import ServiziUser, ServiziUserDailyCredits
 import settings
 import logging
 import importlib
 from jsonrpc import jsonrpc_method
+from django.core.cache import cache
+
 
 session_engine = importlib.import_module(settings.SESSION_ENGINE)
 
@@ -86,8 +89,53 @@ class Risposta(models.Model):
 		return u"%s, %s" % (unicode(self.invocazione), self.valore)
 	
 	class Meta:
-		verbose_name_plural = 'Risposte'		
-	
+		verbose_name_plural = 'Risposte'
+
+
+def apply_cost(user, cost=1):
+	"""
+	Apply cost to user
+
+	:param user: User object
+	:param cost: Cost to be applied, or 1
+	:return: True iff there is enough credit to proceed
+	"""
+	if cost is None:
+		return True
+	authorized = True
+	td = datetime.date.today()
+	cache_key = 'log_servizi_cost_{}_{}'.format(user.pk, str(td))
+	uc = cache.get(cache_key, None)
+	if uc is None:
+		user = user.serviziuser
+		sudcs = ServiziUserDailyCredits.objects.filter(user=user, date=td)
+		if len(sudcs) == 0:
+			ServiziUserDailyCredits(user=user, date=td).save()
+		else:
+			sudc = sudcs[0]
+			if user.daily_credits is not None and sudc.used_credits > user.daily_credits:
+				authorized = False
+		uc = {
+			'user': user,
+			'daily': user.daily_credits,
+			'partial': 0,
+			'authorized': authorized,
+		}
+	if uc['daily'] is not None:
+		authorized = uc['authorized']
+		uc['partial'] += 1
+		if uc['partial'] >= 10:
+			user = uc['user']
+			ServiziUserDailyCredits.objects.filter(user=user, date=td).update(used_credits=models.F('used_credits') + uc['partial'])
+			sudc = ServiziUserDailyCredits.objects.filter(user=user, date=td)
+			if sudc[0].used_credits > uc['daily']:
+				authorized = False
+				uc['authorized'] = False
+			uc['partial'] = 0
+	cache.set(cache_key, uc)
+	return authorized
+
+
 class ServerVersione(SimpleXMLRPCDispatcher):
 	def __init__(self, nome_servizio, numero_versione):
 		SimpleXMLRPCDispatcher.__init__(self, allow_none=True)
@@ -177,7 +225,7 @@ class ServerVersione(SimpleXMLRPCDispatcher):
 		g.saved_argspec = inspect.getargspec(f)
 		return g
 	
-	def enforce_login(self, group_required=None):
+	def enforce_login(self, group_required=None, cost=1):
 		"""
 		Decorator. Enforce that 2nd param (token) was assigned to a logged user
 		"""
@@ -191,6 +239,8 @@ class ServerVersione(SimpleXMLRPCDispatcher):
 				request.session = session_engine.SessionStore(session_key=token)
 				u = get_user(request)
 				if u.is_authenticated():
+					if not apply_cost(u, cost):
+						raise errors.XMLRPC['XRE_DAILY_LIMIT']
 					if group_required is None:
 						return f(*args)
 					print "Autenticato, verifico gruppo"
@@ -264,13 +314,13 @@ class ServerVersione(SimpleXMLRPCDispatcher):
 		#standard_logger.debug("Uscita dal metodo. Tempo impiegato: %s" % unicode(datetime.datetime.now() - dt_inizio_invocazione))
 		return response
 	
-	def xmlrpc(self, name, require_token=True, group_required=None):
+	def xmlrpc(self, name, require_token=True, group_required=None, cost=1):
 		"""
 		Decorator. Turns a function into an xml-rpc method
 		"""
 		def decoratore(f):
 			if require_token:
-				f = self.enforce_login(group_required=group_required)(f)
+				f = self.enforce_login(group_required=group_required, cost=cost)(f)
 			f = self.log_on_file(f, name)
 			self.register_function(f, name)
 			return f
@@ -290,15 +340,14 @@ class ServerVersione(SimpleXMLRPCDispatcher):
 			print nome_completo
 			jsonrpc_method(nome_completo)(self.togli_token(f))
 		return decoratore		
-		
-	
-	def metodo(self, nome, require_token=True, group_required=None, json=True):
+
+	def metodo(self, nome, require_token=True, group_required=None, json=True, cost=1):
 		print "Registro", nome
 		def decoratore(f):
 			if json and not group_required:
 				self.jsonrpc(nome)(f)
 			f = self.logger(nome)(self.service_reply(f))
-			return self.xmlrpc(str("%s.%s" % (self.versione.servizio.nome, nome)), require_token=require_token, group_required=group_required)(f)
+			return self.xmlrpc(str("%s.%s" % (self.versione.servizio.nome, nome)), require_token=require_token, group_required=group_required, cost=cost)(f)
 		return decoratore
 		
 	def get_url_entry(self):
@@ -317,6 +366,7 @@ def times2string(el):
 		return [times2string(k) for k in el]
 	else:
 		return el
+
 
 def convert_times_to_string(f):
 	def g(*args, **kwargs):

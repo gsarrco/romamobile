@@ -573,7 +573,7 @@ def scarica_orari_partenza_giorno(giorno):
 		for k in os1:
 			PartenzeCapilinea.objects.filter(id_percorso=k[0], orario_partenza=k[1]).delete()
 			deleted += 1
-	print "Aggiornamento completato: {} invariati, {} inseriri, {} eliminati".format(ok, added, deleted)
+	print "Aggiornamento completato: {} invariati, {} inseriti, {} eliminati".format(ok, added, deleted)
 
 
 def scarica_orari_partenza():
