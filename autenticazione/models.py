@@ -25,16 +25,30 @@ from django.contrib.auth.models import User
 
 TOKEN_APP_LENGTH = 42
 
+
 class ServiziUser(User):
 	secret = models.CharField(max_length=127, unique=True, db_index=True)
+	daily_credits = models.IntegerField(null=True, blank=True, default=None)
+
+
+class ServiziUserDailyCredits(models.Model):
+	user = models.ForeignKey(ServiziUser)
+	date = models.DateField(db_index=True)
+	used_credits = models.IntegerField(default=0)
+
+	def __unicode__(self):
+		return u"[{}] {}: {}".format(self.date, self.user, self.used_credits)
+
 	
 class MuoversiaromaUser(User):
 	user_id = models.CharField(max_length=20, unique=True, db_index=True)
-	
+
+
 class LocalizzazioneUser(User):
 	restype = models.IntegerField(db_index=True)
 	resid = models.CharField(max_length=40, db_index=True)
-	
+
+
 class LogAutenticazioneServizi(models.Model):
 	orario = models.DateTimeField(db_index=True)
 	user = models.ForeignKey(ServiziUser)
@@ -44,15 +58,18 @@ class LogAutenticazioneServizi(models.Model):
 	def __unicode__(self):
 		return "%s, %s" % (self.orario, self.user)
 
+
 class TokenApp(models.Model):
 	token_app = models.CharField(max_length=TOKEN_APP_LENGTH, db_index=True)
 	user = models.ForeignKey(User)
 	ultimo_accesso = models.DateTimeField(db_index=True)
 
+
 class Telefono(models.Model):
 	user = models.ForeignKey(User)
 	numero = models.CharField(max_length=31)
-	
+
+
 class Sottosito(models.Model):
 	id_sottosito = models.IntegerField(db_index=True)
 	nome = models.CharField(max_length=31)

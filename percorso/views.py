@@ -197,8 +197,9 @@ def cerca1(
 
 
 # Registrazione ws XML-RPC
-percorso1.xmlrpc("percorso.Cerca")(percorso1.logger("Cerca")(cerca1))
-percorso2.xmlrpc("percorso.Cerca")(percorso1.logger("Cerca")(cerca))
+percorso1.xmlrpc("percorso.Cerca", cost=15)(percorso1.logger("Cerca")(cerca1))
+percorso2.xmlrpc("percorso.Cerca", cost=15)(percorso1.logger("Cerca")(cerca))
+
 
 def infopoint_normalize(infopoint):
 	"""
@@ -218,6 +219,7 @@ def infopoint_normalize(infopoint):
 	setdef(infopoint, 'carpooling_vincoli', None)
 	setdef(infopoint, 'ztl', [])
 	setdef(infopoint, 'tipi_ris', [])
+
 
 def infopoint_to_get_params(infopoint, da=True):
 	params = {
@@ -291,11 +293,14 @@ def _get_percorso(percorso):
 				pass		
 	return passi
 
+
 def info_linee_escluse(linee_escluse):
 	return [{'id_linea': k, 'nome': linee_escluse[k]} for k in linee_escluse]
 
+
 class AggiungiPuntoForm(forms.Form):
 	address = forms.CharField(widget=forms.TextInput(attrs={'size':'20'}))
+
 
 def infopoint_to_cache_key(infopoint):
 	ck = copy(infopoint)
@@ -469,6 +474,7 @@ def formatta_calcola_percorso(request, webservice, ctx, tr, opzioni=None, mail=N
 	else:
 		return TemplateResponse(request, 'percorso-dinamico.html', ctx)
 
+
 def mappa_dinamico(request):
 	ctx = {}
 	tr = request.session['percorso-trattoroot']
@@ -477,6 +483,7 @@ def mappa_dinamico(request):
 	ctx['mappa'] = mark_safe(mappa.render())
 	ctx['percorso'] = True
 	return TemplateResponse(request, 'map-fullscreen.html', ctx)
+
 
 def mappa_statica_dinamico(request, zoom=None, center_x=None, center_y=None):
 	ctx = {}
@@ -498,6 +505,7 @@ def mappa_statica_dinamico(request, zoom=None, center_x=None, center_y=None):
 	ctx['right'] = "%f" % (float(ret['center_x']) + float(ret['shift_h']))
 	return calcola_percorso_espandi(request, ctx=ctx)
 
+
 def aggiorna_posizione(request, id_palina):
 	p = palinemodels.Palina.objects.by_date().get(id_palina=id_palina)
 	infopoint = request.session['infopoint']
@@ -513,10 +521,12 @@ def aggiorna_posizione(request, id_palina):
 	infopoint['dt'] = datetime.now()
 	return calcola_percorso_dinamico(request)
 
+
 def modo(request, m):
 	request.session['infopoint']['mezzo'] = int(m)
 	request.session['infopoint']['tipi_ris'] = []
 	return calcola_percorso_dinamico(request)
+
 
 def avanzate(request):
 	ctx = {}
@@ -585,14 +595,11 @@ def avanzate(request):
 	return calcola_percorso_espandi(request, ctx=ctx)
 
 
-
-
-
-	
 def bici(request, bici):
 	infopoint = request.session['infopoint']
 	infopoint['mezzo'] = 3 if bici == '1' else 1
 	return calcola_percorso_dinamico(request)
+
 
 def escludi(request, linea):
 	infopoint = request.session['infopoint']
@@ -603,6 +610,7 @@ def escludi(request, linea):
 	infopoint['linee_escluse'][linea] = nome_linea	
 	return calcola_percorso_dinamico(request)
 
+
 def includi(request, linea):
 	infopoint = request.session['infopoint']
 	try:
@@ -611,12 +619,14 @@ def includi(request, linea):
 		pass
 	return calcola_percorso_dinamico(request)
 
+
 def offri_passaggio(request):
 	infopoint = request.session['infopoint']
 	p = palinemodels.PercorsoSalvatoTest(nome=str(datetime.now()))
 	p.percorso = infopoint['percorso_auto_salvato']
 	p.save()
 	return calcola_percorso_dinamico(request)
+
 
 def calcola_percorso_espandi(request, espandi='', ctx=None):
 	if ctx is None:
@@ -627,6 +637,7 @@ def calcola_percorso_espandi(request, espandi='', ctx=None):
 	opzioni = {'espandi': espandi}
 	tr = request.session['percorso-trattoroot']
 	return formatta_calcola_percorso(request, False, ctx, tr, opzioni)
+
 
 def calcola_percorso_mail(request, addresses):
 	ctx = {}
@@ -650,7 +661,8 @@ def _place_choice(elem):
 	if place != loc:
 		return (place, loc, "i")
 	return (place, loc) 
-	
+
+
 def _validate_address(request, address, partenza):
 	af = None
 	pf = None
@@ -694,8 +706,10 @@ def _validate_address(request, address, partenza):
 			error_fields.append("%s_address" % what)
 	return af, pf, error_messages, error_fields, correct_output
 
+
 class RisorseForm(forms.Form):
 	risorse = forms.ModelMultipleChoiceField(queryset=risorse.models.TipoRisorsa.objects.all())
+
 
 class PercorsoBaseForm(forms.Form):
 	start_address = forms.CharField(widget=forms.TextInput(attrs={'size':'24'}))
@@ -769,7 +783,6 @@ class OpzioniAvanzateForm(forms.Form):
 	def set_error(self, fields):
 		for f in fields:
 			self.fields[f].widget.attrs.update({'class': 'hlform'})
-
 
 
 def default(request):
