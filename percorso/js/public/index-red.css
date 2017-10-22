@@ -16,6 +16,24 @@
 body {
 	font-family: 'Droid Sans', sans-serif;
 }
+/* droid-sans-regular - latin */
+@font-face {
+  font-family: 'Droid Sans';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Droid Sans Regular'), local('DroidSans-Regular'),
+    url('fonts/DroidSans-Regular.ttf') format('tff');
+}
+
+/* droid-sans-700 - latin */
+@font-face {
+  font-family: 'Droid Sans';
+  font-style: normal;
+  font-weight: 700;
+  src: local('Droid Sans Bold'), local('DroidSans-Bold'),
+    url('fonts/DroidSans-Bold.ttf') format('tff');
+}
+
 table {
 font-size:13px;
 }
