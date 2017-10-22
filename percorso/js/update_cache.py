@@ -57,7 +57,10 @@ NETWORK:
 f.close()
 
 for el in ['safari', 'opera', 'oldmoz']:
-	os.remove('output/main.%s.cache.html' % el)
+	try:
+		os.remove('output/main.%s.cache.html' % el)
+	except:
+		pass
 
 
 # shutil.rmtree('deploy', ignore_errors=True)
