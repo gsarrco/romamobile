@@ -20,45 +20,42 @@
 		<link href="https://fonts.googleapis.com/css?family=Droid+Sans:400,700" rel="stylesheet">
 		{% block InternalStyle %}
 		{% endblock %}{% block fullscript %}{% endblock %}
-		{% if False %}
-			{% if platform == 'iOS' %}
-				<link rel="stylesheet" href="/xhtml/s/sb/sb.css" type="text/css" media="screen">
-				<meta name="google-play-app" content="app-id=com.realtech.romamobilita">
-				<meta name="apple-itunes-app" content="app-id=820255342">
-				<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8/jquery.min.js"></script>
-				<script src="/xhtml/s/sb/sb.js"></script>
-				<script type="text/javascript">
-					$(function () { $.smartbanner({
-						title: '{% trans "Roma mobile" %}',
-						author: 'Roma mobile',
-						price: '{% trans "App ufficiale" %}',
-						inAppStore: '{% trans "Gratis" %}',
-						inGooglePlay: '{% trans "Gratis" %}',
-						icon: '/xhtml/s/img/app.png',
-						button: '{% trans "VEDI" %}',
-						daysReminder: 0
-					})})
-				</script>
-			{% endif %}
-			{% if platform == 'Android' %}
-				<link rel="stylesheet" href="/xhtml/s/sb/sb.css" type="text/css" media="screen">
-				<meta name="google-play-app" content="app-id=com.realtech.romamobilita">
-				<meta name="apple-itunes-app" content="app-id=820255342">
-				<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8/jquery.min.js"></script>
-				<script src="/xhtml/s/sb/sb.js"></script>
-				<script type="text/javascript">
-					$(function () { $.smartbanner({
-						title: '{% trans "Roma mobile" %}',
-						author: 'Roma mobile',
-						price: '{% trans "App ufficiale" %}',
-						inAppStore: '{% trans "Gratis" %}',
-						inGooglePlay: '{% trans "Gratis" %}',
-						icon: '/xhtml/s/img/app.png',
-						button: '{% trans "VEDI" %}',
-						daysReminder: 0
-					})})
-				</script>
-			{% endif %}
+		{% if False and platform == 'iOS' %}
+			<link rel="stylesheet" href="/xhtml/s/sb/sb.css" type="text/css" media="screen">
+			<meta name="google-play-app" content="app-id=it.skeed.romamobile">
+			<meta name="apple-itunes-app" content="app-id=820255342">
+			<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8/jquery.min.js"></script>
+			<script src="/xhtml/s/sb/sb.js"></script>
+			<script type="text/javascript">
+				$(function () { $.smartbanner({
+					title: '{% trans "Roma mobile" %}',
+					author: 'Roma mobile',
+					price: '{% trans "App ufficiale" %}',
+					inAppStore: '{% trans "Gratis" %}',
+					inGooglePlay: '{% trans "Gratis" %}',
+					icon: '/xhtml/s/img/app.png',
+					button: '{% trans "VEDI" %}',
+					daysReminder: 0
+				})})
+			</script>
+		{% endif %}
+		{% if platform == 'Android' %}
+			<link rel="stylesheet" href="/xhtml/s/sb/sb.css" type="text/css" media="screen">
+			<meta name="google-play-app" content="app-id=it.skeed.romamobile">
+			<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8/jquery.min.js"></script>
+			<script src="/xhtml/s/sb/sb.js"></script>
+			<script type="text/javascript">
+				$(function () { $.smartbanner({
+					title: '{% trans "Roma mobile" %}',
+					author: 'App originale',
+					price: '{% trans "Gratis" %}',
+					inAppStore: '{% trans "Gratis" %}',
+					// inGooglePlay: '{% trans "Gratis" %}',
+					icon: '/xhtml/s/img/app.png',
+					button: '{% trans "VEDI" %}',
+					daysReminder: 0
+				})})
+			</script>
 		{% endif %}
     <!-- Begin Cookie Consent plugin by Silktide - http://silktide.com/cookieconsent -->
     <script type="text/javascript">
@@ -175,6 +172,15 @@
 				<div id="info">
 					<table style="width: 100%; border: none; padding: 0px; margin: 0px; border-collapse: collapse;">
 						<tr>
+							<td style="padding-left: 5px; vertical-align: middle">
+								<p>
+									<a alt="App Android" href="https://play.google.com/store/apps/details?id=it.skeed.romamobile"><img src="/xhtml/s/img/android-app.png"/></a>
+								</p>
+								<p>
+									<a href="https://www.facebook.com/romamobileapp" class="nound"><img src="/xhtml/s/img/ico-fb.png" alt="Facebook"/></a>
+									<a href="https://twitter.com/roma_mobile" class="nound"><img src="/xhtml/s/img/ico-tw.png" alt="Twitter"/></a>
+								</p>
+							</td>
 							<td style="padding-right: 5px; text-align: right; vertical-align:top;">
 									{{ DebugString }}
 									{{ Nota }}

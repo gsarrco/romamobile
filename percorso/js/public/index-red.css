@@ -21,8 +21,7 @@ body {
   font-family: 'Droid Sans';
   font-style: normal;
   font-weight: 400;
-  src: local('Droid Sans Regular'), local('DroidSans-Regular'),
-    url('fonts/DroidSans-Regular.ttf') format('tff');
+  src: local('Droid Sans Regular'), local('DroidSans-Regular'), url('fonts/DroidSans-Regular.ttf') format('truetype');
 }
 
 /* droid-sans-700 - latin */
@@ -30,8 +29,7 @@ body {
   font-family: 'Droid Sans';
   font-style: normal;
   font-weight: 700;
-  src: local('Droid Sans Bold'), local('DroidSans-Bold'),
-    url('fonts/DroidSans-Bold.ttf') format('tff');
+  src: local('Droid Sans Bold'), local('DroidSans-Bold'), url('fonts/DroidSans-Bold.ttf') format('truetype');
 }
 
 table {
