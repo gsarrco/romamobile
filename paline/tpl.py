@@ -170,10 +170,10 @@ class PosizioneVeicolo(object):
 		"""
 		Inizializza una posizione veicolo a partire da percorso e coordinate proiettive
 
-		:return: Oggetto PosizioneVeicolo
+		:return: (PosizioneVeicolo, distanza_2d)
 		"""
 		i, dist_tratto, dist_inizio = percorso.segmenti.project((x, y))
-		return cls.from_dist(percorso, dist_inizio)
+		return cls.from_dist(percorso, dist_inizio), dist_tratto
 
 	@classmethod
 	def from_dist(cls, percorso, distanza_capolinea, rev=False):
@@ -325,23 +325,23 @@ class RetePercorso(object):
 		self.map_fermate_tratti.append(n_tratto)
 		self.numero_fermate = n_fermata
 
-	def get_tratto_e_distanza_da_fermata(self, n_fermata, dist_fermata):
-		"""
-		Restituisce l'indice del tratto, il tratto e la distanza a partire dalla posizione linearizzata in fermate
-
-		Il metodo converte la posizione linearizzata, espressa in termini di fermate "non soppresse" e distanza
-		dall'ultima fermata, in una nuova posizione linearizzata espressa in termini di tratti di percorso:
-		restituisce una terna (indice_tratto_percorso, tratto_percorso, distanza_da_inizio_tratto_percorso)
-		"""
-		# TODO: Sostituire usando PosizioneVeicolo
-		n_tratto = self.map_fermate_tratti[n_fermata]
-		tp = self.tratti_percorso[n_tratto]
-		dist = tp.rete_tratto_percorsi.dist
-		if dist < dist_fermata:
-			dist_fermata -= dist
-			tp = tp.t.tratto_percorso_successivo
-			n_tratto += 1
-		return (n_tratto, tp, dist_fermata)
+	# def get_tratto_e_distanza_da_fermata(self, n_fermata, dist_fermata):
+	# 	"""
+	# 	Restituisce l'indice del tratto, il tratto e la distanza a partire dalla posizione linearizzata in fermate
+	#
+	# 	Il metodo converte la posizione linearizzata, espressa in termini di fermate "non soppresse" e distanza
+	# 	dall'ultima fermata, in una nuova posizione linearizzata espressa in termini di tratti di percorso:
+	# 	restituisce una terna (indice_tratto_percorso, tratto_percorso, distanza_da_inizio_tratto_percorso)
+	# 	"""
+	# 	# TODO: Rimuovere
+	# 	n_tratto = self.map_fermate_tratti[n_fermata]
+	# 	tp = self.tratti_percorso[n_tratto]
+	# 	dist = tp.rete_tratto_percorsi.dist
+	# 	if dist < dist_fermata:
+	# 		dist_fermata -= dist
+	# 		tp = tp.t.tratto_percorso_successivo
+	# 		n_tratto += 1
+	# 	return (n_tratto, tp, dist_fermata)
 
 	def serializza_dinamico(self):
 		return {
@@ -388,102 +388,105 @@ class RetePercorso(object):
 			self.segmenti.add_segment(punti[i-1], punti[i], i)
 		self.segmenti.freeze()
 
-	def coord_to_linear(self, p):
-		"""
-		Trasforma il punto p (coppia x, y) nella posizione linearizzata
+	# def coord_to_linear(self, p):
+	# 	"""
+	# 	Trasforma il punto p (coppia x, y) nella posizione linearizzata
+	#
+	# 	Restituisce un dizionario con le seguenti chiavi:
+	# 	- distanza_capolinea: distanza dal capolinea iniziale
+	# 	- distanza_capolinea_finale: distanza dal capolinea finale
+	# 	- tratto_percorso: tratto_percorso a cui appartiene il punto
+	# 	- distanza_inizio_tratto: distanza dall'inizio del tratto
+	# 	- distanza_fine_tratto: distanza dalla fine del tratto
+	# 	- distanza_2d: distanza 2D del punto dal segmento
+	# 	- progressiva: progressivo del tratto di percorso (partendo da 1 per il primo tratto)
+	# 	"""
+	# 	# TODO: Rimuovere
+	#
+	# 	i, dist_tratto, dist_inizio = self.segmenti.project(p)
+	#
+	# 	residua = dist_inizio
+	# 	tp = self.tratti_percorso[0]
+	# 	i = 0
+	#
+	# 	while True:
+	# 		dist = tp.rete_tratto_percorsi.dist
+	# 		tratto_successivo = tp.t.tratto_percorso_successivo
+	# 		i += 1
+	# 		if residua < dist or tratto_successivo is None:
+	# 			return {
+	# 				'distanza_capolinea': dist_inizio,
+	# 				'distanza_capolinea_finale': self.dist - dist_inizio,
+	# 				'tratto_percorso': tp,
+	# 				'distanza_inizio_tratto': residua,
+	# 				'distanza_fine_tratto': dist - residua,
+	# 				'distanza_2d': dist_tratto,
+	# 				'progressiva': i,
+	# 			}
+	# 		residua -= dist
+	# 		tp = tratto_successivo
 
-		Restituisce un dizionario con le seguenti chiavi:
-		- distanza_capolinea: distanza dal capolinea iniziale
-		- distanza_capolinea_finale: distanza dal capolinea finale
-		- tratto_percorso: tratto_percorso a cui appartiene il punto
-		- distanza_inizio_tratto: distanza dall'inizio del tratto
-		- distanza_fine_tratto: distanza dalla fine del tratto
-		- distanza_2d: distanza 2D del punto dal segmento
-		- progressiva: progressivo del tratto di percorso (partendo da 1 per il primo tratto)
-		"""
-		# TODO: Sostituire usando PosizioneVeicolo
+	# def linear_to_coord(self, distanza_capolinea, rev=True):
+	# 	"""
+	# 	A partire dalla posizione linearizzata, calcola coordinate e direzione del veicolo
+	#
+	# 	distanza_capolinea: distanza da capolinea finale (rev=True, default) o iniziale
+	# 	Restituisce una terna (lng, lat, azimuth)
+	# 	"""
+	# 	# TODO: Rimuovere
+	#
+	# 	op = None
+	# 	mp = None
+	# 	d = distanza_capolinea if rev else self.dist - distanza_capolinea
+	# 	for p in self.iter_punti_rev():
+	# 		if op is not None:
+	# 			dp = geomath.distance(p, op)
+	# 			if d < dp:
+	# 				frac = d / dp
+	# 				#print "frac = ", frac
+	# 				mp = (op[0] + frac * (p[0] - op[0]), op[1] + frac * (p[1] - op[1]))
+	# 				#print "Posizione: ", mp
+	# 				break
+	# 			d -= dp
+	# 		op = p
+	# 		#print "Fine ciclo, distanza residua", d2
+	# 	if mp is None:
+	# 		return None
+	# 	# p:  nuovo punto
+	# 	# op: vecchio punto
+	# 	# mp: posizione interpolata
+	# 	mpw = gbfe_to_wgs84(*mp)
+	# 	return (mpw[0], mpw[1], geomath.azimuth_deg(p, op))
 
-		i, dist_tratto, dist_inizio = self.segmenti.project(p)
-
-		residua = dist_inizio
-		tp = self.tratti_percorso[0]
-		i = 0
-
-		while True:
-			dist = tp.rete_tratto_percorsi.dist
-			tratto_successivo = tp.t.tratto_percorso_successivo
-			i += 1
-			if residua < dist or tratto_successivo is None:
-				return {
-					'distanza_capolinea': dist_inizio,
-					'distanza_capolinea_finale': self.dist - dist_inizio,
-					'tratto_percorso': tp,
-					'distanza_inizio_tratto': residua,
-					'distanza_fine_tratto': dist - residua,
-					'distanza_2d': dist_tratto,
-					'progressiva': i,
-				}
-			residua -= dist
-			tp = tratto_successivo
-
-	def linear_to_coord(self, distanza_capolinea, rev=True):
-		"""
-		A partire dalla posizione linearizzata, calcola coordinate e direzione del veicolo
-
-		distanza_capolinea: distanza da capolinea finale (rev=True, default) o iniziale
-		Restituisce una terna (lng, lat, azimuth)
-		"""
-		# TODO: Sostituire usando PosizioneVeicolo
-
-		op = None
-		mp = None
-		d = distanza_capolinea if rev else self.dist - distanza_capolinea
-		for p in self.iter_punti_rev():
-			if op is not None:
-				dp = geomath.distance(p, op)
-				if d < dp:
-					frac = d / dp
-					#print "frac = ", frac
-					mp = (op[0] + frac * (p[0] - op[0]), op[1] + frac * (p[1] - op[1]))
-					#print "Posizione: ", mp
-					break
-				d -= dp
-			op = p
-			#print "Fine ciclo, distanza residua", d2
-		if mp is None:
-			return None
-		# p:  nuovo punto
-		# op: vecchio punto
-		# mp: posizione interpolata
-		mpw = gbfe_to_wgs84(*mp)
-		return (mpw[0], mpw[1], geomath.azimuth_deg(p, op))
-
-	def campioni_fvd(self, orario_min):
-		ss = self.fv.speed
-		out = []
-		for s in reversed(ss):
-			t, p, s, id = s
-			if orario_min is not None and t < orario_min:
-				break
-			res = self.linear_to_coord(p)
-			if res is None:
-				print "Errore nella posizione del veicolo"
-				continue
-			lng, lat, azimuth = res
-			out.append({
-				'id_veicolo': id,
-				'data_acquisizione': datetime2mysql(t),
-				'lon': lng,
-				'lat': lat,
-				'direzione': int(azimuth),
-				'velocita': int(s * 3.6),
-				'stato': 1,
-				'quality': 3,
-				'classe_veicolo': 'B',
-				'id_sistema': 'A',
-				'distanza': int(self.dist - p),
-			})
-		return out
+	# def campioni_fvd(self, orario_min):
+	#		# Todo: rimuovere
+	# 	ss = self.fv.speed
+	# 	out = []
+	# 	for s in reversed(ss):
+	# 		t, p, s, id = s
+	# 		if orario_min is not None and t < orario_min:
+	# 			break
+	# 		p = PosizioneVeicolo.from_dist(self, p, True)
+	# 		if p is None:
+	# 			print "Errore nella posizione del veicolo"
+	# 			continue
+	# 		res = p.get_dettagli(True)
+	# 		x, y, azimuth = res['x'], res['y'], res['azimuth']
+	# 		lng, lat =  gbfe_to_wgs84(x, y)
+	# 		out.append({
+	# 			'id_veicolo': id,
+	# 			'data_acquisizione': datetime2mysql(t),
+	# 			'lon': lng,
+	# 			'lat': lat,
+	# 			'direzione': int(azimuth),
+	# 			'velocita': int(s * 3.6),
+	# 			'stato': 1,
+	# 			'quality': 3,
+	# 			'classe_veicolo': 'B',
+	# 			'id_sistema': 'A',
+	# 			'distanza': int(self.dist - p),
+	# 		})
+	# 	return out
 
 	def log_tempo_attesa(self, data=None, ora=None):
 		arrivi = self.tratti_percorso[-1].t.arrivi
@@ -1893,7 +1896,11 @@ class Rete(object):
 				distanza_precedente = v['dist_prec']
 				a_capolinea = (progressiva == 0 and distanza_precedente == 0)
 				percorso = self.percorsi[id_percorso]
-				n_tratto, tpo, dist_precedente_tratto = percorso.get_tratto_e_distanza_da_fermata(progressiva, distanza_precedente)
+				posizione_veicolo = PosizioneVeicolo.from_fermata(percorso, progressiva, distanza_precedente)
+				posizione_dict = posizione_veicolo.get_dettagli()
+				tpo = posizione_dict['tratto_percorso']
+				# n_tratto = posizione_dict['progressiva_tratto']
+				dist_precedente_tratto = posizione_dict['distanza_inizio_tratto']
 				distanza_successiva = tpo.rete_tratto_percorsi.dist - dist_precedente_tratto
 				distanza_capolinea_finale = tpo.distanza_a_capolinea(distanza_successiva)
 				x, y = v['x'], v['y']
@@ -1937,14 +1944,15 @@ class Rete(object):
 					# print "** Veicolo %s troppo distante, %f" % (id_veicolo, dist)
 					filtrati += 1
 					v_filtrato = True
-					linear = percorso.coord_to_linear((x, y))
-					dist_2d = linear['distanza_2d']
+
+					posizione_veicolo_proj, dist_2d = PosizioneVeicolo.from_coord(percorso, x, y)
+					linear = posizione_veicolo_proj.get_dettagli()
 					if dist_2d <= max_distanza:
-						distanza_capolinea_finale = percorso.dist - linear['distanza_capolinea']
+						distanza_capolinea_finale = percorso.dist - linear['distanza_capolinea_finale']
 						tratto_percorso = linear['tratto_percorso']
 						distanza_successiva = tratto_percorso.rete_tratto_percorsi.dist - linear['distanza_inizio_tratto']
 						veicolo = self.aggiorna_posizione_bus(id_veicolo, distanza_capolinea_finale, distanza_successiva, tpo, a_capolinea, punto, dotazioni=dotazioni)
-						progressiva_ric = linear['progressiva'] - 1
+						progressiva_ric = linear['progressiva_tratto']
 					else:
 						v_filtrato_2d = True
 
