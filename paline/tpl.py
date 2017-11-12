@@ -71,6 +71,7 @@ LINEE_MINI = ['90', '542', '61', 'MEB', 'MEB1', '998', 'MEA', 'FR1']
 VALIDITA_TEMPO_ARCHI = timedelta(minutes=60)
 # Per ogni ciclo di aggiornamento tempi archi, massimo numero di tentativi per ciascun arcoprint
 MAX_PERIODO_PERCORSO_ATTIVO = timedelta(minutes=58)
+MAX_ARRETRAMENTO_MANTENIMENTO_CORSA = 200
 
 MIN_PESO_VELOCITA = 0.1
 
@@ -154,15 +155,16 @@ class PosizioneVeicolo(object):
 	"""
 	Classe per rappresentare la posizione del veicolo su percorso
 	"""
-	def __init__(self, tratto_percorso, distanza):
+	def __init__(self, tratto_percorso, distanza, rev=False):
 		"""
 		Inizializza con rappresentazione standard
 
 		:param tratto_percorso: tratto di percorso di appartenenza
-		:param distanza: distanza dall'inizio del tratto
+		:param distanza: distanza dall'inizio del tratto (o dalla fine se rev=True)
+		:param rev: se True, la distanza è espressa dalla fine del tratto
 		"""
 		self.tratto_percorso = tratto_percorso
-		self.distanza = distanza
+		self.distanza = distanza if not rev else tratto_percorso.rete_tratto_percorsi.dist - distanza
 		self._coord = None
 
 	@classmethod
@@ -257,7 +259,7 @@ class PosizioneVeicolo(object):
 		if coord:
 			if self._coord is None:
 				self._coord = tp.rete_tratto_percorsi.linear_to_coord(self.distanza)
-			if self.coord is not None:
+			if self._coord is not None:
 				out.update(self._coord)
 			else:
 				out['x'] = None
@@ -266,6 +268,14 @@ class PosizioneVeicolo(object):
 
 		return out
 
+	def __sub__(self, other):
+		"""
+		Restituisce la differenza di posizione fra due posizioni del medesimo percorso, in metri
+		"""
+		assert self.tratto_percorso.percorso is other.tratto_percorso.percorso
+		dist_inizio_1 = self.tratto_percorso.s.distanza_da_partenza + self.distanza
+		dist_inizio_2 = other.tratto_percorso.s.distanza_da_partenza + other.distanza
+		return dist_inizio_1 - dist_inizio_2
 
 
 class RetePercorso(object):
@@ -1285,11 +1295,8 @@ class ReteVeicolo(object):
 
 	def aggiorna_posizione(
 		self,
-		distanza_capolinea,
-		distanza_successiva,
-		tratto_percorso,
+		posizione,
 		a_capolinea,
-		punto,
 		propaga=True,
 		ultimo_aggiornamento=None,
 		orario_partenza_capolinea=None,
@@ -1299,8 +1306,7 @@ class ReteVeicolo(object):
 
 		Se punto=None, calcola le coordinate in base alla posizione linearizzata
 		"""
-		# TODO: Modificare segnatura e aggiornare
-		percorso = tratto_percorso.rete_percorso
+		percorso = posizione.tratto_percorso.rete_percorso
 
 		variata_corsa = False
 
@@ -1312,7 +1318,7 @@ class ReteVeicolo(object):
 			if percorso != old_percorso:
 				self.elimina_da_percorso()
 				variata_corsa = True
-			elif (a_capolinea and not self.a_capolinea) or distanza_capolinea > self.distanza_capolinea + MAX_ARRETRAMENTO_MANTENIMENTO_CORSA:
+			elif (a_capolinea and not self.a_capolinea) or posizione - self.posizione < - MAX_ARRETRAMENTO_MANTENIMENTO_CORSA:
 				variata_corsa = True
 
 		if variata_corsa:
@@ -1323,24 +1329,18 @@ class ReteVeicolo(object):
 
 		percorso.veicoli[self.id_veicolo] = self
 		old_tratto = None
-		if self.posizione.tratto_percorso is not None:
+		if self.posizione is not None:
 			old_tratto = self.posizione.tratto_percorso
-			if tratto_percorso != old_tratto and self.id_veicolo in old_tratto.veicoli:
+			if posizione.tratto_percorso != old_tratto and self.id_veicolo in old_tratto.veicoli:
 				del old_tratto.veicoli[self.id_veicolo]
-		if old_tratto != tratto_percorso:
-			tratto_percorso.veicoli[self.id_veicolo] = self
+		if old_tratto != posizione.tratto_percorso:
+			posizione.tratto_percorso.veicoli[self.id_veicolo] = self
 
-		self.distanza_capolinea = distanza_capolinea
-		self.distanza_successiva = distanza_successiva
-		self.posizione.tratto_percorso = tratto_percorso
+		self.posizione = posizione
 		self.ultimo_aggiornamento = datetime.now() if ultimo_aggiornamento is None else ultimo_aggiornamento
 		self.ultima_interpolazione = self.ultimo_aggiornamento
 		self.a_capolinea = a_capolinea
 		self.orario_partenza_capolinea = orario_partenza_capolinea
-		if punto is None:
-			self.get_punto()
-		else:
-			self.punto = punto
 		if propaga:
 			self.propaga_su_fermate()
 
@@ -1670,13 +1670,12 @@ class Rete(object):
 						if id_tratto is None:
 							self.invalida_bus(r['id'])
 						else:
+							tpo = self.tratti_percorso[id_tratto]
+							posizione = PosizioneVeicolo(tpo, r['distanza_successiva'], True)
 							self.aggiorna_posizione_bus(
 								r['id'],
-								r['distanza_capolinea'],
-								r['distanza_successiva'],
-								self.tratti_percorso[id_tratto],
+								posizione,
 								r['a_capolinea'],
-								r['punto'],
 								r['dotazioni'],
 								ultimo_aggiornamento=r['ultimo_aggiornamento'],
 								orario_partenza_capolinea=r['orario_partenza_capolinea'],
@@ -1808,10 +1807,10 @@ class Rete(object):
 		if id_veicolo in self.veicoli:
 			self.veicoli[id_veicolo].elimina_da_percorso()
 
-	def aggiorna_posizione_bus(self, id_veicolo, distanza_capolinea, distanza_successiva, tratto, a_capolinea, punto, dotazioni=None, propaga=True, ultimo_aggiornamento=None, orario_partenza_capolinea=None):
+	def aggiorna_posizione_bus(self, id_veicolo, posizione, a_capolinea, dotazioni=None, propaga=True, ultimo_aggiornamento=None, orario_partenza_capolinea=None):
 		if not id_veicolo in self.veicoli:
 			self.veicoli[id_veicolo] = ReteVeicolo(id_veicolo, dotazioni=dotazioni)
-		self.veicoli[id_veicolo].aggiorna_posizione(distanza_capolinea, distanza_successiva, tratto, a_capolinea, punto, propaga, ultimo_aggiornamento=ultimo_aggiornamento, orario_partenza_capolinea=orario_partenza_capolinea)
+		self.veicoli[id_veicolo].aggiorna_posizione(posizione, a_capolinea, propaga, ultimo_aggiornamento=ultimo_aggiornamento, orario_partenza_capolinea=orario_partenza_capolinea)
 		return self.veicoli[id_veicolo]
 
 	def elimina_veicolo_da_percorso(self, id_veicolo):
@@ -1848,7 +1847,9 @@ class Rete(object):
 			if id_veicolo.startswith("51") or id_veicolo.startswith("52"):
 				dotazioni['pedana'] = False
 
-			self.aggiorna_posizione_bus(id_veicolo, distanza_capolinea_finale, tpi.dist - linear['da_fermata'], tpo, a_capolinea, punto, dotazioni=dotazioni)
+			posizione = PosizioneVeicolo(tpo, linear['da_capolinea'])
+
+			self.aggiorna_posizione_bus(id_veicolo, posizione, a_capolinea, dotazioni=dotazioni)
 
 	@djangotransaction.commit_on_success(using='gis')
 	def dati_da_avm_atac(self):
@@ -1900,18 +1901,11 @@ class Rete(object):
 				a_capolinea = (progressiva == 0 and distanza_precedente == 0)
 				percorso = self.percorsi[id_percorso]
 				posizione_veicolo = PosizioneVeicolo.from_fermata(percorso, progressiva, distanza_precedente)
-				posizione_dict = posizione_veicolo.get_dettagli()
-				tpo = posizione_dict['tratto_percorso']
-				# n_tratto = posizione_dict['progressiva_tratto']
-				dist_precedente_tratto = posizione_dict['distanza_inizio_tratto']
-				distanza_successiva = tpo.rete_tratto_percorsi.dist - dist_precedente_tratto
-				distanza_capolinea_finale = tpo.distanza_a_capolinea(distanza_successiva)
 				x, y = v['x'], v['y']
 				if x is not None:
 					punto = Point(x, y, srid=3004)
 				else:
 					punto = None
-
 				dotazioni = {
 					'meb': False,
 					'aria': False,
@@ -1927,18 +1921,19 @@ class Rete(object):
 						if orario_partenza_capolinea < now:
 							orario_partenza_capolinea += timedelta(days=1)
 
-				veicolo = self.aggiorna_posizione_bus(id_veicolo, distanza_capolinea_finale, distanza_successiva, tpo, a_capolinea, punto, dotazioni=dotazioni, orario_partenza_capolinea=orario_partenza_capolinea)
+				self.aggiorna_posizione_bus(id_veicolo, posizione_veicolo, a_capolinea, dotazioni=dotazioni, orario_partenza_capolinea=orario_partenza_capolinea)
 
-				cx, cy = veicolo.get_punto()
-				punto_ric = Point(cx, cy, srid=3004)
+				dettagli = posizione_veicolo.get_dettagli()
+				cx, cy = dettagli['x'], dettagli['y']
+				distanza_capolinea_finale = dettagli['distanza_capolinea_finale']
 
 				if punto is None:
 					dist = None
 				else:
 					dist = geomath.distance((x, y), (cx, cy))
 
-				dist_2d = None
-				progressiva_ric=None
+				# dist_2d = None
+				# progressiva_ric=None
 
 				if dist is not None and dist <= max_distanza:
 					# Aggiungo campione
@@ -1949,109 +1944,105 @@ class Rete(object):
 					v_filtrato = True
 
 					posizione_veicolo_proj, dist_2d = PosizioneVeicolo.from_coord(percorso, x, y)
-					linear = posizione_veicolo_proj.get_dettagli()
 					if dist_2d <= max_distanza:
-						distanza_capolinea_finale = percorso.dist - linear['distanza_capolinea_finale']
-						tratto_percorso = linear['tratto_percorso']
-						distanza_successiva = tratto_percorso.rete_tratto_percorsi.dist - linear['distanza_inizio_tratto']
-						veicolo = self.aggiorna_posizione_bus(id_veicolo, distanza_capolinea_finale, distanza_successiva, tpo, a_capolinea, punto, dotazioni=dotazioni)
-						progressiva_ric = linear['progressiva_tratto']
+						veicolo = self.aggiorna_posizione_bus(id_veicolo, posizione_veicolo_proj, a_capolinea, dotazioni=dotazioni)
+						progressiva_ric = posizione_veicolo_proj.get_dettagli()['progressiva_tratto']
 					else:
 						v_filtrato_2d = True
 
-				if v_fuori or v_filtrato:
-					veicolo.set_problematico(
-						fuori_percorso=v_fuori,
-						lontano_1d=v_filtrato,
-						distanza_1d=dist,
-						lontano_2d=v_filtrato_2d,
-						distanza_2d=dist_2d,
-						progressiva_atac=progressiva,
-						progressiva_ric=progressiva_ric,
-					)
+				# if v_fuori or v_filtrato:
+				# 	veicolo.set_problematico(
+				# 		fuori_percorso=v_fuori,
+				# 		lontano_1d=v_filtrato,
+				# 		distanza_1d=dist,
+				# 		lontano_2d=v_filtrato_2d,
+				# 		distanza_2d=dist_2d,
+				# 		progressiva_atac=progressiva,
+				# 		progressiva_ric=progressiva_ric,
+				# 	)
 
 				per_tipo[(v_fuori, v_filtrato)].append({'veicolo': v, 'distanza': dist})
 
 				# Log
-				if log_cities:
-					LogCities(
-						data_ora_ric=v['timestamp'],
-						num_soc=id_veicolo,
-						geom=punto,
-						linea=linea,
-						dest=v['dest'],
-						cod_perc=v['id_percorso'],
-						cod_perc_alt=v['cod_perc_alt'],
-						prog_ferm=progressiva,
-						dist_da_ferm=distanza_precedente,
-						ferm_da_arr=v['ferm_da_arr'],
-						cod_corsa=v['cod_corsa'],
-						geom_ric=punto_ric,
-						dist_ric=dist,
-						id_percorso_dec=id_percorso,
-					).save()
-				if log_cities_tr:
-					LogCitiesTr(
-						data_ora_ric=v['timestamp'],
-						num_soc=id_veicolo,
-						geom=punto,
-						linea=linea,
-						dest=v['dest'],
-						cod_perc=v['id_percorso'],
-						cod_perc_alt=v['cod_perc_alt'],
-						prog_ferm=progressiva,
-						dist_da_ferm=distanza_precedente,
-						ferm_da_arr=v['ferm_da_arr'],
-						cod_corsa=v['cod_corsa'],
-						geom_ric=punto_ric,
-						dist_ric=dist,
-						id_percorso_dec=id_percorso,
-					).save()
+				# if log_cities:
+				# 	LogCities(
+				# 		data_ora_ric=v['timestamp'],
+				# 		num_soc=id_veicolo,
+				# 		geom=punto,
+				# 		linea=linea,
+				# 		dest=v['dest'],
+				# 		cod_perc=v['id_percorso'],
+				# 		cod_perc_alt=v['cod_perc_alt'],
+				# 		prog_ferm=progressiva,
+				# 		dist_da_ferm=distanza_precedente,
+				# 		ferm_da_arr=v['ferm_da_arr'],
+				# 		cod_corsa=v['cod_corsa'],
+				# 		geom_ric=punto_ric,
+				# 		dist_ric=dist,
+				# 		id_percorso_dec=id_percorso,
+				# 	).save()
+				# if log_cities_tr:
+				# 	LogCitiesTr(
+				# 		data_ora_ric=v['timestamp'],
+				# 		num_soc=id_veicolo,
+				# 		geom=punto,
+				# 		linea=linea,
+				# 		dest=v['dest'],
+				# 		cod_perc=v['id_percorso'],
+				# 		cod_perc_alt=v['cod_perc_alt'],
+				# 		prog_ferm=progressiva,
+				# 		dist_da_ferm=distanza_precedente,
+				# 		ferm_da_arr=v['ferm_da_arr'],
+				# 		cod_corsa=v['cod_corsa'],
+				# 		geom_ric=punto_ric,
+				# 		dist_ric=dist,
+				# 		id_percorso_dec=id_percorso,
+				# 	).save()
 			except:
 				logging.error('Errore aggiornamento posizione veicolo: %s' % traceback.format_exc())
-				if log_cities or log_cities_tr:
-					try:
-						x, y = v['x'], v['y']
-						if x is not None:
-							punto = Point(x, y, srid=3004)
-						else:
-							punto = None
-						if log_cities:
-							LogCities(
-								data_ora_ric=v['timestamp'],
-								num_soc=v['id_veicolo'],
-								geom=punto,
-								linea=v['id_linea'],
-								dest=v['dest'],
-								cod_perc=v['id_percorso'],
-								cod_perc_alt=v['cod_perc_alt'],
-								prog_ferm=v['progressiva'],
-								dist_da_ferm=distanza_precedente,
-								ferm_da_arr=v['ferm_da_arr'],
-								cod_corsa=v['cod_corsa'],
-								geom_ric=None,
-								dist_ric=None,
-								id_percorso_dec=None,
-							).save()
-						if log_cities_tr:
-							LogCitiesTr(
-								data_ora_ric=v['timestamp'],
-								num_soc=v['id_veicolo'],
-								geom=punto,
-								linea=v['id_linea'],
-								dest=v['dest'],
-								cod_perc=v['id_percorso'],
-								cod_perc_alt=v['cod_perc_alt'],
-								prog_ferm=v['progressiva'],
-								dist_da_ferm=distanza_precedente,
-								ferm_da_arr=v['ferm_da_arr'],
-								cod_corsa=v['cod_corsa'],
-								geom_ric=None,
-								dist_ric=None,
-								id_percorso_dec=None,
-							).save()
-					except:
-						logging.error('Errore logging veicolo errato: %s' % traceback.format_exc())
+				# if log_cities or log_cities_tr:
+				# 	try:
+				# 		x, y = v['x'], v['y']
+				# 		if x is not None:
+				# 			punto = Point(x, y, srid=3004)
+				# 		else:
+				# 			punto = None
+				# 		if log_cities:
+				# 			LogCities(
+				# 				data_ora_ric=v['timestamp'],
+				# 				num_soc=v['id_veicolo'],
+				# 				geom=punto,
+				# 				linea=v['id_linea'],
+				# 				dest=v['dest'],
+				# 				cod_perc=v['id_percorso'],
+				# 				cod_perc_alt=v['cod_perc_alt'],
+				# 				prog_ferm=v['progressiva'],
+				# 				dist_da_ferm=distanza_precedente,
+				# 				ferm_da_arr=v['ferm_da_arr'],
+				# 				cod_corsa=v['cod_corsa'],
+				# 				geom_ric=None,
+				# 				dist_ric=None,
+				# 				id_percorso_dec=None,
+				# 			).save()
+				# 		if log_cities_tr:
+				# 			LogCitiesTr(
+				# 				data_ora_ric=v['timestamp'],
+				# 				num_soc=v['id_veicolo'],
+				# 				geom=punto,
+				# 				linea=v['id_linea'],
+				# 				dest=v['dest'],
+				# 				cod_perc=v['id_percorso'],
+				# 				cod_perc_alt=v['cod_perc_alt'],
+				# 				prog_ferm=v['progressiva'],
+				# 				dist_da_ferm=distanza_precedente,
+				# 				ferm_da_arr=v['ferm_da_arr'],
+				# 				cod_corsa=v['cod_corsa'],
+				# 				geom_ric=None,
+				# 				dist_ric=None,
+				# 				id_percorso_dec=None,
+				# 			).save()
+				# 	except:
+				# 		logging.error('Errore logging veicolo errato: %s' % traceback.format_exc())
 
 		print "Interrogazione CITIES completata. %d in percorso, %d fuori percorso, %d altro percorso, %d filtrati" % (in_percorso, fuori_percorso, altro_percorso, filtrati)
 
