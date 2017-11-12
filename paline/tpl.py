@@ -248,16 +248,21 @@ class PosizioneVeicolo(object):
 			'distanza_capolinea_iniziale': dist_inizio,
 			'distanza_capolinea_finale': percorso.dist - dist_inizio,
 			'tratto_percorso': tp,
-			'distanza_inizio_tratto': dist_inizio,
-			'distanza_fine_tratto': tp.rete_tratto_percorsi.dist - dist_inizio,
+			'distanza_inizio_tratto': self.distanza,
+			'distanza_fine_tratto': tp.rete_tratto_percorsi.dist - self.distanza,
 			'progressiva_tratto': tp.indice_tratto,
 			'progressiva_fermata': tp.indice_fermata,
 		}
 
 		if coord:
 			if self._coord is None:
-				self._coord = tp.rete_tratto_percorsi.linear_to_coord(dist_inizio)
-			out.update(self._coord)
+				self._coord = tp.rete_tratto_percorsi.linear_to_coord(self.distanza)
+			if self.coord is not None:
+				out.update(self._coord)
+			else:
+				out['x'] = None
+				out['y'] = None
+				out['azimuth'] = None
 
 		return out
 
@@ -1196,14 +1201,16 @@ class ReteVeicolo(object):
 	def __init__(self, id_veicolo, dotazioni=None):
 		object.__init__(self)
 		self.id_veicolo = id_veicolo
-		self.distanza_capolinea = None
-		self.distanza_successiva = None
-		self.tratto_percorso = None
+		self.posizione = None
+		self.posizione_interpolata = None
+		# self.distanza_capolinea = None
+		# self.distanza_successiva = None
+		# self.posizione.tratto_percorso = None
 		self.ultimo_aggiornamento = None
 		self.ultima_interpolazione = None
 		self.a_capolinea = None
 		self.orario_partenza_capolinea = None
-		self.punto = None
+		# self.punto = None
 		if dotazioni is None:
 			self.dotazioni = {
 				'pedana': False,
@@ -1215,41 +1222,42 @@ class ReteVeicolo(object):
 			self.dotazioni = dotazioni
 		self.orario_inizio_corsa = None
 		# Diagnostica problemi veicoli problematici
-		self.problematico = False
-		self.tratto_percorso_problematico = None
-		self.fuori_percorso = False
-		self.lontano_1d = False
-		self.distanza_1d = None
-		self.lontano_2d = False
-		self.distanza_2d = None
-		self.progressiva_atac = None
-		self.progressiva_ric = None
+		# self.problematico = False
+		# self.posizione.tratto_percorso_problematico = None
+		# self.fuori_percorso = False
+		# self.lontano_1d = False
+		# self.distanza_1d = None
+		# self.lontano_2d = False
+		# self.distanza_2d = None
+		# self.progressiva_atac = None
+		# self.progressiva_ric = None
 
 
 	def serializza_dinamico(self):
+		v = self.posizione.get_dettagli(True)
 		return {
 			'type': 'ReteVeicolo',
 			'id': self.id_veicolo,
-			'distanza_capolinea': self.distanza_capolinea,
-			'distanza_successiva': self.distanza_successiva,
-			'tratto_percorso': None if not self.is_valido() else self.tratto_percorso.get_id(),
+			'distanza_capolinea': v['distanza_capolinea_finale'],
+			'distanza_successiva': v['distanza_fine_tratto'],
+			'tratto_percorso': v['tratto_percorso'],
 			'ultimo_aggiornamento': self.ultimo_aggiornamento,
 			'ultima_interpolazione': self.ultima_interpolazione,
 			'a_capolinea': self.a_capolinea,
 			'dotazioni': self.dotazioni,
-			'punto': self.punto,
+			'punto': (v['x'], v['y']),
 			'orario_inizio_corsa': self.orario_inizio_corsa,
 			'orario_partenza_capolinea': self.orario_partenza_capolinea,
 		}
 
 	def log_su_db(self):
-		lon, lat = gbfe_to_wgs84(*self.punto)
-
+		v = self.posizione.get_dettagli(True)
+		lon, lat = gbfe_to_wgs84(v['x'], v['y'])
 		LogPosizioneVeicolo(
 			id_veicolo=self.id_veicolo,
-			id_percorso=self.tratto_percorso.rete_percorso.id_percorso,
+			id_percorso=v['tratto_percorso'].rete_percorso.id_percorso,
 			orario=self.ultimo_aggiornamento,
-			distanza_capolinea=self.distanza_capolinea,
+			distanza_capolinea=v['distanza_capolinea_finale'],
 			lon=lon,
 			lat=lat,
 			sistema=settings.MERCURY_GIANO,
@@ -1257,14 +1265,17 @@ class ReteVeicolo(object):
 
 
 	def deserializza_dinamico(self, rete, res):
-		self.distanza_capolinea = res['distanza_capolinea']
-		self.distanza_successiva = res['distanza_successiva']
-		self.tratto_percorso = rete.tratti_percorso[res['tratto_percorso']]
+		percorso = rete.tratti_percorso[res['tratto_percorso']].rete_percorso
+		dist = res['distanza_capolinea']
+		self.posizione = PosizioneVeicolo.from_dist(percorso, dist, True)
+		# self.distanza_capolinea = dist
+		# self.distanza_successiva = v['distanza_fine_tratto']
+		# self.posizione.tratto_percorso = rete.tratti_percorso[res['tratto_percorso']]
 		self.ultimo_aggiornamento = res['ultimo_aggiornamento']
 		self.ultima_interpolazione = res['ultima_interpolazione']
 		self.a_capolinea = res['a_capolinea']
 		self.dotazioni = res['dotazioni']
-		self.punto = res['punto']
+		# self.punto = res['punto']
 		if 'orario_inizio_corsa' in res:
 			self.orario_inizio_corsa = res['orario_inizio_corsa']
 		if 'orario_partenza_capolinea' in res:
@@ -1288,7 +1299,7 @@ class ReteVeicolo(object):
 
 		Se punto=None, calcola le coordinate in base alla posizione linearizzata
 		"""
-		self.problematico = False
+		# TODO: Modificare segnatura e aggiornare
 		percorso = tratto_percorso.rete_percorso
 
 		variata_corsa = False
@@ -1296,8 +1307,8 @@ class ReteVeicolo(object):
 		if self.orario_inizio_corsa is None:
 			variata_corsa = True
 
-		if self.tratto_percorso is not None:
-			old_percorso = self.tratto_percorso.rete_percorso
+		if self.posizione is not None:
+			old_percorso = self.posizione.tratto_percorso.rete_percorso
 			if percorso != old_percorso:
 				self.elimina_da_percorso()
 				variata_corsa = True
@@ -1312,8 +1323,8 @@ class ReteVeicolo(object):
 
 		percorso.veicoli[self.id_veicolo] = self
 		old_tratto = None
-		if self.tratto_percorso is not None:
-			old_tratto = self.tratto_percorso
+		if self.posizione.tratto_percorso is not None:
+			old_tratto = self.posizione.tratto_percorso
 			if tratto_percorso != old_tratto and self.id_veicolo in old_tratto.veicoli:
 				del old_tratto.veicoli[self.id_veicolo]
 		if old_tratto != tratto_percorso:
@@ -1321,52 +1332,39 @@ class ReteVeicolo(object):
 
 		self.distanza_capolinea = distanza_capolinea
 		self.distanza_successiva = distanza_successiva
-		self.tratto_percorso = tratto_percorso
+		self.posizione.tratto_percorso = tratto_percorso
 		self.ultimo_aggiornamento = datetime.now() if ultimo_aggiornamento is None else ultimo_aggiornamento
 		self.ultima_interpolazione = self.ultimo_aggiornamento
 		self.a_capolinea = a_capolinea
 		self.orario_partenza_capolinea = orario_partenza_capolinea
 		if punto is None:
-			self.calcola_punto()
+			self.get_punto()
 		else:
 			self.punto = punto
 		if propaga:
 			self.propaga_su_fermate()
 
 	def aggiorna_posizione_interpolata(self, tratto_percorso, distanza_precedente, ultima_interpolazione):
+		# TODO: Rivedere
 		tpi = tratto_percorso.rete_tratto_percorsi
 		self.distanza_successiva = tpi.dist - distanza_precedente
 		percorso = tratto_percorso.rete_percorso
 		self.distanza_capolinea = percorso.dist - tratto_percorso.s.distanza_da_partenza + distanza_precedente
-		if self.tratto_percorso != tratto_percorso:
-			del self.tratto_percorso.veicoli[self.id_veicolo]
-			self.tratto_percorso.veicoli[self.id_veicolo] = self
+		if self.posizione.tratto_percorso != tratto_percorso:
+			del self.posizione.tratto_percorso.veicoli[self.id_veicolo]
+			self.posizione.tratto_percorso.veicoli[self.id_veicolo] = self
 		self.ultima_interpolazione = ultima_interpolazione
-		self.calcola_punto()
+		self.get_punto()
 
 	def get_punto(self):
 		"""
 		A partire dalla posizione linearizzata, calcola le coordinate occupate dal veicolo
 		"""
-		tpi = self.tratto_percorso.rete_tratto_percorsi
-		d = tpi.dist - self.distanza_successiva
-		op = None
-		mp = None
-		for p in tpi.punti:
-			if op is not None:
-				dp = geomath.distance(p, op)
-				if d < dp:
-					frac = d / dp
-					mp = (op[0] + frac * (p[0] - op[0]), op[1] + frac * (p[1] - op[1]))
-					break
-				d -= dp
-			op = p
-		if mp is None:
-			mp = op
-		return mp
+		v = self.posizione.get_dettagli()
+		return v['x'], v['y']
 
-	def calcola_punto(self):
-		self.punto = self.get_punto()
+	# def calcola_punto(self):
+	# 	self.punto = self.get_punto()
 
 	def reset_fermate(self, a_fermata=None):
 		"""
@@ -1375,7 +1373,7 @@ class ReteVeicolo(object):
 		Se non è indicata una fermata, cancella su tutto il percorso.
 		"""
 		if a_fermata is None:
-			a_fermata = self.tratto_percorso.rete_percorso.tratti_percorso[-1].t
+			a_fermata = self.posizione.tratto_percorso.rete_percorso.tratti_percorso[-1].t
 		while a_fermata is not None:
 			a_fermata.elimina_veicolo(self)
 			tp = a_fermata.tratto_percorso_precedente
@@ -1386,15 +1384,15 @@ class ReteVeicolo(object):
 				a_fermata = None
 
 	def elimina_da_percorso(self):
-		if self.tratto_percorso is not None:
-			old_percorso = self.tratto_percorso.rete_percorso
+		if self.posizione.tratto_percorso is not None:
+			old_percorso = self.posizione.tratto_percorso.rete_percorso
 			self.reset_fermate()
 			if self.id_veicolo in old_percorso.veicoli:
 				del old_percorso.veicoli[self.id_veicolo]
-			self.tratto_percorso = None
+			self.posizione.tratto_percorso = None
 
 	def propaga_su_fermate(self):
-		tpo = self.tratto_percorso
+		tpo = self.posizione.tratto_percorso
 		self.reset_fermate(tpo.s)
 		numero = 0
 		tempo = self.orario_partenza_capolinea if self.a_capolinea else datetime.now()
@@ -1407,7 +1405,8 @@ class ReteVeicolo(object):
 			velocita = tpi.get_velocita()
 			if tempo is not None and velocita > 0:
 				if numero == 1:
-					d = self.distanza_successiva
+					v = self.posizione.get_dettagli()
+					d = v['distanza_fine_tratto']
 					if d < 0:
 						d = dist / 2
 					tempo = tempo + timedelta(seconds=(d / velocita))
@@ -1418,34 +1417,33 @@ class ReteVeicolo(object):
 			fermata.add_arrivo(self, tempo, numero)
 			tpo = fermata.tratto_percorso_successivo
 
-
 	def is_valido(self):
-		if self.tratto_percorso is None:
+		if self.posizione.tratto_percorso is None:
 			return False
 		if self.ultimo_aggiornamento is None or datetime.now() - self.ultimo_aggiornamento > TIMEOUT_VALIDITA_VEICOLO:
 			return False
 		return True
 
-	def set_problematico(
-		self,
-		fuori_percorso=False,
-		lontano_2d=False,
-		distanza_2d=None,
-		lontano_1d=False,
-		distanza_1d=None,
-		progressiva_atac=None,
-		progressiva_ric=None,
-	):
-		self.problematico = True
-		self.fuori_percorso = fuori_percorso
-		self.lontano_2d = lontano_2d
-		self.distanza_1d = distanza_1d
-		self.distanza_2d = distanza_2d
-		self.lontano_1d = lontano_1d
-		self.tratto_percorso_problematico = self.tratto_percorso
-		self.progressiva_atac = progressiva_atac
-		self.progressiva_ric = progressiva_ric
-		self.elimina_da_percorso()
+	# def set_problematico(
+	# 	self,
+	# 	fuori_percorso=False,
+	# 	lontano_2d=False,
+	# 	distanza_2d=None,
+	# 	lontano_1d=False,
+	# 	distanza_1d=None,
+	# 	progressiva_atac=None,
+	# 	progressiva_ric=None,
+	# ):
+	# 	self.problematico = True
+	# 	self.fuori_percorso = fuori_percorso
+	# 	self.lontano_2d = lontano_2d
+	# 	self.distanza_1d = distanza_1d
+	# 	self.distanza_2d = distanza_2d
+	# 	self.lontano_1d = lontano_1d
+	# 	self.tratto_percorso_problematico = self.tratto_percorso
+	# 	self.progressiva_atac = progressiva_atac
+	# 	self.progressiva_ric = progressiva_ric
+	# 	self.elimina_da_percorso()
 
 	def get_arrivi(self):
 		"""
@@ -1454,8 +1452,9 @@ class ReteVeicolo(object):
 		out = {}
 		n = datetime.now()
 		if not self.a_capolinea:
-			t = self.tratto_percorso
-			d = self.distanza_successiva
+			t = self.posizione.tratto_percorso
+			v = self.posizione.get_dettagli()
+			d = v['distanza_fine_tratto']
 			dt = (n - self.ultimo_aggiornamento).seconds
 			# Scalo
 			while t is not None and dt > 0:
@@ -1476,8 +1475,9 @@ class ReteVeicolo(object):
 			# A capolinea
 			if self.orario_partenza_capolinea is None:
 				return {}
-			t = self.tratto_percorso
-			d = self.distanza_successiva
+			t = self.posizione.tratto_percorso
+			v = self.posizione.get_dettagli()
+			d = v['distanza_fine_tratto']
 			if self.orario_partenza_capolinea > n:
 				tempo = (self.orario_partenza_capolinea - n).seconds
 			else:
@@ -1507,25 +1507,28 @@ class ReteVeicolo(object):
 		return out
 
 	def get_info(self, get_arrivi=True, get_distanza=False):
+		v = self.posizione.get_dettagli(True)
 		out = {
 			'id_veicolo': self.id_veicolo,
-			'id_prossima_palina': self.tratto_percorso.t.rete_palina.id_palina if not self.a_capolinea else self.tratto_percorso.s.rete_palina.id_palina,
+			'id_prossima_palina': self.posizione.tratto_percorso.t.rete_palina.id_palina if not self.a_capolinea else self.posizione.tratto_percorso.s.rete_palina.id_palina,
 			'self.a_capolinea': self.a_capolinea,
 			'a_capolinea': self.a_capolinea,
-			'x': self.punto[0],
-			'y': self.punto[1],
+			'x': v['x'],
+			'y': v['y'],
 			'orario_partenza_capolinea': self.orario_partenza_capolinea,
 		}
 		if get_distanza:
-			out['distanza_capolinea'] = self.distanza_capolinea
+			out['distanza_capolinea'] = v['distanza_capolinea_finale']
 		if get_arrivi:
 			out['arrivi'] = self.get_arrivi()
 		return out
+
 
 def get_parametri_costo_pedonale(a0, a1, exp):
 	c0 = a0
 	c1 = (a1 - c0) / math.pow(1000, exp)
 	return (c0, c1, exp)
+
 
 class ReteZtl(object):
 	def __init__(self, codice, nome, orari):
