@@ -47,6 +47,7 @@ from parcheggi import models as parcheggi
 import os, os.path
 import settings
 import tratto
+import atac_website
 from django import db
 from django.db.models import Avg, Max, Min, Count, F
 import os, os.path
@@ -198,11 +199,12 @@ class PosizioneVeicolo(object):
 			tp = tratto_successivo
 
 	@classmethod
-	def from_fermata(cls, percorso, indice_fermata, dist_fermata, rev=False):
+	def from_fermata(cls, percorso, indice_fermata, dist_fermata=None, rev=False):
 		"""
 		Inizializza una posizione veicolo a partire da numero e distanza della fermata
 
 		indice_fermata: indice fermata non soppressa, a partire da 0
+		dist_fermata: distanza dalla fermata; se None, posiziona nel punto medio
 		Se rev, conta all'indietro dal capolinea di destinazione
 
 		:return: Oggetto PosizioneVeicolo
@@ -211,6 +213,8 @@ class PosizioneVeicolo(object):
 			n_tratto = percorso.map_fermate_tratti[indice_fermata]
 			tp = percorso.tratti_percorso[n_tratto]
 			dist = tp.rete_tratto_percorsi.dist
+			if dist_fermata is None:
+				dist_fermata = dist / 2
 			while dist < dist_fermata:
 				dist_fermata -= dist
 				tp = tp.t.tratto_percorso_successivo
@@ -221,10 +225,13 @@ class PosizioneVeicolo(object):
 			n_tratto = percorso.map_fermate_tratti[indice_fermata + 1]
 			tp = percorso.tratti_percorso[n_tratto - 1]
 			dist = tp.rete_tratto_percorsi.dist
+			if dist_fermata is None:
+				dist_fermata = dist / 2
 			while dist < dist_fermata:
 				dist_fermata -= dist
 				tp = tp.t.tratto_percorso_precedente
-			return PosizioneVeicolo(tp, tp.dist - dist_fermata)
+				dist = tp.rete_tratto_percorsi.dist
+			return PosizioneVeicolo(tp, dist - dist_fermata)
 
 	def get_dettagli(self, coord=False):
 		"""
@@ -272,7 +279,7 @@ class PosizioneVeicolo(object):
 		"""
 		Restituisce la differenza di posizione fra due posizioni del medesimo percorso, in metri
 		"""
-		assert self.tratto_percorso.percorso is other.tratto_percorso.percorso
+		assert self.tratto_percorso.rete_percorso is other.tratto_percorso.rete_percorso
 		dist_inizio_1 = self.tratto_percorso.s.distanza_da_partenza + self.distanza
 		dist_inizio_2 = other.tratto_percorso.s.distanza_da_partenza + other.distanza
 		return dist_inizio_1 - dist_inizio_2
@@ -519,7 +526,6 @@ class RetePercorso(object):
 					tempo=tempo
 				).save()
 
-
 	def stampa_tempi(self):
 		print " *** Tempi percorso %s (linea %s) ***" % (self.id_percorso, self.id_linea)
 		i = 0
@@ -632,6 +638,16 @@ class RetePercorso(object):
 			# 			da_cancellare.append(a)
 			# 	for a in da_cancellare:
 			# 		arrivi.remove(a)
+
+	def elimina_tutti_veicoli(self):
+		"""
+		Elimina tutti i veicoli dal percorso
+
+		:return:
+		"""
+		vs = self.veicoli.values()
+		for v in vs:
+			v.elimina_da_percorso()
 
 	def stato(self):
 		"""
@@ -1097,7 +1113,7 @@ class ReteFermata(object):
 				secondi = 0
 		if secondi > (10 + 4 * dist_fermate) * 60:
 			secondi = -1
-		percorso = veicolo.tratto_percorso.rete_percorso
+		percorso = veicolo.posizione.tratto_percorso.rete_percorso
 		self.arrivi.append({
 			'tempo': secondi,
 			'id_percorso': percorso.id_percorso,
@@ -1242,7 +1258,6 @@ class ReteVeicolo(object):
 		# self.progressiva_atac = None
 		# self.progressiva_ric = None
 
-
 	def serializza_dinamico(self):
 		v = self.posizione.get_dettagli(True)
 		return {
@@ -1272,7 +1287,6 @@ class ReteVeicolo(object):
 			lat=lat,
 			sistema=settings.MERCURY_GIANO,
 		).save()
-
 
 	def deserializza_dinamico(self, rete, res):
 		percorso = rete.tratti_percorso[res['tratto_percorso']].rete_percorso
@@ -1384,12 +1398,12 @@ class ReteVeicolo(object):
 				a_fermata = None
 
 	def elimina_da_percorso(self):
-		if self.posizione.tratto_percorso is not None:
+		if self.posizione is not None:
 			old_percorso = self.posizione.tratto_percorso.rete_percorso
 			self.reset_fermate()
 			if self.id_veicolo in old_percorso.veicoli:
 				del old_percorso.veicoli[self.id_veicolo]
-			self.posizione.tratto_percorso = None
+			self.posizione = None
 
 	def propaga_su_fermate(self):
 		tpo = self.posizione.tratto_percorso
@@ -2343,7 +2357,8 @@ class Rete(object):
 
 	def get_veicoli_percorso(self, id_percorso):
 		percorso = self.percorsi[id_percorso]
-		percorso.aggiorna_posizione_veicoli()
+		# percorso.aggiorna_posizione_veicoli()
+		# test_viaggiaconatac(self, percorso)
 		veicoli = []
 		for id_veicolo in percorso.veicoli:
 			v = percorso.veicoli[id_veicolo]
@@ -3922,6 +3937,56 @@ def log_percorso_cities(id_percorso, id_linea, riconosciuto):
 		).save()
 	else:
 		percorsi_cities[id_percorso][1] += 1
+
+
+def viaggiaconatac_to_rete(rete, id_palina, arrivi):
+	p = rete.paline[id_palina]
+	# Associo ad ogni linea che fa capolinea ALLA SUCCESSIVA
+	# il percorso con più veicoli
+	# (e, in subordine, quello con il carteggio più semplice
+	# -- da fare, serve accedere in modo efficiente al carteggio)
+	percorsi_linea = {}
+	for id_fermata in p.fermate:
+		f = p.fermate[id_fermata]
+		if f.tratto_percorso_successivo is not None and f.tratto_percorso_successivo.t.is_capolinea():
+			pe = f.rete_percorso
+			l = pe.id_linea
+			if l in arrivi:
+				if l in percorsi_linea:
+					pe_old = percorsi_linea[l]
+					vn = len(pe.veicoli)
+					vn_old = len(pe_old.veicoli)
+					if vn > vn_old:  # or (vn == vn_old and ...carteggio...)
+						percorsi_linea[l] = pe
+				else:
+					percorsi_linea[l] = pe
+
+	# Per ogni linea di cui si hanno risultati,
+	# sostituisco i veicoli del percorso "principale"
+	for l in percorsi_linea:
+		pe = percorsi_linea[l]
+		pe.elimina_tutti_veicoli()
+		i = 0
+		for dist in arrivi[l]:
+			i += 1
+			id_veicolo = "{}_{}".format(l, i)
+			if dist is not None:
+				posizione = PosizioneVeicolo.from_fermata(pe, dist, rev=True)
+				rete.aggiorna_posizione_bus(id_veicolo, posizione, False)
+			else:
+				posizione = PosizioneVeicolo(pe.tratti_percorso[0], 0)
+				rete.aggiorna_posizione_bus(id_veicolo, posizione, True)
+
+
+
+def test_viaggiaconatac(rete, percorso):
+	id_palina = percorso.tratti_percorso[-1].s.rete_palina.id_palina
+	print "Arrivi palina {}".format(id_palina)
+	xml = atac_website.get_viaggiaconatac(id_palina)
+	arrivi = atac_website.parse_viaggiaconatac(xml)
+	print "Test Viaggia con Atac"
+	pprint(arrivi)
+	viaggiaconatac_to_rete(rete, id_palina, arrivi)
 
 
 def grafo2shape(g, path, filename):

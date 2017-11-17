@@ -381,10 +381,13 @@ def _orari(id_percorso, data=None, day_only=True):
 	ctx['note_no_orari'] = percorso.note_no_orari
 	return ctx
 
+
 def trovalinea_orari(request, token, id_percorso, data=None):
 	return _orari(id_percorso, data, True)
 
+
 TrovalineaOrariWS = paline7.metodo("Trovalinea.Orari")(trovalinea_orari)
+
 
 def _percorso(request, id_percorso, ctx=None, id_veicolo=None, giorno_partenze=None, as_service=False):
 	if ctx is None:
@@ -453,6 +456,7 @@ def _percorso(request, id_percorso, ctx=None, id_veicolo=None, giorno_partenze=N
 	except Percorso.DoesNotExist:
 		return TemplateResponse(request, 'messaggio.html', {'msg': _("Il percorso %s non esiste") % id_percorso})
 
+
 def percorso(request, id_percorso, ctx=None):
 	if ctx is None:
 		ctx = {}
@@ -475,6 +479,7 @@ def percorso(request, id_percorso, ctx=None):
 	else:
 		giorno = None
 	return _percorso(request, id_percorso, ctx, id_veicolo, giorno)
+
 
 def percorso_per_json(request, id_percorso, id_veicolo=None):
 	giorni = []
