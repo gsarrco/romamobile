@@ -29,6 +29,7 @@ from servizi.utils import datetime2time
 from django.db.models import Q
 from mercury.models import *
 import traceback
+import sys
 
 config = {
 	'allow_public_attrs': True,
@@ -85,7 +86,7 @@ class Command(BaseCommand):
 						j.action = 'S'
 					j.save()
 
-					command = "python manage.py run_job %s" % j.function
+					command = "%s manage.py run_job %s" % (sys.executable, j.function)
 					print "Lancio %s" % j.function
 					print subprocess.Popen(command.split())
 
