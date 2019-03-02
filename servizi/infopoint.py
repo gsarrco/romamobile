@@ -36,9 +36,15 @@ from pprint import pprint
 from paline import models as paline
 from risorse import models as risorse
 from mercury.models import Mercury
+import requests
 import traceback
 
-DEFAULT_GEOCODER = 'google'
+DEFAULT_GEOCODER = 'esri'
+ESRI_GEOCODER_MIN_SCORE = 60
+ESRI_GEOCODER_MIN_DELTA = 5
+ESRI_GEOCODER_MAX_DELTA = 8
+ESRI_GEOCODER_URL_PREFIX = r'http://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer'
+ESRI_GEOCODER_URL_PREFIX = r'http://geocoding.romamobilita.it/full'
 
 map_width = 200
 map_height = 150
@@ -203,6 +209,62 @@ def geocode_place_infotpdati(request, composite_address):
 	return out
 
 
+def geocode_place_esri(request, composite_address):
+	location = json.dumps({
+		"x": 41.892055,
+		"y": 12.483559,
+		"spatialReference": {
+			"wkid": 4326,
+		},
+	})
+	res = requests.get(
+		ESRI_GEOCODER_URL_PREFIX + '/findAddressCandidates',
+		params={
+			'SingleLine': composite_address,
+			'forStorage': 'false',
+			'location': location,
+			'f': 'pjson',
+		}
+	)
+	print(res.status_code)
+	print(res.text)
+	res = res.json()['candidates']
+	# cs = [(c['score'], c['address'], c['location']['x'], c['location']['y']) for c in res['candidates'] if c['score'] >= ESRI_GEOCODER_MIN_SCORE]
+	res.sort(key=lambda c: c['score'], reverse=True)
+	single = True
+	if len(res) == 0:
+		return {
+			'stato': 'Error',
+		}
+	if len(res) > 1:
+		single = False
+		s0 = res[0]['score']
+		s1 = res[1]['score']
+		if (s0 == 100 and s1 < 100) or s0 - s1 > ESRI_GEOCODER_MIN_DELTA:
+			single = True
+	if single:
+		r = res[0]
+		loc = r['location']
+		lng, lat = loc['x'], loc['y']
+		x, y = wgs84_to_gbfe(lng, lat)
+		return {
+			'stato': 'OK',
+			'indirizzo': r['address'],
+			'ricerca': r['address'],
+			'streetno': '',
+			'address': r['address'],
+			'place': '',
+			'y': y,
+			'x': x,
+			'lng': lng,
+			'lat': lat,
+			'nnp': '',
+		}
+	return {
+		'stato': 'Ambiguous',
+		'indirizzi': [r['address'] for r in res],
+	}
+
 
 def geocode_place_google(request, composite_address):
 	# print "Geocoding con GOOGLE"
@@ -325,7 +387,9 @@ def geocode_place_infotp(request, composite_address):
 def geocode_place_gbfe_only(request, address, geocoder=DEFAULT_GEOCODER):
 	if len(paline.Linea.objects.by_date().filter(id_linea=address.strip())) > 0:
 		return {'stato': 'Error'}
-	if geocoder == 'infotpdati':
+	if geocoder == 'esri':
+		gc = geocode_place_esri
+	elif geocoder == 'infotpdati':
 		gc = geocode_place_infotpdati
 	elif geocoder == 'google':
 		gc = geocode_place_google
@@ -398,7 +462,7 @@ def geocode_place(request, address, geocoder=DEFAULT_GEOCODER):
 			indirizzo = ''
 		geom = r.geom
 		x, y = r.geom.x, r.geom.y
-		lng, lat = gbfe_to_wgs84(x, y)
+		# lng, lat = gbfe_to_wgs84(x, y)
 		return {
 			'stato': 'OK',
 			'address': address,
