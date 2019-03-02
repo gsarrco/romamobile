@@ -22,9 +22,12 @@
 import marisa_trie as trie
 from collections import defaultdict
 from pprint import pprint
+import requests
+from infopoint import ESRI_GEOCODER_URL_PREFIX
+import json
 import re
 
-class Autocomplete(object):
+class AutocompleteInternal(object):
 	def __init__(self, resources, min_len=3, delimiter=" |/|'"):
 		"""
 		resources: list of pairs (item_data, resource)
@@ -65,6 +68,38 @@ class Autocomplete(object):
 				else:
 					res.intersection_update(resource_indexes)
 		return [self.resources[i] for i in res]
+
+
+class AutocompleteEsri(object):
+	def __init__(self, resources, min_len=3, delimiter=" |/|'"):
+		pass
+
+	def find(self, lookup):
+		"""
+		Find all resources containing a prefix of each word in lookup
+
+		Return a list of pairs (item_data, resource)
+		"""
+		url = ESRI_GEOCODER_URL_PREFIX + '/suggest'
+		location = json.dumps({
+			"x": 41.892055,
+			"y": 12.483559,
+			"spatialReference": {
+				"wkid": 4326,
+			},
+		})
+		res = requests.get(url, params={
+			"text": lookup,
+			"location": location,
+		})
+		out = []
+		for elem in res.json()['suggestions']:
+			t = elem['text']
+			out.append((-1, t))
+		return out
+
+
+Autocomplete = AutocompleteEsri
 
 
 def find_in_list(lookup, resources, min_length=3, delimiter=" |/|'"):
