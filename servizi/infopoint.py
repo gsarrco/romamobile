@@ -234,7 +234,7 @@ def geocode_place_esri(request, composite_address):
 		single = False
 		s0 = res[0]['score']
 		s1 = res[1]['score']
-		if (s0 == 100 and s1 < 100) or s0 - s1 > ESRI_GEOCODER_MIN_DELTA:
+		if s0 == 100 or s0 - s1 > ESRI_GEOCODER_MIN_DELTA:
 			single = True
 	if single:
 		r = res[0]
