@@ -44,7 +44,6 @@ ESRI_GEOCODER_MIN_SCORE = 60
 ESRI_GEOCODER_MIN_DELTA = 5
 ESRI_GEOCODER_MAX_DELTA = 8
 ESRI_GEOCODER_URL_PREFIX = r'http://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer'
-ESRI_GEOCODER_URL_PREFIX = r'http://geocoding.romamobilita.it/full'
 
 map_width = 200
 map_height = 150
@@ -210,24 +209,19 @@ def geocode_place_infotpdati(request, composite_address):
 
 
 def geocode_place_esri(request, composite_address):
-	location = json.dumps({
-		"x": 41.892055,
-		"y": 12.483559,
-		"spatialReference": {
-			"wkid": 4326,
-		},
-	})
 	res = requests.get(
 		ESRI_GEOCODER_URL_PREFIX + '/findAddressCandidates',
 		params={
 			'SingleLine': composite_address,
 			'forStorage': 'false',
-			'location': location,
 			'f': 'pjson',
+			'countryCode': 'IT',
+			'searchExtent': '12.37602,42.00589,12.6163,41.7650',
+			'location': '12.483559,41.892055'
 		}
 	)
-	print(res.status_code)
-	print(res.text)
+	# print(res.status_code)
+	# print(res.text)
 	res = res.json()['candidates']
 	# cs = [(c['score'], c['address'], c['location']['x'], c['location']['y']) for c in res['candidates'] if c['score'] >= ESRI_GEOCODER_MIN_SCORE]
 	res.sort(key=lambda c: c['score'], reverse=True)
