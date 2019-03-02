@@ -81,18 +81,16 @@ class AutocompleteEsri(object):
 		Return a list of pairs (item_data, resource)
 		"""
 		url = ESRI_GEOCODER_URL_PREFIX + '/suggest'
-		location = json.dumps({
-			"x": 41.892055,
-			"y": 12.483559,
-			"spatialReference": {
-				"wkid": 4326,
-			},
-		})
 		res = requests.get(url, params={
 			"text": lookup,
-			"location": location,
+			'countryCode': 'IT',
+			'searchExtent': '12.37602,42.00589,12.6163,41.7650',
+			'location': '12.483559,41.892055',
+			"f": "pjson",
 		})
 		out = []
+		print res.status_code
+		print res.text
 		for elem in res.json()['suggestions']:
 			t = elem['text']
 			out.append((-1, t))
