@@ -5,6 +5,86 @@
 {% block NavigationTop %}
 {% endblock %}
 
+{% block InternalStyle %}
+	{% if mar_style_transition %}
+		<style>
+			@keyframes mar_transition {
+			0% {
+					background-color: #13985F;
+					color: #ffffff;
+			}
+			60% {
+					background-color: #13985F;
+					color: #ffffff;
+			}
+			100% {
+					background-color: #FFFFFF;
+					color: #000000;
+			}
+		}
+		@keyframes mar_transition_h1 {
+			0% {
+				color: white;
+				background-color: #861128;
+			}
+			60% {
+				color: white;
+				background-color: #861128;
+			}
+			100% {
+				background-color: #f84f00;
+				color: white;
+			}
+		}
+		@keyframes mar_transition_h2 {
+			0% {
+				color: #8e001c;
+				background-color: white;
+				filter: alpha(opacity=70);
+				opacity: .7;
+			}
+			60% {
+				color: #8e001c;
+				background-color: white;
+				filter: alpha(opacity=70);
+				opacity: .7;
+			}
+			100% {
+				color: #ffffff;
+				background-color: #888888;
+				filter: alpha(opacity=70);
+				opacity: .7;
+			}
+		}
+		@keyframes mar_transition_a {
+			0% {
+				color: #FFFFFF;
+			}
+			60% {
+				color: #FFFFFF;
+			}
+			100% {
+				color: #f84f00;;
+			}
+		}
+
+
+		body, #main {
+			animation: 8s ease-out 0s 1 mar_transition;
+		}
+		h1 {
+			animation: 8s ease-out 0s 1 mar_transition_h1;
+		}
+		h2 {
+			animation: 8s ease-out 0s 1 mar_transition_h2;
+		}
+		.menulink, a {
+			animation: 8s ease-out 0s 1 mar_transition_a;
+		}
+		</style>
+	{% endif %}
+{% endblock %}
+
 {% block content %}
 	<div class="right-head">
 		{% if not request.user|in_group:"readonly" %}
