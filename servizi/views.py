@@ -326,6 +326,10 @@ def servizi_new(request):
 
 	error_messages = []
 	error_fields = []
+
+	if 'mar_transition_done' not in request.session:
+		request.session['mar_transition_done'] = True
+		ctx['mar_style_transition'] = True
 		
 	if f.is_bound and 'Avanzate' in request.GET:
 		cd = f.data
