@@ -39,7 +39,7 @@
 				})})
 			</script>
 		{% endif %}
-		{% if platform == 'Android' %}
+		{% if not mar_style_transition and platform == 'Android' %}
 			<link rel="stylesheet" href="/xhtml/s/sb/sb.css" type="text/css" media="screen">
 			<meta name="google-play-app" content="app-id=it.skeed.romamobile">
 			<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8/jquery.min.js"></script>
